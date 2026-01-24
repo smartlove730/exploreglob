@@ -43,57 +43,58 @@ class GenerateBlogs implements ShouldQueue
         set_time_limit(30000);
 
         $categories = Category::with('country')->where('country_id', $this->countryId)->where('id', $this->categoryID)->get();
-
-        $models = ['gemini-3-flash','gemini-2.5-flash-lite','gemini-2.5-flash','gemma-3-12b'];
-
+ 
         foreach ($categories as $category) {
+        
+        $PromptGenforcat = "Generate a prompt for blog of trending article genration on the topic of {$category->name}. output should be in json form as following format.
+        {
+        'prompt':''
+        }";
+
+         // Call Gemini API to generate prompt
+            $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
             
-            Log::info('Starting blog generation', [
-                'category_id' => $category->id,
-                'category_name' => $category->name,
-                'country_id' => $this->countryId
-            ]);
+            if (!$apiKey) {
+                Log::error('Gemini API key not configured');
+                throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
+            }
 
-        $prompt = "You are a content generator for a modern blog platform also research for high performing keywords bogs are mainly for whole world not for specific country so generalize accordingly.
-Generate one complete blog article with the following structure and style:
-Topic: {$category->name}
+            $model = "gemma-3-27b-it";
+            $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+           
+            $result = Http::timeout(180)
+                ->withHeaders([
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($apiUrl, [
+                    'contents' => [['parts' => [['text' => $PromptGenforcat]]]]
+                ]);
 
-Main Blog Data:
+            if (!$result->successful()) {
+                Log::error('AI API request for prompt generation failed', [
+                    'status' => $result->status(),
+                    'response' => $result->body()
+                ]);
+                throw new \Exception('AI API request for prompt generation failed');
+            }
 
-title: A catchy, SEO-friendly blog title.
+            $responseJson = $result->json();
+            $promptData = $this->normalizeAiResponse($responseJson);
+            
+            $prompt1 = $promptData['prompt'] ?? null;
 
-subtitle: A one-sentence summary tagline of the blog.
+            if (!$prompt1) {
+                Log::error('Failed to generate prompt from AI response', [
+                    'response' => $responseJson
+                ]);
+                throw new \Exception('Failed to generate prompt from AI response');
+            }
 
-author: full name of Author.
+            // Now use the generated prompt to create the blog content
 
-published_date: In YYYY-MM-DD format.
 
-read_time: Estimated reading time in minutes.
-
-cover_image: A URL for a representative image from Unsplash (related to the topic) Check before using image it should not show 404.
-
-Blog Content Sections:
-Generate an array called sections, each with:
-
-heading: A subheading for that part of the article.
-
-content: 3-5 descriptive paragraphs of natural language text (Markdown allowed).
-
-Social Share Info:
-
-hashtags: Up to 5 relevant hashtags (no “#” symbol).
-
-Related Blogs:
-Create an array called related_blogs with 3 blog suggestions, each containing:
-
-title: Related blog title.
-
-excerpt: 1 short sentence summary.
-
-image: Unsplash image URL related to the topic.
-
-slug: A URL-friendly slug (e.g. 'minimalist-design-tips').
-
+        $prompt = $prompt1 ."
+Give related image generation prompt for the blog article.
 Format your response strictly as JSON using this exact schema:
 
 {
@@ -107,24 +108,17 @@ Format your response strictly as JSON using this exact schema:
   'seo_description': '',
   'json_schema': '',
   'seo_keywords': '',
+  'image_gen_prompt_for_related_blog': '',
   'sections': [
     {
       'heading': '',
       'content': ''
     }
   ],
-  'hashtags': [],
-  'related_blogs': [
-    {
-      'title': '',
-      'excerpt': '',
-      'image': '',
-      'slug': ''
-    }
-  ]
+  'hashtags': [] 
 }
 The content should sound insightful, helpful, and written by a human, suitable for a design or technology blog. Use realistic and educational examples, not overly generic text.";
-            
+          
             // Get API key from config/environment
             $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
             
@@ -133,7 +127,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
                 throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
             }
 
-            $model = config('gemini.model', 'gemini-2.0-flash-exp');
+              $model = config('gemini.model', 'gemma-3-27b');
             $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
             
             $maxRetries = 3;
@@ -142,7 +136,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
             
             do {
                 try {
-                    Log::info("Attempting AI generation (attempt {$retryCount + 1}/{$maxRetries})");
+                 
                     
                     $result = Http::timeout(180)
                         ->withHeaders([
@@ -196,7 +190,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
                 throw new \Exception('Failed to generate valid blog content from AI');
             }
  
- 
+  
     
           $blog = Blog::create([
     'title'           => $aiRaw['title'] ?? 'Untitled',
@@ -211,6 +205,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
         'sections'       => $aiRaw['sections'] ?? [],
         'hashtags'       => $aiRaw['hashtags'] ?? [],
         'related_blogs'  => $aiRaw['related_blogs'] ?? [],
+        'image_gen_prompt_for_related_blog'  => $aiRaw['image_gen_prompt_for_related_blog'] ?? [],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
 
     // You can still extract a short excerpt dynamically
@@ -297,6 +292,9 @@ The content should sound insightful, helpful, and written by a human, suitable f
         'sections' => $data['sections'] ?? [],
         'hashtags' => $data['hashtags'] ?? [],
         'related_blogs' => $data['related_blogs'] ?? [],
+        'prompt' => $data['prompt'] ?? '',
+        'image_gen_prompt_for_related_blog' => $data['image_gen_prompt_for_related_blog'] ??''
+
     ];
 }
 

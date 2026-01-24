@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
-use App\Models\Blog;
-
+use App\Models\Blog; 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 class CategoryController extends Controller
 {
     public function index()
@@ -27,4 +30,15 @@ class CategoryController extends Controller
 
         return view('categories.show', compact('category', 'blogs'));
     }
+
+  public function syncCategoryImages()
+{
+    // Dispatch the job to the queue
+    \App\Jobs\SyncCategoryImagesJob::dispatch();
+
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Image synchronization started in the background.'
+    ]);
+}
 }

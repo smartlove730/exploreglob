@@ -133,22 +133,16 @@
 </section>
 
 <!-- Related Blogs -->
-@if(!empty($relatedBlogs))
+@if(!empty($related))
 <section class="related-blogs-section">
     <div class="container">
         <h2 class="section-title text-center mb-5">Related Articles</h2>
         <div class="row g-4">
-            @foreach($relatedBlogs as $index => $related)
+            @foreach($related as $index => $related)
                 <div class="col-md-4">
                     <div class="related-blog-card">
-                        @php
-                            $relatedImage = $related['image'] ?? null;
-                            if (empty($relatedImage)) {
-                                $text = urlencode(substr($related['title'] ?? 'Image', 0, 15));
-                                $relatedImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%236366f1' width='100%25' height='100%25'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial,sans-serif' font-size='24' font-weight='600'%3E" . $text . "%3C/text%3E%3C/svg%3E";
-                            }
-                        @endphp
-                        <img src="{{ $relatedImage }}" 
+                    
+                        <img src="{{ asset( $randomImage) }}" 
                              class="card-img-top" 
                              alt="{{ $related['title'] ?? 'Related' }}"
                              style="height: 220px; object-fit: cover;" loading="lazy"

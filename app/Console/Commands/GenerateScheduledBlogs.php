@@ -106,7 +106,7 @@ class GenerateScheduledBlogs extends Command
             }
         }
 
-        $this->info("Queued {$categories->count() * $limit} blog(s) for {$categories->count()} category/categories");
+        
     }
 
     /**
