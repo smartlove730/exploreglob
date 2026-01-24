@@ -3,6 +3,7 @@
 @section('content')
     
 @php
+    use Illuminate\Support\Facades\Storage;
     // Decode the JSON content from DB
     $content = json_decode($blog->content ?? '{}', true);
 
@@ -24,7 +25,16 @@
     }
     
 @endphp
+     @php
+    
 
+    $categoryFolder = 'categories/' . $blog->category->name ;
+    $images = Storage::disk('public')->files($categoryFolder);
+
+    $randomImage = count($images) > 0
+        ? asset('storage/' . $images[array_rand($images)])
+        : asset('images/default-category.webp'); // fallback image
+@endphp
 <!-- Blog Header Section -->
 <section class="blog-header-section">
     <div class="container">
@@ -52,13 +62,13 @@
 
 <!-- Cover Image -->
 
-@if($coverImage)
+@if($randomImage)
 <div class="container mt-4 mb-5">
     <div class="row">
         <div class="col-lg-10 mx-auto">
-            <img src="{{ asset( $coverImage) }}" 
+            <img src="{{ asset( $randomImage) }}" 
                  alt="{{ $blog->title }}" 
-                 class="blog-cover-image"
+                 class="blog-cover-image" loading="lazy"
                  >
         </div>
     </div>
@@ -141,7 +151,7 @@
                         <img src="{{ $relatedImage }}" 
                              class="card-img-top" 
                              alt="{{ $related['title'] ?? 'Related' }}"
-                             style="height: 220px; object-fit: cover;"
+                             style="height: 220px; object-fit: cover;" loading="lazy"
                              onerror="if(!this.classList.contains('image-placeholder')){const w=this.width||400;const h=this.height||300;const t=this.alt||'Image';const s=`%3Csvg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'%3E%3Crect fill='%236366f1' width='100%25' height='100%25'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial,sans-serif' font-size='${Math.min(w,h)/15}' font-weight='600'%3E${t}%3C/text%3E%3C/svg%3E`;this.src='data:image/svg+xml,'+s;this.classList.add('image-placeholder');}">
                         <div class="card-body">
                             <h5 class="card-title">{{ $related['title'] }}</h5>

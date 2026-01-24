@@ -4,7 +4,7 @@
     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 </div>
 <div class="modal-body">
-    <form id="admin-category-form" method="POST" action="{{ $isEdit ? route('admin.categories.update', $category) : route('admin.categories.store') }}">
+    <form id="admin-category-form" method="POST" action="{{ $isEdit ? route('admin.categories.update', $category) : route('admin.categories.store') }}" enctype="multipart/form-data">
         @csrf
         @if($isEdit) @method('PUT') @endif
 
@@ -21,6 +21,12 @@
         <div class="mb-3">
             <label class="form-label">Description</label>
             <textarea name="description" class="form-control">{{ $isEdit ? $category->description : '' }}</textarea>
+        </div>    
+        <div class="mb-3">
+            <label class="form-label">Image</label>
+            <input name="image" class="form-control" type="file" />
+
+             <img src="{{ asset('storage/' . $category->image) }}" class="form-control" type="file" width="100" height="100" />
         </div>
 
         <div class="mb-3">

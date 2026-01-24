@@ -1,14 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use App\Notifications\TestPushNotification;
 
 Route::get('/', function () {
     return view('welcome');
 });
-
-
 use App\Http\Controllers\{
     HomeController,
     CategoryController,
@@ -19,17 +15,6 @@ use App\Http\Controllers\{
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
-Route::get('/push/test', function () {
-    $user = auth()->user();
-
-    if (!$user) {
-        abort(403, 'You must be logged in');
-    }
-
-    $user->notify(new TestPushNotification());
-
-    return 'Push notification sent!';
-});
 // Country Selector
 Route::get('/country/{code}', [CountryController::class, 'setCountry'])->name('country.set');
 
@@ -72,15 +57,4 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('categories/{category}/edit-modal', [AdminCategoryController::class, 'editModal'])->name('categories.editModal');
             Route::resource('categories', AdminCategoryController::class);
     });
-});
-
-Route::post('/push/store', function (Request $request) {
-
-    $request->user()->updatePushSubscription(
-        $request->endpoint,
-        $request->keys['p256dh'],
-        $request->keys['auth']
-    );
-
-    return response()->json(['status' => 'subscribed']);
 });

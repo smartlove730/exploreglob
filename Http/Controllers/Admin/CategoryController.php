@@ -7,7 +7,8 @@ use Illuminate\Http\Request;
 use App\Models\Category;
 use App\Models\Country;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage; 
+use Illuminate\Support\Facades\Storage;
+
 class CategoryController extends Controller
 {
     public function index()
@@ -41,9 +42,14 @@ class CategoryController extends Controller
             'description' => 'nullable|string',
             'country_id' => 'nullable|integer',
             'status' => 'nullable|boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $data['slug'] = Str::slug($data['name']);
+
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('categories', 'public');
+        }
 
         Category::create($data);
 
@@ -61,27 +67,21 @@ class CategoryController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'image' =>      'nullable|file',
             'country_id' => 'nullable|integer',
             'status' => 'nullable|boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $data['slug'] = Str::slug($data['name']);
- // Handle image upload
-    if ($request->hasFile('image')) {
 
-        // Delete old image if exists
-        
-        if ($category->image && Storage::disk('public')->exists($category->image)) {
-            Storage::disk('public')->delete($category->image);
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($category->image && Storage::disk('public')->exists($category->image)) {
+                Storage::disk('public')->delete($category->image);
+            }
+            $data['image'] = $request->file('image')->store('categories', 'public');
         }
 
-        // Store new image
-        $data['image'] = $request->file('image')
-            ->store('categories', 'public');
-           
-    }
- 
         $category->update($data);
 
         return redirect()->route('admin.categories.index')->with('success', 'Category updated');
@@ -89,6 +89,11 @@ class CategoryController extends Controller
 
     public function destroy(Category $category)
     {
+        // Delete image if exists
+        if ($category->image && Storage::disk('public')->exists($category->image)) {
+            Storage::disk('public')->delete($category->image);
+        }
+
         $category->delete();
         return redirect()->route('admin.categories.index')->with('success', 'Category deleted');
     }

@@ -1,7 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-
+@php
+    use Illuminate\Support\Facades\Storage;
+ 
+@endphp
 <!-- Hero Section -->
 <section class="hero-section" style="min-height: 35vh;">
     <div class="container">
@@ -16,22 +19,28 @@
 
 <div class="container my-5">
     <!-- Blogs Grid -->
+          
+
     @if($blogs->count() > 0)
         <div class="row g-4">
             @foreach($blogs as $index => $blog)
+            @php
+    
+
+    $categoryFolder = 'categories/' . $category->name ;
+    $images = Storage::disk('public')->files($categoryFolder);
+
+    $randomImage = count($images) > 0
+        ? asset('storage/' . $images[array_rand($images)])
+        : asset('images/default-category.webp'); // fallback image
+@endphp
                 <div class="col-md-6 col-lg-4">
-                    <div class="animated-card">
-                        @php
-                            $imageUrl = $blog->featured_image ?? null;
-                            if (empty($imageUrl)) {
-                                $text = urlencode(substr($blog->title, 0, 20));
-                                $imageUrl = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect fill='%236366f1' width='100%25' height='100%25'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial,sans-serif' font-size='32' font-weight='600'%3E" . $text . "%3C/text%3E%3C/svg%3E";
-                            }
-                        @endphp
-                        <img src="{{ $imageUrl }}" 
-                             class="card-img-top" 
-                             alt="{{ $blog->title }}"
-                             onerror="if(!this.classList.contains('image-placeholder')){const w=this.width||800;const h=this.height||600;const t=this.alt||'Image';const s=`%3Csvg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'%3E%3Crect fill='%236366f1' width='100%25' height='100%25'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial,sans-serif' font-size='${Math.min(w,h)/15}' font-weight='600'%3E${t}%3C/text%3E%3C/svg%3E`;this.src='data:image/svg+xml,'+s;this.classList.add('image-placeholder');}">
+                    <div class="animated-card"> 
+                                   <img 
+            src="{{ $randomImage }}" 
+            alt="{{ $category->name }}" 
+            class="card-img-top"  loading="lazy"
+        >
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title">
                                 <a href="{{ route('blog.show', $blog->slug) }}">

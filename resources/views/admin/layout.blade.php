@@ -90,36 +90,7 @@ document.addEventListener('click', function(e){
 </script>
 
 </script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-if ('serviceWorker' in navigator && 'PushManager' in window) {
-  navigator.serviceWorker.register('/sw.js').then(registration => {
 
-    document.getElementById('enablePush').addEventListener('click', async () => {
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return;
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey:
-          "{{ config('webpush.vapid.public_key') }}"
-      });
-
-      // 🔴 THIS is what Laravel expects
-      await fetch('/push/store', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify(subscription)
-      });
-    });
-
-  });
-}
-</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -1,7 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-
+@php
+    use Illuminate\Support\Facades\Storage;
+ 
+@endphp
 <!-- Hero Section -->
 <section class="hero-section" style="min-height: 35vh;">
     <div class="container">
@@ -14,13 +17,25 @@
 
 <div class="container my-5">
     <div class="row g-4">
-        @php
-            $categoryIcons = ['🎨', '💻', '📱', '🚀', '🎮', '📚', '🎬', '🎵', '🏃', '🍔', '✈️', '🏠', '🎯', '🔬', '💡'];
-        @endphp
+          
+@php
+    
+
+    $categoryFolder = 'categories/' . $category->name ;
+    $images = Storage::disk('public')->files($categoryFolder);
+
+    $randomImage = count($images) > 0
+        ? asset('storage/' . $images[array_rand($images)])
+        : asset('images/default-category.webp'); // fallback image
+@endphp
         @forelse($categories as $index => $category)
             <div class="col-md-4 col-sm-6">
                 <div class="category-card">
-                    <span class="category-icon">{{ $categoryIcons[$index % count($categoryIcons)] }}</span>
+                 <img 
+            src="{{ $randomImage }}" 
+            alt="{{ $category->name }}" 
+            class="img-fluid mb-3 rounded" loading="lazy"
+        >
                     <h5 class="card-title mb-3">{{ $category->name }}</h5>
                     <p class="card-text mb-4">
                         {{ $category->description ?? 'Explore amazing blogs in this category' }}
