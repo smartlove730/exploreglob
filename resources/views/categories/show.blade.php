@@ -37,7 +37,7 @@
                 <div class="col-md-6 col-lg-4">
                     <div class="animated-card"> 
                                    <img 
-            src="{{ $randomImage }}" 
+            src="{{ is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage }}" 
             alt="{{ $category->name }}" 
             class="card-img-top"  loading="lazy"
         >

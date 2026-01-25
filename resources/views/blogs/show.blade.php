@@ -34,6 +34,10 @@
     $randomImage = count($images) > 0
         ? asset('storage/' . $images[array_rand($images)])
         : asset('images/default-category.webp'); // fallback image
+
+         $randomImage1= count($images) > 0
+        ? asset('storage/' . $images[array_rand($images)])
+        : asset('images/default-category.webp'); // fallback image
 @endphp
 <!-- Blog Header Section -->
 <section class="blog-header-section">
@@ -66,7 +70,7 @@
 <div class="container mt-4 mb-5">
     <div class="row">
         <div class="col-lg-10 mx-auto">
-            <img src="{{ asset( $randomImage) }}" 
+            <img src="{{ is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage }}" 
                  alt="{{ $blog->title }}" 
                  class="blog-cover-image" loading="lazy"
                  >
@@ -141,8 +145,16 @@
             @foreach($related as $index => $related)
                 <div class="col-md-4">
                     <div class="related-blog-card">
-                    
-                        <img src="{{ asset( $randomImage) }}" 
+                    @php
+    $images = json_decode($blog->featured_image, true);
+    // Check if it decoded correctly and is a non-empty array
+    $src = (is_array($images) && !empty($images)) 
+            ? $images[array_rand($images)] 
+            : $randomImage;
+@endphp
+
+ 
+                        <img src="{{ $src }}" 
                              class="card-img-top" 
                              alt="{{ $related['title'] ?? 'Related' }}"
                              style="height: 220px; object-fit: cover;" loading="lazy"

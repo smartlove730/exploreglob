@@ -7,7 +7,7 @@ use App\Jobs\GenerateBlogs;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;
 use Gemini\Laravel\Facades\Gemini;
-
+use Illuminate\Support\Facades\Cache;
 class BlogController extends Controller
 {
     public function index(Request $request)
@@ -19,23 +19,30 @@ class BlogController extends Controller
 
     public function show($slug)
     {
+       // 1. Define a unique cache key based on the slug
+    $cacheKey = "blog_post_{$slug}";
+
+    // 2. Wrap the logic in Cache::remember
+    // 3600 seconds = 1 hour. You can adjust this as needed.
+    $data = Cache::remember($cacheKey, 3600, function () use ($slug) {
         $blog = Blog::where('slug', $slug)->with('category')->firstOrFail();
 
         $related = Blog::where('category_id', $blog->category_id)
             ->where('id', '!=', $blog->id)
             ->limit(5)
             ->get();
-            $seo_title = $blog->seo_title ?? $blog->title;
-            $seo_description = $blog->seo_description ?? str($blog->content)->limit(160);
-            $og_image = $blog->featured_image;
-  
-            return view('blogs.show', compact(
-                'blog',
-                'related',
-                'seo_title',
-                'seo_description',
-                'og_image'
-            ));
+
+        return [
+            'blog' => $blog,
+            'related' => $related,
+            'seo_title' => $blog->seo_title ?? $blog->title,
+            'seo_description' => $blog->seo_description ?? str($blog->content)->limit(160),
+            'og_image' => $blog->featured_image,
+        ];
+    });
+
+    // 3. Pass the cached data array to the view
+    return view('blogs.show', $data);
 
        
     }

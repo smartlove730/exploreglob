@@ -35,11 +35,12 @@
     $randomImage = count($images) > 0
         ? asset('storage/' . $images[array_rand($images)])
         : asset('images/default-category.webp'); // fallback image
+       
 @endphp
                 <div class="col-md-6 col-lg-4">
                     <div class="animated-card">
-                        
-                      <img src="{{  $randomImage }}"
+                       
+                      <img src="{{ is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage }}"
      class="card-img-top"
      alt="{{ $blog->title }}" loading="lazy" > <div class="card-body d-flex flex-column">
                             <h5 class="card-title">

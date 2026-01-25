@@ -46,5 +46,5 @@ return [
     | Options: gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash
     */
 
-    'model' => env('GEMINI_MODEL', 'gemini-2.0-flash-exp'),
+    'model' => env('GEMINI_MODEL', 'gemma-3-27b-it'),
 ];

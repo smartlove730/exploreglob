@@ -59,7 +59,7 @@ class GenerateBlogs implements ShouldQueue
                 throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
             }
 
-            $model = "gemma-3-27b-it";
+            $model = config('gemini.model', 'gemma-3-27b');
             $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
            
             $result = Http::timeout(180)
@@ -77,9 +77,9 @@ class GenerateBlogs implements ShouldQueue
                 ]);
                 throw new \Exception('AI API request for prompt generation failed');
             }
-
             $responseJson = $result->json();
-            $promptData = $this->normalizeAiResponse($responseJson);
+            
+            $promptData = $this->normalizeAiResponse($responseJson,null);
             
             $prompt1 = $promptData['prompt'] ?? null;
 
@@ -121,7 +121,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
           
             // Get API key from config/environment
             $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
-            
+              
             if (!$apiKey) {
                 Log::error('Gemini API key not configured');
                 throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
@@ -162,7 +162,8 @@ The content should sound insightful, helpful, and written by a human, suitable f
                     }
 
                     $responseJson = $result->json();
-                    $aiRaw = $this->normalizeAiResponse($responseJson);
+                 
+                    $aiRaw = $this->normalizeAiResponse($responseJson,$category->name);
 
                     // Check if we got valid data (should have more than just empty fields)
                     if (!empty($aiRaw['title']) && !empty($aiRaw['sections'])) {
@@ -185,7 +186,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
                     }
                 }
             } while ($retryCount < $maxRetries);
-            
+           
             if (!$aiRaw || empty($aiRaw['title'])) {
                 throw new \Exception('Failed to generate valid blog content from AI');
             }
@@ -200,19 +201,19 @@ The content should sound insightful, helpful, and written by a human, suitable f
         'author'         => $aiRaw['author'] ?? '',
         'published_date' => $aiRaw['published_date'] ?? '',
         'read_time'      => $aiRaw['read_time'] ?? '',
-        'cover_image'    => $aiRaw['cover_image'] ?? '',
+        'cover_image'    => json_encode($aiRaw['cover_image'] ?? []) ?? '',
         'json_schema'    => $aiRaw['json_schema'] ?? '',
         'sections'       => $aiRaw['sections'] ?? [],
         'hashtags'       => $aiRaw['hashtags'] ?? [],
         'related_blogs'  => $aiRaw['related_blogs'] ?? [],
-        'image_gen_prompt_for_related_blog'  => $aiRaw['image_gen_prompt_for_related_blog'] ?? [],
+        'image_gen_prompt_for_related_blog'  => $aiRaw['image_gen_prompt_for_related_blog'] ?? '',
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
 
     // You can still extract a short excerpt dynamically
     'excerpt'         => Str::limit(strip_tags($aiRaw['sections'][0]['content'] ?? ''), 200),
 
     // Map existing fields properly
-    'featured_image'  => $aiRaw['cover_image'] ?? null,
+    'featured_image'  => json_encode($aiRaw['cover_image'] ?? []) ?? null,
     'category_id'     => $category->id,
     'country_id'      => $category->country_id,
     'seo_title'       => $aiRaw['seo_title'] ?? ($aiRaw['title'] ?? 'Untitled'),
@@ -235,8 +236,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
     /**
      * Normalize AI response from Gemini API
      */
-    private function normalizeAiResponse(array $aiResponse): array
-{
+    private function normalizeAiResponse($aiResponse, $categoryName){
     // Safely extract the raw text from Gemini's nested response structure
     $rawText = $aiResponse['candidates'][0]['content']['parts'][0]['text'] ?? null;
 
@@ -261,9 +261,10 @@ The content should sound insightful, helpful, and written by a human, suitable f
 
     // Decode JSON
     $data = json_decode($rawText, true);
-
+$originalUrl=[];
     // Handle JSON decode errors gracefully
     if (json_last_error() !== JSON_ERROR_NONE || !$data) {
+       
         return [
             'title' => '',
             'subtitle' => '',
@@ -276,7 +277,26 @@ The content should sound insightful, helpful, and written by a human, suitable f
             'related_blogs' => []
         ];
     }
-
+ 
+ if($categoryName  != null)
+            {
+           
+                   $apiKey = 'L9qUCZTQJhmkc3SXYZFX8YAbIoWNoPekItT4DFiPTwNju1I29T0xCvHH';
+ $response = Http::withHeaders([
+                'Authorization' => $apiKey
+            ])->get('https://api.pexels.com/v1/search', [
+                'query' => $categoryName ,
+                'per_page' => 10,
+                'orientation' => 'landscape'
+            ]);
+              if ($response->successful()) {
+                $photos = $response->json()['photos'] ?? [];
+                    
+                $originalUrl = collect($photos)->pluck('src.original')->all();
+                   
+              }
+            }
+         
     // Normalize the structure
     return [
         'title' => $data['title'] ?? '',
@@ -284,7 +304,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
         'author' => $data['author'] ?? '',
         'published_date' => $data['published_date'] ?? '',
         'read_time' => $data['read_time'] ?? '',
-        'cover_image' => $data['cover_image'] ?? '',
+        'cover_image' => $originalUrl ?? [],
         'seo_title' => $data['seo_title'] ?? '',
         'seo_description' => $data['seo_description'] ?? '',
         'seo_keywords' => $data['seo_keywords'] ?? '',
