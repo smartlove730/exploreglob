@@ -1,5 +1,12 @@
 @extends('layouts.app')
-
+@section('SeoTags')
+    @include('partials.seo', [
+        'seo_title' => 'Explore Global Explorer - Your Gateway to Worldwide Stories',
+        'seo_description' => 'Dive into a world of captivating blogs and articles from various countries and categories. Discover, read, and share stories that inspire and inform.',
+        'seo_keywords' => 'global blogs, international stories, travel blogs, cultural articles, worldwide news, global explorer, country-specific blogs',
+        'og_image' => asset('images/home-og-image.jpg'),
+    ])  
+@endsection
 @section('content')
 @php
     use Illuminate\Support\Facades\Storage;

@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('content')
-    
 @php
+ 
     use Illuminate\Support\Facades\Storage;
     // Decode the JSON content from DB
     $content = json_decode($blog->content ?? '{}', true);
@@ -25,7 +24,8 @@
     }
     
 @endphp
-     @php
+
+ @php
     
 
     $categoryFolder = 'categories/' . $blog->category->name ;
@@ -39,6 +39,21 @@
         ? asset('storage/' . $images[array_rand($images)])
         : asset('images/default-category.webp'); // fallback image
 @endphp
+
+
+@section('SeoTags')
+@include('partials.seo', [
+    'seo_title'       => $blog->seo_title,
+    'seo_description' => $blog->seo_description,
+    'seo_keywords'    => $blog->seo_keywords,
+    'og_image'        => is_array(json_decode($blog->featured_image, true)) 
+                            ? json_decode($blog->featured_image, true)[0] 
+                            : $randomImage,
+]) 
+@endsection
+@section('content')
+    
+    
 <!-- Blog Header Section -->
 <section class="blog-header-section">
     <div class="container">

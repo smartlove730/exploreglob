@@ -14,8 +14,8 @@ class CategoryController extends Controller
     {
             $country = session('country');
            
-        $categories = Category::where('status', 1)
-        ->when($country, fn($q) => $q->where('country_id', $country))->get();
+        $categories = Category::where('status', 1)->where('country_id', 183)
+        ->when($country, fn($q) => $q->where('country_id',$country))->get();
 
         return view('categories.index', compact('categories'));
     }
