@@ -46,7 +46,7 @@ class GenerateBlogs implements ShouldQueue
  
         foreach ($categories as $category) {
         
-        $PromptGenforcat = "Generate a prompt for blog of trending article genration on the topic of {$category->name}. output should be in json form as following format.
+        $PromptGenforcat = "Generate a prompt for blog of trending article genration on the topic of {$category->name} Target Audience will be people of USA. output should be in json form as following format.
         {
         'prompt':''
         }";

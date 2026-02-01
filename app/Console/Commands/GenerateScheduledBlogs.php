@@ -34,7 +34,7 @@ class GenerateScheduledBlogs extends Command
     {
         $countryId = $this->option('country');
         $categoryId = $this->option('category');
-        $limit = (int) $this->option('limit');
+        $limit = (int) $this->option('limit') ?? 1;
 
         $this->info('Starting scheduled blog generation...');
 
