@@ -31,7 +31,7 @@ class SyncCategoryImagesJob implements ShouldQueue
         ];
 
         // Fetch only the categories we need
-        $categories = Category::whereNotIn('name', $categoriesToBeFilled)->where('country_id',183)->get();
+        $categories = Category::where('country_id',183)->get();
 
         foreach ($categories as $category) {
             $folderName = $category->name;
@@ -42,7 +42,7 @@ class SyncCategoryImagesJob implements ShouldQueue
                 'Authorization' => $apiKey
             ])->get('https://api.pexels.com/v1/search', [
                 'query' => $category->name,
-                'per_page' => 80,
+                'per_page' => 10,
                 'orientation' => 'landscape'
             ]);
 
