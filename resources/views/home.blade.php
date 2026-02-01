@@ -89,7 +89,7 @@
     $images = Storage::disk('public')->files($categoryFolder);
 if($category['name'] == 'Nutrition')
     {
-     dd($images);   
+     dd($categoryFolder);   
     }
     $randomImage = count($images) > 0
         ? asset('public/storage/' . $images[array_rand($images)])
