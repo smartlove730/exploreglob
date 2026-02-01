@@ -22,7 +22,7 @@ class HomeController extends Controller
     ->where('country_id', $country)
     ->whereHas('blogs') // only categories that have blogs
     ->get()->toArray();
- 
+ dd( $categories );
         return view('home', compact('blogs', 'categories'));
     }
 }
