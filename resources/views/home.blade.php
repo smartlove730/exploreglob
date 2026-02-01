@@ -85,10 +85,12 @@
 @php
     
 
-    $categoryFolder = 'categories/' . $category['name'] ;
+    $categoryFolder = 'categories/' . trim($category['name']);
     $images = Storage::disk('public')->files($categoryFolder);
 
-    $randomImage =  asset('public/storage/' . $images[array_rand($images)]); // fallback image
+    $randomImage = count($images) > 0
+        ? asset('public/storage/' . $images[array_rand($images)])
+        : asset('images/default-category.webp'); // fallback image
 @endphp
                 <div class="col-md-4 col-sm-6">
                     <div class="category-card">
