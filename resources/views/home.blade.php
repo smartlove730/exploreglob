@@ -40,7 +40,7 @@
     $images = Storage::disk('public')->files($categoryFolder);
 
     $randomImage = count($images) > 0
-        ? asset('storage/' . $images[array_rand($images)])
+        ? asset('storage/public/' . $images[array_rand($images)])
         : asset('images/default-category.webp'); // fallback image
        
 @endphp
@@ -89,7 +89,7 @@
     $images = Storage::disk('public')->files($categoryFolder);
 
     $randomImage = count($images) > 0
-        ? asset('storage/' . $images[array_rand($images)])
+        ? asset('storage/public/' . $images[array_rand($images)])
         : asset('images/default-category.webp'); // fallback image
 @endphp
                 <div class="col-md-4 col-sm-6">
