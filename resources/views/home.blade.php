@@ -87,10 +87,7 @@
 
     $categoryFolder = 'categories/' . trim($category['name']);
     $images = Storage::disk('public')->files($categoryFolder);
-if($category['name'] == 'Nutrition')
-    {
-     dd($categoryFolder);   
-    }
+ 
     $randomImage = count($images) > 0
         ? asset('public/storage/' . $images[array_rand($images)])
         : asset('images/default-category.webp'); // fallback image
