@@ -17,7 +17,7 @@
     
     <!-- Custom CSS -->
     @vite(['resources/css/app.css'])
-    <link rel="stylesheet" href="{{ asset('public/css/custom.css') }}">
+    <link rel="stylesheet" href="{{ asset('/css/custom.css') }}">
 <style>
 
 .navbar-toggler {
@@ -102,7 +102,7 @@ $(document).ready(function () {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
 
 <!-- Custom Animations -->
-<script src="{{ asset('public/js/animations.js') }}"></script>
+<script src="{{ asset('/js/animations.js') }}"></script>
 
 </body>
 </html>
