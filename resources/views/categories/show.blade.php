@@ -36,8 +36,12 @@
 @endphp
                 <div class="col-md-6 col-lg-4">
                     <div class="animated-card"> 
+                        @php
+    $images = json_decode($blog->featured_image, true); // decode JSON to array
+    $randomImageforblog = $images ? $images[array_rand($images)] : null; // pick random element
+@endphp
                                    <img 
-            src="{{ is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage }}" 
+            src="{{ is_array(json_decode($blog->featured_image, true)) ?  $randomImageforblog  : $randomImage }}" 
             alt="{{ $category->name }}" 
             class="card-img-top"  loading="lazy"
         >
