@@ -286,7 +286,7 @@ $originalUrl=[];
                 'Authorization' => $apiKey
             ])->get('https://api.pexels.com/v1/search', [
                 'query' => $categoryName ,
-                'per_page' => 10,
+                'per_page' => 79,
                 'orientation' => 'landscape'
             ]);
               if ($response->successful()) {
