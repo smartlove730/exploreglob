@@ -35,7 +35,7 @@
 <header>
   <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top shadow-sm">
   <div class="container">
-    <a class="navbar-brand fw-bold" href="{{ route('home') }}"><img src="{{asset('e.avif')}}" height="100" widht="100">  Global Explorer</a>
+    <a class="navbar-brand fw-bold" href="{{ route('home') }}"><img src="{{asset('e.avif')}}" style="height:20px!important;">  Global Explorer</a>
  
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
       data-bs-target="#navbarNav">
