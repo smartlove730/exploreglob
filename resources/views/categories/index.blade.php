@@ -33,7 +33,7 @@
         $images = Storage::disk('public')->files($categoryFolder);
         
         return count($images) > 0
-            ? asset('public/storage/' . $images[array_rand($images)])
+            ? asset('storage/' . $images[array_rand($images)])
             : asset('images/default-category.webp');
     });
 @endphp
