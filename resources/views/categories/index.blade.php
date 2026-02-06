@@ -28,14 +28,11 @@
 
         @forelse($categories as $index => $category)
     @php
-    $randomImage = Cache::remember('cat_image_' . $category->id, 3600, function() use ($category) {
-        $categoryFolder = 'categories/' . $category->name;
+         $categoryFolder = 'categories/' . $category->name;
         $images = Storage::disk('public')->files($categoryFolder);
-        
-        return count($images) > 0
+    $randomImage = count($images) > 0
             ? asset('storage/' . $images[array_rand($images)])
             : asset('images/default-category.webp');
-    });
 @endphp
             <div class="col-md-4 col-sm-6">
                 <div class="category-card">
