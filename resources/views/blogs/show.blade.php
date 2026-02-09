@@ -105,8 +105,11 @@
                 @if(!empty($section['content']))
                     @php
                         $sectionContent = $section['content'];
+                        $sectionContent = preg_replace('/\\*\\*--(.*?)--\\*\\*/s', '<strong>$1</strong>', $sectionContent);
+                        $sectionContent = preg_replace('/\\*--(.*?)--\\*/s', '<em>$1</em>', $sectionContent);
                         $sectionContent = preg_replace('/\*\*(.*?)\*\*/s', '<strong>$1</strong>', $sectionContent);
                         $sectionContent = preg_replace('/\*(.*?)\*/s', '<em>$1</em>', $sectionContent);
+                        $sectionContent = preg_replace('/--(.*?)--/s', '<strong>$1</strong>', $sectionContent);
                         $sectionContent = nl2br($sectionContent);
                     @endphp
                     <div>{!! $sectionContent !!}</div>

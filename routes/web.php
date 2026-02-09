@@ -28,10 +28,13 @@ Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
 // Static Pages
 Route::get('/contact', [PageController::class, 'contact'])->name('contact');
-Route::post('/contact', [PageController::class, 'submitContact'])->name('contact.submit');
+Route::post('/contact/submit', [PageController::class, 'submitContact'])->name('contact.submit');
 Route::get('/policy', [PageController::class, 'policy'])->name('policy');
+Route::get('/privacy-policy', [PageController::class, 'policy'])->name('policy.alternate');
 Route::get('/terms', [PageController::class, 'terms'])->name('terms');
+Route::get('/terms-and-conditions', [PageController::class, 'terms'])->name('terms.alternate');
 Route::get('/about', [PageController::class, 'about'])->name('about');
+Route::get('/about-us', [PageController::class, 'about'])->name('about.alternate');
 Route::get('/addblog', [BlogController::class, 'store'])->name('store');
 Route::get('/genimage', [BlogController::class, 'genImage'])->name('genImage');
 
