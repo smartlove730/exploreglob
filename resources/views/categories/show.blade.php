@@ -3,7 +3,7 @@
 @section('content')
 @php
     use Illuminate\Support\Facades\Storage;
- 
+   use App\Helpers\TextHumanizer;
 @endphp
 <!-- Hero Section -->
 <section class="hero-section" style="min-height: 35vh;">
@@ -52,7 +52,20 @@
                                 </a>
                             </h5>
                             <p class="card-text flex-grow-1">
-                                {{ Str::limit($blog->excerpt ?? '', 150) }}
+                                 @php
+                                  use App\Helpers\TextHumanizer;
+                        $sectionContent = $blog->excerpt ?? '';
+                        $sectionContent = preg_replace('/\\*\\*--(.*?)--\\*\\*/s', '<strong>$1</strong>', $sectionContent);
+                        $sectionContent = preg_replace('/\\*--(.*?)--\\*/s', '<em>$1</em>', $sectionContent);
+                        $sectionContent = preg_replace('/\*\*(.*?)\*\*/s', '<strong>$1</strong>', $sectionContent);
+                        $sectionContent = preg_replace('/\*(.*?)\*/s', '<em>$1</em>', $sectionContent);
+                        $sectionContent = preg_replace('/--(.*?)--/s', '<strong>$1</strong>', $sectionContent);
+                        $sectionContent = nl2br($sectionContent);
+                    @endphp
+                  
+
+                              {!! TextHumanizer::humanize($sectionContent) !!}
+
                             </p>
                             <div class="d-flex justify-content-between align-items-center mt-auto pt-3">
                                 <small class="text-muted">

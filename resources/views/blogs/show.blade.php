@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @php
- 
+  use App\Helpers\TextHumanizer;
     use Illuminate\Support\Facades\Storage;
     // Decode the JSON content from DB
     $content = json_decode($blog->content ?? '{}', true);
@@ -104,6 +104,7 @@
                 @endif
                 @if(!empty($section['content']))
                     @php
+                    
                         $sectionContent = $section['content'];
                         $sectionContent = preg_replace('/\\*\\*--(.*?)--\\*\\*/s', '<strong>$1</strong>', $sectionContent);
                         $sectionContent = preg_replace('/\\*--(.*?)--\\*/s', '<em>$1</em>', $sectionContent);
@@ -112,7 +113,7 @@
                         $sectionContent = preg_replace('/--(.*?)--/s', '<strong>$1</strong>', $sectionContent);
                         $sectionContent = nl2br($sectionContent);
                     @endphp
-                    <div>{!! $sectionContent !!}</div>
+                    <div>{!! TextHumanizer::humanize($sectionContent) !!}</div>
                 @endif
             </div>
         @endforeach

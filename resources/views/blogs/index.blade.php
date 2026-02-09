@@ -1,7 +1,9 @@
 @extends('layouts.app')
 
 @section('content')
-
+@php
+  use App\Helpers\TextHumanizer;
+@endphp
 <!-- Hero Section -->
 <section class="hero-section" style="min-height: 40vh;">
     <div class="container">
@@ -37,7 +39,7 @@
             </h5>
 
             <p class="card-text flex-grow-1">
-              {{ Str::limit($blog->excerpt ?? strip_tags($blog->content), 150) }}
+              {{ Str::limit(TextHumanizer::humanize($blog->content ?? ''), 150) }}
             </p>
 
             <div class="d-flex justify-content-between align-items-center mt-auto pt-3">
