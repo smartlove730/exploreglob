@@ -93,7 +93,7 @@ class GenerateBlogs implements ShouldQueue
             // Now use the generated prompt to create the blog content
 
 
-        $prompt = $prompt1 ."
+        $prompt = $prompt1 ."   Try to include specific personal anecdotes, expert commentary that a standard AI wouldn't naturally produce. Google values 'Information Gain'—the idea that your site provides something the 100 other sites on the same topic don't. Prefers deeper, comprehensive guides (1,000+ words) that provide 'unique information' not easily found elsewhere. Ensure all posts are polished. Any significant grammatical errors or 'unnatural' phrasing (often seen in unedited AI text) is a red flag for quality.
 Give related image generation prompt for the blog article.
 Format your response strictly as JSON using this exact schema:
 
