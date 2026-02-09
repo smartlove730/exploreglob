@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Blog;
 use App\Models\Category;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -302,7 +303,7 @@ $originalUrl=[];
         'title' => $data['title'] ?? '',
         'subtitle' => $data['subtitle'] ?? '',
         'author' => $data['author'] ?? '',
-        'published_date' => $data['published_date'] ?? '',
+        'published_date' => Carbon::parse( now()?? now())->format('Y-m-d H:i:s') ?? '',
         'read_time' => $data['read_time'] ?? '',
         'cover_image' => $originalUrl ?? [],
         'seo_title' => $data['seo_title'] ?? '',
