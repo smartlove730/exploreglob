@@ -85,7 +85,7 @@
 @php
     
 
-    $categoryFolder = 'categories/' . trim($category['name']);
+    $categoryFolder = 'categories/' . trim($category->name);
     $images = Storage::disk('public')->files($categoryFolder);
  
     $randomImage = count($images) > 0
@@ -96,14 +96,14 @@
                     <div class="category-card">
                        <img 
             src="{{ $randomImage }}" 
-            alt="{{ $category['name'] }}" 
+            alt="{{ $category->name }}" 
             class="img-fluid mb-3 rounded" loading="lazy"
         >
-                        <h5 class="card-title mb-3">{{ $category['name'] }}</h5>
+                        <h5 class="card-title mb-3">{{ $category->name }}</h5>
                         <p class="card-text mb-4">
-                            {{ $category['description'] ?? 'Explore amazing blogs in this category' }}
+                            {{ $category->description ?? 'Explore amazing blogs in this category' }}
                         </p>
-                        <a href="{{ route('category.show', $category['slug'] ?? $category['id']) }}" class="btn btn-primary">
+                        <a href="{{ route('category.show', $category->slug ?? $category->id) }}" class="btn btn-primary">
                             Explore Blogs →
                         </a>
                     </div>

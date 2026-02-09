@@ -79,7 +79,13 @@
 
 <footer>
     <div class="container">
-        <p class="mb-0">© {{ date('Y') }} Blog Platform. All rights reserved.</p>
+        <p class="mb-2">© {{ date('Y') }} Global Explorer. All rights reserved.</p>
+        <div class="d-flex flex-wrap gap-3">
+            <a href="{{ route('about') }}" class="text-decoration-none">About Us</a>
+            <a href="{{ route('policy') }}" class="text-decoration-none">Privacy Policy</a>
+            <a href="{{ route('terms') }}" class="text-decoration-none">Terms & Conditions</a>
+            <a href="{{ route('contact') }}" class="text-decoration-none">Contact</a>
+        </div>
     </div>
 </footer>
 <script src="https://code.jquery.com/jquery-3.6.0.slim.min.js"
@@ -104,6 +110,7 @@ $(document).ready(function () {
 
 <!-- Custom Animations -->
 <script src="{{ asset('/js/animations.js') }}"></script>
+@stack('scripts')
 
 </body>
 </html>
