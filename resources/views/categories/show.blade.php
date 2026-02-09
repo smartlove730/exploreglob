@@ -53,7 +53,7 @@
                             </h5>
                             <p class="card-text flex-grow-1">
                                  @php
-                                  use App\Helpers\TextHumanizer;
+                                
                         $sectionContent = $blog->excerpt ?? '';
                         $sectionContent = preg_replace('/\\*\\*--(.*?)--\\*\\*/s', '<strong>$1</strong>', $sectionContent);
                         $sectionContent = preg_replace('/\\*--(.*?)--\\*/s', '<em>$1</em>', $sectionContent);
