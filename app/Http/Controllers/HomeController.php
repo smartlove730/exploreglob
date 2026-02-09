@@ -10,6 +10,7 @@ class HomeController extends Controller
     public function index()
     {
         $country = session('country')?? 183;
+        $minBlogs = (int) env('CATEGORY_MIN_BLOGS', 3);
 
         $blogs = Blog::with('category')
             ->where('status', 1)
@@ -18,10 +19,11 @@ class HomeController extends Controller
             ->take(10)
             ->get();
 
-    $categories = Category::where('status', 1)
-    ->where('country_id', $country)
-    ->whereHas('blogs') // only categories that have blogs
-    ->get()->toArray();
+        $categories = Category::where('status', 1)
+            ->where('country_id', $country)
+            ->withCount(['blogs' => fn($q) => $q->where('status', 1)])
+            ->having('blogs_count', '>=', $minBlogs)
+            ->get();
  
         return view('home', compact('blogs', 'categories'));
     }
