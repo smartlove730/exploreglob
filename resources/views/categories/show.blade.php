@@ -3,6 +3,7 @@
 @section('content')
 @php
     use Illuminate\Support\Facades\Storage;
+    use App\Helpers\ImageOptimizer;
    use App\Helpers\TextHumanizer;
 @endphp
 <!-- Hero Section -->
@@ -40,10 +41,14 @@
     $images = json_decode($blog->featured_image, true); // decode JSON to array
     $randomImageforblog = $images ? $images[array_rand($images)] : null; // pick random element
 @endphp
+                                   @php
+            $categoryBlogImage = is_array(json_decode($blog->featured_image, true)) ? $randomImageforblog : $randomImage;
+            $optimizedCategoryBlogImage = ImageOptimizer::optimize($categoryBlogImage, 640, 72);
+                                   @endphp
                                    <img 
-            src="{{ is_array(json_decode($blog->featured_image, true)) ?  $randomImageforblog  : $randomImage }}" 
+            src="{{ $optimizedCategoryBlogImage }}" 
             alt="{{ $category->name }}" 
-            class="card-img-top"  loading="lazy"
+            class="card-img-top"  loading="lazy" decoding="async" width="640" height="400"
         >
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title">

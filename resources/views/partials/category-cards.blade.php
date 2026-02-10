@@ -1,5 +1,6 @@
 @php
     use Illuminate\Support\Facades\Storage;
+    use App\Helpers\ImageOptimizer;
 @endphp
 
 @foreach($categories as $category)
@@ -13,11 +14,17 @@
     @endphp
     <div class="col-md-4 col-sm-6">
         <div class="category-card">
+            @php
+                $optimizedCategoryImage = ImageOptimizer::optimize($randomImage, 480, 70);
+            @endphp
             <img
-                src="{{ $randomImage }}"
+                src="{{ $optimizedCategoryImage }}"
                 alt="{{ $category->name }}"
                 class="img-fluid mb-3 rounded"
                 loading="lazy"
+                decoding="async"
+                width="480"
+                height="320"
             >
             <h5 class="card-title mb-3">{{ $category->name }}</h5>
             <p class="card-text mb-4">
