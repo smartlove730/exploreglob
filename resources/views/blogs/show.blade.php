@@ -16,6 +16,11 @@
     $sections = $content['sections'] ?? [];
     $hashtags = $content['hashtags'] ?? [];
     $relatedBlogs = $content['related_blogs'] ?? [];
+    $encodedShareTitle = rawurlencode($blog->title);
+    $encodedShareUrl = rawurlencode(request()->fullUrl());
+    $twitterShareUrl = "https://twitter.com/intent/tweet?text={$encodedShareTitle}&url={$encodedShareUrl}";
+    $facebookShareUrl = "https://www.facebook.com/sharer/sharer.php?u={$encodedShareUrl}";
+    $linkedInShareUrl = "https://www.linkedin.com/sharing/share-offsite/?url={$encodedShareUrl}";
     
     // Use SVG placeholder if no cover image
     if (empty($coverImage)) {
@@ -136,18 +141,21 @@
     <div class="social-share">
         <div class="d-flex align-items-center gap-3 flex-wrap">
             <strong class="me-2">Share this article:</strong>
-            <a href="https://twitter.com/intent/tweet?text={{ urlencode($blog->title) }}&url={{ urlencode(request()->fullUrl()) }}" 
+            <a href="{{ $twitterShareUrl }}"
                target="_blank" 
+               rel="noopener noreferrer"
                class="social-btn twitter">
                 🐦 Twitter
             </a>
-            <a href="https://www.facebook.com/sharer/sharer.php?u={{ urlencode(request()->fullUrl()) }}" 
+            <a href="{{ $facebookShareUrl }}"
                target="_blank" 
+               rel="noopener noreferrer"
                class="social-btn facebook">
                 📘 Facebook
             </a>
-            <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ urlencode(request()->fullUrl()) }}" 
+            <a href="{{ $linkedInShareUrl }}"
                target="_blank" 
+               rel="noopener noreferrer"
                class="social-btn linkedin">
                 💼 LinkedIn
             </a>
@@ -200,12 +208,23 @@
             <div class="p-5 rounded-4" style="background: var(--gradient-1); color: white; text-align: center;">
                 <h2 class="mb-3">📬 Join Our Newsletter</h2>
                 <p class="mb-4">Get weekly articles, tips, and updates straight to your inbox</p>
-                <form class="row g-3 justify-content-center" onsubmit="event.preventDefault(); alert('Thanks for subscribing!');">
+                @if(session('newsletter_success'))
+                    <div class="alert alert-success">{{ session('newsletter_success') }}</div>
+                @endif
+                <form class="row g-3 justify-content-center" method="POST" action="{{ route('newsletter.subscribe') }}">
+                    @csrf
+                    <input type="hidden" name="blog_id" value="{{ $blog->id }}">
                     <div class="col-md-5">
-                        <input type="text" class="form-control form-control-lg" placeholder="Your name" required>
+                        <input type="text" name="name" class="form-control form-control-lg" placeholder="Your name" value="{{ old('name') }}" required>
+                        @error('name')
+                            <small class="d-block text-white mt-2">{{ $message }}</small>
+                        @enderror
                     </div>
                     <div class="col-md-5">
-                        <input type="email" class="form-control form-control-lg" placeholder="Your email" required>
+                        <input type="email" name="email" class="form-control form-control-lg" placeholder="Your email" value="{{ old('email') }}" required>
+                        @error('email')
+                            <small class="d-block text-white mt-2">{{ $message }}</small>
+                        @enderror
                     </div>
                     <div class="col-md-3">
                         <button class="btn btn-light btn-lg w-100" type="submit">

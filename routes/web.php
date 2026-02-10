@@ -10,7 +10,8 @@ use App\Http\Controllers\{
     CategoryController,
     BlogController,
     PageController,
-    CountryController
+    CountryController,
+    NewsletterSubscriptionController
 };
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -25,6 +26,7 @@ Route::get('/category/{slug}', [CategoryController::class, 'show'])->name('categ
 // Blogs
 Route::get('/blogs/{id}', [BlogController::class, 'index'])->name('blogs.index');
 Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
+Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'store'])->name('newsletter.subscribe');
 
 // Static Pages
 Route::get('/contact', [PageController::class, 'contact'])->name('contact');
