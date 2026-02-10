@@ -99,6 +99,7 @@
         </div>
     </div>
 </footer>
+    
 <script src="https://code.jquery.com/jquery-3.6.0.slim.min.js"
         ></script>
         <script>
@@ -111,7 +112,9 @@ $(document).ready(function () {
 
 });
 </script>
-
+    
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3230339294601454"
+     crossorigin="anonymous"></script>
 <!-- Bootstrap 5 JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
