@@ -101,10 +101,10 @@
             <div class="col-12 col-md-6 col-lg-3">
                 <h5 class="footer-title">Company</h5>
                 <ul class="footer-links list-unstyled mb-0">
-                    <li><a href="{{ route('about') }}" class="text-decoration-none">About Us</a></li>
-                    <li><a href="{{ route('contact') }}" class="text-decoration-none">Contact</a></li>
-                    <li><a href="{{ route('policy') }}" class="text-decoration-none">Privacy Policy</a></li>
-                    <li><a href="{{ route('terms') }}" class="text-decoration-none">Terms & Conditions</a></li>
+                    <li><a href="{{ route('about') }}" class="text-decoration-none text-white">About Us</a></li>
+                    <li><a href="{{ route('contact') }}" class="text-decoration-none text-white">Contact</a></li>
+                    <li><a href="{{ route('policy') }}" class="text-decoration-none text-white">Privacy Policy</a></li>
+                    <li><a href="{{ route('terms') }}" class="text-decoration-none text-white">Terms & Conditions</a></li>
                 </ul>
             </div>
 
