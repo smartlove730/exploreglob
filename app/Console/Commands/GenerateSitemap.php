@@ -6,6 +6,7 @@ use App\Models\Blog;
 use App\Models\Category;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\URL;
 
 class GenerateSitemap extends Command
 {

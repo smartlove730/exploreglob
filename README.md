@@ -110,7 +110,6 @@ php artisan sitemap:generate
 ```
 
 Sitemap generation is also scheduled daily at 1 AM in `routes/console.php`.
-Sitemap uses base URL `https://explore-glob.blog` and includes category/blog URLs only for `country_id = 183`.
 
 
 ```bash
