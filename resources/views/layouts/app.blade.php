@@ -80,7 +80,7 @@
 <footer>
     <div class="container">
         <p class="mb-2">© {{ date('Y') }} Global Explorer. All rights reserved.</p>
-        <div class="d-flex flex-wrap gap-3 justify-content-center">
+        <div class="d-flex flex-wrap gap-3 justify-content-center ">
             <a href="{{ route('about') }}" class="text-decoration-none">About Us</a>
             <a href="{{ route('policy') }}" class="text-decoration-none">Privacy Policy</a>
             <a href="{{ route('terms') }}" class="text-decoration-none">Terms & Conditions</a>
