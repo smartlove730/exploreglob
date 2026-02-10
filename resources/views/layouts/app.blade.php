@@ -93,10 +93,9 @@
         <div class="row g-4">
             <div class="col-12 col-md-6 col-lg-3">
                 <a href="{{ route('home') }}" class="footer-brand text-decoration-none d-inline-flex align-items-center gap-2 mb-3">
-                    <img src="{{ asset('e.avif') }}" alt="Global Explorer logo" class="footer-logo">
-                    <span class="fw-bold text-white">Global Explorer</span>
+                    <img src="{{ asset('e.avif') }}" alt="Global Explorer logo" class="footer-logo"> 
                 </a>
-                <p class="footer-copy mb-0">© {{ date('Y') }} Global Explorer. All rights reserved.</p>
+                
             </div>
 
             <div class="col-12 col-md-6 col-lg-3">
@@ -114,7 +113,7 @@
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterCategories as $footerCategory)
                         <li>
-                            <a href="{{ route('category.show', $footerCategory->slug) }}" class="text-decoration-none">
+                            <a href="{{ route('category.show', $footerCategory->slug) }}" class="text-decoration-none text-white">
                                 {{ $footerCategory->name }}
                             </a>
                         </li>
@@ -129,7 +128,7 @@
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterBlogs as $footerBlog)
                         <li>
-                            <a href="{{ route('blog.show', $footerBlog->slug) }}" class="text-decoration-none">
+                            <a href="{{ route('blog.show', $footerBlog->slug) }}" class="text-decoration-none text-white">
                                 {{ \Illuminate\Support\Str::limit($footerBlog->title, 45) }}
                             </a>
                         </li>
@@ -139,6 +138,7 @@
                 </ul>
             </div>
         </div>
+        <p class="footer-copy mb-0">© {{ date('Y') }} Global Explorer. All rights reserved.</p>
     </div>
 </footer>
     
