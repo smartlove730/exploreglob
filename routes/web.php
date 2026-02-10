@@ -15,6 +15,7 @@ use App\Http\Controllers\{
 };
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/home/categories/load', [HomeController::class, 'loadCategories'])->name('home.categories.load');
 
 // Country Selector
 Route::get('/country/{code}', [CountryController::class, 'setCountry'])->name('country.set');
