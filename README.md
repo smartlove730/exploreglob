@@ -105,6 +105,15 @@ Call the API directly from your server's crontab:
 Generate blogs manually:
 
 ```bash
+# Generate sitemap.xml immediately
+php artisan sitemap:generate
+```
+
+Sitemap generation is also scheduled daily at 1 AM in `routes/console.php`.
+Sitemap uses base URL `https://explore-glob.blog` and includes category/blog URLs only for `country_id = 183`.
+
+
+```bash
 # All countries and categories
 php artisan blogs:generate-scheduled
 

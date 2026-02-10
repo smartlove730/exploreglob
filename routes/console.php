@@ -20,3 +20,10 @@ Schedule::command('blogs:generate-scheduled --limit=1')
 //     ->everySixHours()
 //     ->withoutOverlapping()
 //     ->runInBackground();
+
+
+// Generate sitemap daily at 1:00 AM
+Schedule::command('sitemap:generate')
+    ->dailyAt('01:00')
+    ->withoutOverlapping()
+    ->runInBackground();
