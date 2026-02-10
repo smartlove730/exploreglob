@@ -63,7 +63,7 @@
         <option value="">🌍 Select Country</option>
         @foreach(\App\Models\Country::all() as $country)
         @if($country->code == 'US')
-          <option value="{{ url('country/'.$country->code) }}">
+          <option value="{{ url('country/'.$country->code) }}" selected>
             {{ $country->name }}
           </option>
           @endif
