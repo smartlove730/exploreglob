@@ -78,38 +78,17 @@
     @if(isset($categories) && count($categories) > 0)
     <section class="mt-5 pt-5">
         <h2 class="section-title">Browse Categories</h2>
-        <div class="row g-4">
-           
-            @foreach($categories as $index => $category)
-            
-@php
-    
-
-    $categoryFolder = 'categories/' . trim($category->name);
-    $images = Storage::disk('public')->files($categoryFolder);
- 
-    $randomImage = count($images) > 0
-        ? asset('storage/' . $images[array_rand($images)])
-        : asset('images/default-category.webp'); // fallback image
-@endphp
-                <div class="col-md-4 col-sm-6">
-                    <div class="category-card">
-                       <img 
-            src="{{ $randomImage }}" 
-            alt="{{ $category->name }}" 
-            class="img-fluid mb-3 rounded" loading="lazy"
-        >
-                        <h5 class="card-title mb-3">{{ $category->name }}</h5>
-                        <p class="card-text mb-4">
-                            {{ $category->description ?? 'Explore amazing blogs in this category' }}
-                        </p>
-                        <a href="{{ route('category.show', $category->slug ?? $category->id) }}" class="btn btn-primary">
-                            Explore Blogs →
-                        </a>
-                    </div>
-                </div>
-            @endforeach
+        <div class="row g-4" id="category-grid">
+            @include('partials.category-cards', ['categories' => $categories])
         </div>
+
+        <div id="category-loader" class="category-loader d-none" aria-live="polite" aria-label="Loading more categories">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <div id="category-scroll-trigger" class="category-scroll-trigger {{ $hasMoreCategories ? '' : 'd-none' }}"></div>
     </section>
     @endif
 
@@ -124,3 +103,116 @@
 </div>
 
 @endsection
+
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const trigger = document.getElementById('category-scroll-trigger');
+    const loader = document.getElementById('category-loader');
+    const categoryGrid = document.getElementById('category-grid');
+
+    if (!trigger || !loader || !categoryGrid) {
+        return;
+    }
+
+    let offset = categoryGrid.children.length;
+    let hasMore = {{ $hasMoreCategories ? 'true' : 'false' }};
+    let isLoading = false;
+
+    const loadMoreCategories = async () => {
+        if (!hasMore || isLoading) {
+            return;
+        }
+
+        isLoading = true;
+        loader.classList.remove('d-none');
+
+        try {
+            const response = await fetch(`{{ route('home.categories.load') }}?offset=${offset}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load categories');
+            }
+
+            const data = await response.json();
+
+            if (data.html) {
+                const previousCount = categoryGrid.children.length;
+                categoryGrid.insertAdjacentHTML('beforeend', data.html);
+
+                const appendedCards = Array.from(categoryGrid.querySelectorAll('.category-card')).slice(previousCount);
+
+                if (typeof gsap !== 'undefined' && appendedCards.length > 0) {
+                    gsap.fromTo(appendedCards,
+                        {
+                            opacity: 0,
+                            scale: 0.8,
+                            rotation: -5
+                        },
+                        {
+                            opacity: 1,
+                            scale: 1,
+                            rotation: 0,
+                            duration: 0.6,
+                            stagger: 0.08,
+                            ease: 'back.out(1.7)'
+                        }
+                    );
+                } else {
+                    appendedCards.forEach((card) => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'none';
+                    });
+                }
+            }
+
+            offset = data.nextOffset;
+            hasMore = data.hasMore;
+
+            if (!hasMore) {
+                trigger.classList.add('d-none');
+                observer.disconnect();
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            loader.classList.add('d-none');
+            isLoading = false;
+        }
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                loadMoreCategories();
+            }
+        });
+    }, {
+        rootMargin: '0px 0px 200px 0px',
+    });
+
+    if (hasMore) {
+        observer.observe(trigger);
+    }
+});
+</script>
+<style>
+    .category-loader {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 1.5rem;
+    }
+
+    .category-scroll-trigger {
+        width: 100%;
+        height: 1px;
+    }
+</style>
+@endpush
