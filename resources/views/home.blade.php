@@ -143,7 +143,33 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
 
             if (data.html) {
+                const previousCount = categoryGrid.children.length;
                 categoryGrid.insertAdjacentHTML('beforeend', data.html);
+
+                const appendedCards = Array.from(categoryGrid.querySelectorAll('.category-card')).slice(previousCount);
+
+                if (typeof gsap !== 'undefined' && appendedCards.length > 0) {
+                    gsap.fromTo(appendedCards,
+                        {
+                            opacity: 0,
+                            scale: 0.8,
+                            rotation: -5
+                        },
+                        {
+                            opacity: 1,
+                            scale: 1,
+                            rotation: 0,
+                            duration: 0.6,
+                            stagger: 0.08,
+                            ease: 'back.out(1.7)'
+                        }
+                    );
+                } else {
+                    appendedCards.forEach((card) => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'none';
+                    });
+                }
             }
 
             offset = data.nextOffset;
