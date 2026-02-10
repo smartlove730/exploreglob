@@ -1,4 +1,4 @@
-<title>{{ $seo_title ?? config('app.name') }}</title>
+<title>{{ trim(preg_replace('/\[[^\]]*\]/', '', $seo_title)) ?? config('app.name') }}</title>
 
 <meta name="description" content="{{ $seo_description ?? '' }}">
 <meta name="keywords" content="{{ $seo_keywords ?? '' }}">
