@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
 @section('content')
-    <section class="hero-section" style="min-height: 30vh;">
-        <div class="container">
+    <section class="hero-section" style="min-height: 35vh; display: flex; align-items: center; background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('/path-to-your-banner.jpg') center/cover;">
+        <div class="container text-center">
             <div class="hero-content">
-                <h1 class="hero-title">About Global Explorer</h1>
-                <p class="hero-subtitle">Connecting readers with authentic voices, local insight, and global perspectives.</p>
+                <h1 class="hero-title text-white">Behind Global Explorer</h1>
+                <p class="hero-subtitle text-white-50">Bridging the gap between local insights and a global audience through technology and storytelling.</p>
             </div>
         </div>
     </section>
@@ -13,24 +13,38 @@
     <div class="container my-5">
         <div class="row justify-content-center">
             <div class="col-lg-9">
-                <div class="animated-card">
+                <div class="animated-card shadow-sm border-0">
                     <div class="card-body p-5">
-                        <h2 class="mb-4">Our Mission</h2>
-                        <p>Global Explorer is a curated blog platform built to surface meaningful stories from around the world. We bring together writers, travelers, researchers, and local experts who share on-the-ground insights about culture, food, travel, history, and everyday life.</p>
+                        <h2 class="mb-4">Our Vision</h2>
+                        <p class="lead text-muted">In an era of information overload, finding authentic, localized perspectives is harder than ever. Global Explorer was founded in 2026 to solve this by creating a structured, AI-enhanced platform that organizes world knowledge by country, category, and lived experience.</p>
+                        
+                        <p>Our mission is to surface meaningful stories that often get lost in the noise. By combining advanced web technology with a passion for global culture, we provide a gateway for readers to explore everything from emerging tech trends in the US to spiritual traditions and local cuisines across the globe.</p>
 
-                        <h2 class="mb-4 mt-5">Why We Exist</h2>
-                        <p>We believe great stories help people understand each other. Our platform is designed to highlight credible, experience-driven content that showcases real places and real people. Whether you're planning a trip, learning about a new region, or simply exploring from home, Global Explorer helps you discover voices you can trust.</p>
+                        <div class="row mt-5">
+                            <div class="col-md-6 mb-4">
+                                <h4 class="h5 font-weight-bold">Expert-Driven Content</h4>
+                                <p>We don't just aggregate data; we curate insights. Our platform focuses on deep-dive topics like Web Development, Indian Mythology, and Global Business, ensuring every article adds unique value to the reader.</p>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <h4 class="h5 font-weight-bold">AI-Enhanced Accuracy</h4>
+                                <p>Leveraging the power of the Gemini API and Laravel, we ensure our educational resources are up-to-date, factually grounded, and organized for maximum readability.</p>
+                            </div>
+                        </div>
 
-                        <h2 class="mb-4 mt-5">Editorial Standards</h2>
-                        <ul>
-                            <li><strong>Experience:</strong> We prioritize writers with lived or on-location experience.</li>
-                            <li><strong>Expertise:</strong> Articles are reviewed to ensure accuracy and clarity.</li>
-                            <li><strong>Authoritativeness:</strong> We highlight author bios and sources when relevant.</li>
-                            <li><strong>Trustworthiness:</strong> We maintain transparent policies and protect user data.</li>
+                        <h2 class="mb-4 mt-4">Our Editorial Core (E-E-A-T)</h2>
+                        <p>Adhering to the highest digital standards, we ensure every piece of content on Global Explorer meets four key pillars:</p>
+                        <ul class="list-unstyled custom-list">
+                            <li class="mb-3"><strong><i class="fas fa-check-circle text-success mr-2"></i> Experience:</strong> We prioritize stories backed by real-world interaction and on-the-ground research.</li>
+                            <li class="mb-3"><strong><i class="fas fa-check-circle text-success mr-2"></i> Expertise:</strong> Our technical guides and cultural deep-dives are written by those who live and breathe the subject matter.</li>
+                            <li class="mb-3"><strong><i class="fas fa-check-circle text-success mr-2"></i> Authoritativeness:</strong> We provide clear sourcing and professional context for every claim we make.</li>
+                            <li class="mb-3"><strong><i class="fas fa-check-circle text-success mr-2"></i> Trustworthiness:</strong> Your privacy and data security are paramount. We maintain transparent policies to ensure a safe reading environment.</li>
                         </ul>
 
-                        <h2 class="mb-4 mt-5">Get In Touch</h2>
-                        <p>Have feedback, ideas, or collaboration requests? Visit our <a href="{{ route('contact') }}" class="text-decoration-none" style="color: var(--primary-color); font-weight: 600;">Contact Us</a> page and we’ll respond as quickly as possible.</p>
+                        <div class="bg-light p-4 rounded mt-5 text-center">
+                            <h3 class="h4">Join Our Journey</h3>
+                            <p>Global Explorer is a constantly evolving project. If you are a writer, a developer, or a curious traveler with a story to tell, we’d love to hear from you.</p>
+                            <a href="{{ route('contact') }}" class="btn btn-primary px-4 py-2 mt-2">Get In Touch</a>
+                        </div>
                     </div>
                 </div>
             </div>
