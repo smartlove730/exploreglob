@@ -47,7 +47,7 @@ class GenerateBlogs implements ShouldQueue
  
         foreach ($categories as $category) {
         
-        $PromptGenforcat = "Generate a prompt for blog of trending article genration on the topic of {$category->name} Target Audience will be people of USA. output should be in json form as following format.
+        $PromptGenforcat = "Generate a prompt for blog of trending article genration on the topic of {$category->name} Target Audience will be people of USA. output should be in json form as following format. 
         {
         'prompt':''
         }";
@@ -95,9 +95,8 @@ class GenerateBlogs implements ShouldQueue
 
 
         $prompt = $prompt1 ."   Try to include specific personal anecdotes, expert commentary that a standard AI wouldn't naturally produce. Google values 'Information Gain'—the idea that your site provides something the 100 other sites on the same topic don't. Prefers deeper, comprehensive guides (1,000+ words) that provide 'unique information' not easily found elsewhere. Ensure all posts are polished. Any significant grammatical errors or 'unnatural' phrasing (often seen in unedited AI text) is a red flag for quality.
-Give related image generation prompt for the blog article.
-Format your response strictly as JSON using this exact schema:
-
+  Content should be human written, insightful, and helpful, suitable for a  {$category->name} blog. Use realistic and educational examples, not overly generic text deep content should be there. it should be unique and not copied from anywhere. it should be in depth and comprehensive. it should be engaging and informative. it should be well researched and provide value to the reader. it should be original and not plagiarized. it should be written in a clear and concise manner. it should be formatted properly with headings, subheadings, and bullet points where appropriate. it should be optimized for SEO with relevant keywords and meta descriptions. it should be promoted on social media and other platforms to reach a wider audience. it shouldd be capable of outranking other blogs on the same topic by providing more comprehensive and valuable information. it should be elligible for adsense and should not violate any of Google's content policies.
+Format your response strictly as JSON using this exact schema: 
 {
   'title': '',
   'subtitle': '',
