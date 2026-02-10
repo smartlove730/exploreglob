@@ -29,25 +29,28 @@ class GenerateSitemap extends Command
      */
     public function handle(): int
     {
+        $baseUrl = 'https://explore-glob.blog';
+
         $urls = collect([
             [
-                'loc' => URL::to('/'),
+                'loc' => $this->buildUrl($baseUrl, '/'),
                 'lastmod' => now(),
                 'changefreq' => 'daily',
                 'priority' => '1.0',
             ],
-            ['loc' => URL::to('/categories'), 'lastmod' => now(), 'changefreq' => 'daily', 'priority' => '0.8'],
-            ['loc' => URL::to('/about'), 'lastmod' => now(), 'changefreq' => 'monthly', 'priority' => '0.6'],
-            ['loc' => URL::to('/contact'), 'lastmod' => now(), 'changefreq' => 'monthly', 'priority' => '0.6'],
-            ['loc' => URL::to('/privacy-policy'), 'lastmod' => now(), 'changefreq' => 'yearly', 'priority' => '0.4'],
-            ['loc' => URL::to('/terms'), 'lastmod' => now(), 'changefreq' => 'yearly', 'priority' => '0.4'],
+            ['loc' => $this->buildUrl($baseUrl, '/categories'), 'lastmod' => now(), 'changefreq' => 'daily', 'priority' => '0.8'],
+            ['loc' => $this->buildUrl($baseUrl, '/about'), 'lastmod' => now(), 'changefreq' => 'monthly', 'priority' => '0.6'],
+            ['loc' => $this->buildUrl($baseUrl, '/contact'), 'lastmod' => now(), 'changefreq' => 'monthly', 'priority' => '0.6'],
+            ['loc' => $this->buildUrl($baseUrl, '/privacy-policy'), 'lastmod' => now(), 'changefreq' => 'yearly', 'priority' => '0.4'],
+            ['loc' => $this->buildUrl($baseUrl, '/terms'), 'lastmod' => now(), 'changefreq' => 'yearly', 'priority' => '0.4'],
         ]);
 
         $categoryUrls = Category::query()
             ->where('status', 1)
+            ->where('country_id', 183)
             ->get(['slug', 'updated_at'])
             ->map(fn (Category $category) => [
-                'loc' => URL::to('/category/' . $category->slug),
+                'loc' => $this->buildUrl($baseUrl, '/category/' . $category->slug),
                 'lastmod' => $category->updated_at,
                 'changefreq' => 'weekly',
                 'priority' => '0.7',
@@ -55,9 +58,10 @@ class GenerateSitemap extends Command
 
         $blogUrls = Blog::query()
             ->where('status', 1)
+            ->where('country_id', 183)
             ->get(['slug', 'updated_at'])
             ->map(fn (Blog $blog) => [
-                'loc' => URL::to('/blog/' . $blog->slug),
+                'loc' => $this->buildUrl($baseUrl, '/blog/' . $blog->slug),
                 'lastmod' => $blog->updated_at,
                 'changefreq' => 'weekly',
                 'priority' => '0.9',
@@ -101,5 +105,14 @@ class GenerateSitemap extends Command
         $xml[] = '</urlset>';
 
         return implode(PHP_EOL, $xml) . PHP_EOL;
+    }
+
+    private function buildUrl(string $baseUrl, string $path): string
+    {
+        if ($path === '' || $path === '/') {
+            return $baseUrl;
+        }
+
+        return $baseUrl . '/' . ltrim($path, '/');
     }
 }
