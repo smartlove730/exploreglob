@@ -90,9 +90,14 @@ class GenerateScheduledBlogs extends Command
      */
     private function generateForCountry($countryId, $limit)
     {
-        $categories = Category::where('country_id', $countryId)
-            ->where('status', 1)
-            ->get();
+        // $categories = Category::where('country_id', $countryId)
+        //     ->where('status', 1)
+        //     ->get();
+    $categories =    Category::where('country_id', $countryId)
+    ->where('status', 1)
+    ->inRandomOrder()
+    ->limit(5)
+    ->get();
 
         if ($categories->isEmpty()) {
             $this->warn("No active categories found for country ID: {$countryId}");
