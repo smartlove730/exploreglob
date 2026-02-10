@@ -207,7 +207,7 @@
                     <div class="col-md-5">
                         <input type="email" class="form-control form-control-lg" placeholder="Your email" required>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <button class="btn btn-light btn-lg w-100" type="submit">
                             Subscribe
                         </button>
