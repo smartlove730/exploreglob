@@ -199,7 +199,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
     'content'         => json_encode([
         'subtitle'       => $aiRaw['subtitle'] ?? '',
         'author'         => $aiRaw['author'] ?? '',
-        'published_date' => $aiRaw['published_date'] ?? '',
+        'published_date' => Carbon::parse( now()?? now())->format('Y-m-d H:i:s') ,
         'read_time'      => $aiRaw['read_time'] ?? '',
         'cover_image'    => json_encode($aiRaw['cover_image'] ?? []) ?? '',
         'json_schema'    => $aiRaw['json_schema'] ?? '',
@@ -219,7 +219,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
     'seo_title'       => $aiRaw['seo_title'] ?? ($aiRaw['title'] ?? 'Untitled'),
     'seo_description' => $aiRaw['seo_description'] ?? '',
     'seo_keywords'    => $aiRaw['seo_keywords'] ?? '',
-    'published_at'    => $aiRaw['published_date'] ?? now(),
+    'published_at'    => Carbon::parse( now()?? now())->format('Y-m-d H:i:s'),
     'status'          => 1,
 ]);
 
