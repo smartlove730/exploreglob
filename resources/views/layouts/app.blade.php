@@ -30,14 +30,14 @@
 
 </style>
 
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-N4CGBWESRQ"></script>
+ <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-REDTM9GQ3P"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
 
-  gtag('config', 'G-N4CGBWESRQ');
+  gtag('config', 'G-REDTM9GQ3P');
 </script>
     
 </head>
