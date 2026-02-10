@@ -3,6 +3,7 @@
 @php
   use App\Helpers\TextHumanizer;
     use Illuminate\Support\Facades\Storage;
+    use App\Helpers\ImageOptimizer;
     // Decode the JSON content from DB
     $content = json_decode($blog->content ?? '{}', true);
 
@@ -90,9 +91,13 @@
 <div class="container mt-4 mb-5">
     <div class="row">
         <div class="col-lg-10 mx-auto">
-            <img src="{{ is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage }}" 
+            @php
+                $coverSource = is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage;
+                $optimizedCoverSource = ImageOptimizer::optimize($coverSource, 1200, 75);
+            @endphp
+            <img src="{{ $optimizedCoverSource }}" 
                  alt="{{ $blog->title }}" 
-                 class="blog-cover-image" loading="lazy"
+                 class="blog-cover-image" loading="lazy" decoding="async" width="1200" height="675"
                  >
         </div>
     </div>
@@ -181,10 +186,13 @@
 @endphp
 
  
-                        <img src="{{ $src }}" 
+                        @php
+                            $optimizedRelatedImage = ImageOptimizer::optimize($src, 480, 70);
+                        @endphp
+                        <img src="{{ $optimizedRelatedImage }}" 
                              class="card-img-top" 
                              alt="{{ $related['title'] ?? 'Related' }}"
-                             style="height: 220px; object-fit: cover;" loading="lazy"
+                             style="height: 220px; object-fit: cover;" loading="lazy" decoding="async" width="480" height="220"
                              onerror="if(!this.classList.contains('image-placeholder')){const w=this.width||400;const h=this.height||300;const t=this.alt||'Image';const s=`%3Csvg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'%3E%3Crect fill='%236366f1' width='100%25' height='100%25'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial,sans-serif' font-size='${Math.min(w,h)/15}' font-weight='600'%3E${t}%3C/text%3E%3C/svg%3E`;this.src='data:image/svg+xml,'+s;this.classList.add('image-placeholder');}">
                         <div class="card-body">
                             <h5 class="card-title">{{ $related['title'] }}</h5>

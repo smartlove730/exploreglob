@@ -10,6 +10,7 @@
 @section('content')
 @php
     use Illuminate\Support\Facades\Storage;
+    use App\Helpers\ImageOptimizer;
  
 @endphp
 <!-- Hero Section -->
@@ -47,9 +48,13 @@
                 <div class="col-md-6 col-lg-4">
                     <div class="animated-card">
                        
-                      <img src="{{ is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage }}"
+                      @php
+                          $blogImage = is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage;
+                          $optimizedBlogImage = ImageOptimizer::optimize($blogImage, 640, 72);
+                      @endphp
+                      <img src="{{ $optimizedBlogImage }}"
      class="card-img-top"
-     alt="{{ $blog->title }}" loading="lazy" > <div class="card-body d-flex flex-column">
+     alt="{{ $blog->title }}" loading="lazy" decoding="async" width="640" height="400"> <div class="card-body d-flex flex-column">
                             <h5 class="card-title">
                                 <a href="{{ route('blog.show', $blog->slug) }}">
                                     {{ $blog->title }}
