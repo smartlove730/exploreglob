@@ -105,6 +105,14 @@ Call the API directly from your server's crontab:
 Generate blogs manually:
 
 ```bash
+# Generate sitemap.xml immediately
+php artisan sitemap:generate
+```
+
+Sitemap generation is also scheduled daily at 1 AM in `routes/console.php`.
+
+
+```bash
 # All countries and categories
 php artisan blogs:generate-scheduled
 
