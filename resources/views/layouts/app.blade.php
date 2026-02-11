@@ -28,6 +28,60 @@
     background-image: var(--bs-navbar-toggler-icon-bg);
 }
 
+.header-search-wrapper {
+    position: relative;
+    max-width: 420px;
+    width: 100%;
+}
+
+.header-search-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    z-index: 1051;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.header-search-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #6c757d;
+    padding: 0.5rem 0.75rem 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.header-search-item {
+    display: block;
+    padding: 0.45rem 0.75rem;
+    color: #212529;
+    text-decoration: none;
+    border-top: 1px solid #f1f3f5;
+}
+
+.header-search-item:hover {
+    background-color: #f8f9fa;
+}
+
+.header-search-empty {
+    padding: 0.25rem 0.75rem 0.75rem;
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+@media (max-width: 991.98px) {
+    .header-search-wrapper {
+        margin-top: 0.75rem;
+        max-width: none;
+    }
+}
+
 </style>
 
  <!-- Google tag (gtag.js) -->
@@ -67,7 +121,16 @@
         </li>
       </ul>
 
-     
+      <div class="header-search-wrapper me-3">
+        <input
+          type="search"
+          id="header-search-input"
+          class="form-control form-control-sm"
+          placeholder="Search categories and blogs..."
+          autocomplete="off"
+        >
+        <div id="header-search-results" class="header-search-dropdown d-none"></div>
+      </div>
     </div>
      <select class="form-select form-select-sm" style="width:200px"
         onchange="window.location=this.value">
@@ -142,15 +205,91 @@
     </div>
 </footer>
     
-<script src="https://code.jquery.com/jquery-3.6.0.slim.min.js"
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"
         ></script>
         <script>
 $(document).ready(function () {
 
     const $navbar = $('#navbarNav');
     $navbar.removeClass('collapse');
-     
- 
+
+    const $searchInput = $('#header-search-input');
+    const $searchResults = $('#header-search-results');
+    let searchRequest = null;
+
+    function hideSearchResults() {
+        $searchResults.addClass('d-none').empty();
+    }
+
+    function escapeHtml(value) {
+        return $('<div>').text(value ?? '').html();
+    }
+
+    function renderSection(label, items, type) {
+        let html = `<div class="header-search-label">${escapeHtml(label)}</div>`;
+
+        if (!items.length) {
+            return html + '<div class="header-search-empty">No results found</div>';
+        }
+
+        items.forEach((item) => {
+            const url = type === 'category'
+                ? `{{ url('/category') }}/${item.slug}`
+                : `{{ url('/blog') }}/${item.slug}`;
+
+            const title = type === 'category' ? item.name : item.title;
+            html += `<a class="header-search-item" href="${url}">${escapeHtml(title)}</a>`;
+        });
+
+        return html;
+    }
+
+    function renderResults(data) {
+        const categories = Array.isArray(data.categories) ? data.categories : [];
+        const blogs = Array.isArray(data.blogs) ? data.blogs : [];
+
+        let html = '';
+        html += renderSection('Categories', categories, 'category');
+        html += renderSection('Blogs', blogs, 'blog');
+
+        $searchResults.html(html).removeClass('d-none');
+    }
+
+    $searchInput.on('keyup', function () {
+        const keyword = $(this).val().trim();
+
+        if (searchRequest && searchRequest.readyState !== 4) {
+            searchRequest.abort();
+        }
+
+        if (keyword.length < 2) {
+            hideSearchResults();
+            return;
+        }
+
+        searchRequest = $.ajax({
+            url: `{{ route('home.search') }}`,
+            method: 'GET',
+            data: { q: keyword },
+            dataType: 'json',
+            success: function (response) {
+                renderResults(response);
+            },
+            error: function (xhr, status) {
+                if (status === 'abort') {
+                    return;
+                }
+
+                hideSearchResults();
+            }
+        });
+    });
+
+    $(document).on('click', function (event) {
+        if (!$(event.target).closest('.header-search-wrapper').length) {
+            hideSearchResults();
+        }
+    });
 
 });
 </script>
