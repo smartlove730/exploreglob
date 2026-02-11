@@ -7,6 +7,7 @@ use App\Models\Category;
 
 class HomeController extends Controller
 {
+    private const RECENT_BLOG_LIMIT = 12;
     private const INITIAL_CATEGORY_LIMIT = 12;
     private const CATEGORY_LOAD_LIMIT = 6;
 
@@ -19,7 +20,7 @@ class HomeController extends Controller
             ->where('status', 1)
             ->when($country, fn($q) => $q->where('country_id', $country))
             ->latest()
-            ->take(10)
+            ->take(self::RECENT_BLOG_LIMIT)
             ->get();
 
         $categoriesQuery = Category::where('status', 1)

@@ -26,10 +26,10 @@
 </section>
 
 <div class="container my-5" id="latest-blogs">
-    <!-- Latest Blogs Section -->
+    <!-- Most Recent Blogs Section -->
     @if(isset($blogs) && $blogs->count() > 0)
     <section class="mb-5">
-        <h2 class="section-title">Latest Blogs</h2>
+        <h2 class="section-title">Most Recent Blogs</h2>
         <div class="row g-4">
             @foreach($blogs as $index => $blog)
                  
