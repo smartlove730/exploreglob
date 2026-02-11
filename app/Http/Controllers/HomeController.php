@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Blog;
 use App\Models\Category;
+use Illuminate\Support\Facades\Cache;
 
 class HomeController extends Controller
 {
@@ -17,23 +18,27 @@ class HomeController extends Controller
         $country = session('country')?? 183;
         $minBlogs = (int) env('CATEGORY_MIN_BLOGS', 3);
 
-        $blogs = Blog::with('category')
-            ->where('status', 1)
-            ->when($country, fn($q) => $q->where('country_id', $country))
-            ->latest()
-            ->take(self::RECENT_BLOG_LIMIT)
-            ->get();
+        $blogs = Cache::remember("home:blogs:country:{$country}", now()->addMinutes(10), function () use ($country) {
+            return Blog::with('category')
+                ->where('status', 1)
+                ->when($country, fn($q) => $q->where('country_id', $country))
+                ->latest()
+                ->take(self::RECENT_BLOG_LIMIT)
+                ->get();
+        });
 
-        $categoriesQuery = Category::where('status', 1)
-            ->where('country_id', $country)
-            ->withCount(['blogs' => fn($q) => $q->where('status', 1)])
-            ->having('blogs_count', '>=', $minBlogs);
+        $categoriesWithExtra = Cache::remember("home:categories:country:{$country}:min:{$minBlogs}", now()->addMinutes(10), function () use ($country, $minBlogs) {
+            return Category::where('status', 1)
+                ->where('country_id', $country)
+                ->withCount(['blogs' => fn($q) => $q->where('status', 1)])
+                ->having('blogs_count', '>=', $minBlogs)
+                ->orderBy('name')
+                ->take(self::INITIAL_CATEGORY_LIMIT + 1)
+                ->get();
+        });
 
-        $categories = (clone $categoriesQuery)
-            ->take(self::INITIAL_CATEGORY_LIMIT)
-            ->get();
-
-        $hasMoreCategories = $categoriesQuery->count() > self::INITIAL_CATEGORY_LIMIT;
+        $hasMoreCategories = $categoriesWithExtra->count() > self::INITIAL_CATEGORY_LIMIT;
+        $categories = $categoriesWithExtra->take(self::INITIAL_CATEGORY_LIMIT)->values();
  
         return view('home', compact('blogs', 'categories', 'hasMoreCategories'));
     }
@@ -44,23 +49,23 @@ class HomeController extends Controller
         $minBlogs = (int) env('CATEGORY_MIN_BLOGS', 3);
         $offset = max((int) request('offset', 0), 0);
 
-        $categoriesQuery = Category::where('status', 1)
+        $categoriesWithExtra = Category::where('status', 1)
             ->where('country_id', $country)
             ->withCount(['blogs' => fn($q) => $q->where('status', 1)])
-            ->having('blogs_count', '>=', $minBlogs);
-
-        $categories = (clone $categoriesQuery)
             ->skip($offset)
-            ->take(self::CATEGORY_LOAD_LIMIT)
+            ->take(self::CATEGORY_LOAD_LIMIT + 1)
+            ->orderBy('name')
+            ->having('blogs_count', '>=', $minBlogs)
             ->get();
 
-        $totalCategories = $categoriesQuery->count();
+        $hasMore = $categoriesWithExtra->count() > self::CATEGORY_LOAD_LIMIT;
+        $categories = $categoriesWithExtra->take(self::CATEGORY_LOAD_LIMIT)->values();
         $nextOffset = $offset + $categories->count();
 
         return response()->json([
             'html' => view('partials.category-cards', compact('categories'))->render(),
             'nextOffset' => $nextOffset,
-            'hasMore' => $nextOffset < $totalCategories,
+            'hasMore' => $hasMore,
         ]);
     }
 
