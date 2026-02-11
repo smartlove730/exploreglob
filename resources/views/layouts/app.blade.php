@@ -4,8 +4,7 @@
     @yield('SeoTags')
 <meta name="google-adsense-account" content="ca-pub-3230339294601454">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/png" href="{{asset('e.avif')}}">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,10 +12,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
     <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></noscript>
+
     <!-- Custom CSS -->
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="{{ asset('/css/custom.css') }}">
 <style>
 
@@ -100,7 +100,7 @@
 <header>
   <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top shadow-sm">
   <div class="container">
-      <img src="{{asset('e.avif')}}" style="height:20px!important;">
+      <img src="{{ asset('e.avif') }}" alt="Global Explorer logo" style="height:20px!important;" loading="eager" decoding="async">
     <a class="navbar-brand fw-bold" href="{{ route('home') }}">  Global Explorer</a>
  
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
@@ -132,15 +132,12 @@
         <div id="header-search-results" class="header-search-dropdown d-none"></div>
       </div>
     </div>
-     <select class="form-select form-select-sm" style="width:200px"
-        onchange="window.location=this.value">
+     <select class="form-select form-select-sm" style="width:200px" onchange="if(this.value){window.location=this.value}">
         <option value="">🌍 Select Country</option>
-        @foreach(\App\Models\Country::all() as $country)
-        @if($country->code == 'US')
-          <option value="{{ url('country/'.$country->code) }}" selected>
+        @foreach($countries as $country)
+          <option value="{{ url('country/'.$country->code) }}" @selected(($country->id ?? null) == (session('country') ?? 183))>
             {{ $country->name }}
           </option>
-          @endif
         @endforeach
       </select>
   </div>
@@ -205,106 +202,97 @@
     </div>
 </footer>
     
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"
-        ></script>
-        <script>
-$(document).ready(function () {
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const navbar = document.getElementById('navbarNav');
+    if (navbar) navbar.classList.remove('collapse');
 
-    const $navbar = $('#navbarNav');
-    $navbar.removeClass('collapse');
+    const searchInput = document.getElementById('header-search-input');
+    const searchResults = document.getElementById('header-search-results');
+    let controller = null;
+    let debounce = null;
 
-    const $searchInput = $('#header-search-input');
-    const $searchResults = $('#header-search-results');
-    let searchRequest = null;
+    if (!searchInput || !searchResults) return;
 
-    function hideSearchResults() {
-        $searchResults.addClass('d-none').empty();
-    }
+    const hideSearchResults = () => {
+        searchResults.classList.add('d-none');
+        searchResults.innerHTML = '';
+    };
 
-    function escapeHtml(value) {
-        return $('<div>').text(value ?? '').html();
-    }
+    const escapeHtml = (value = '') => {
+        const div = document.createElement('div');
+        div.textContent = value;
+        return div.innerHTML;
+    };
 
-    function renderSection(label, items, type) {
+    const renderSection = (label, items, type) => {
         let html = `<div class="header-search-label">${escapeHtml(label)}</div>`;
-
-        if (!items.length) {
-            return html + '<div class="header-search-empty">No results found</div>';
-        }
+        if (!items.length) return `${html}<div class="header-search-empty">No results found</div>`;
 
         items.forEach((item) => {
-            const url = type === 'category'
-                ? `{{ url('/category') }}/${item.slug}`
-                : `{{ url('/blog') }}/${item.slug}`;
-
+            const url = type === 'category' ? `{{ url('/category') }}/${item.slug}` : `{{ url('/blog') }}/${item.slug}`;
             const title = type === 'category' ? item.name : item.title;
             html += `<a class="header-search-item" href="${url}">${escapeHtml(title)}</a>`;
         });
 
         return html;
-    }
+    };
 
-    function renderResults(data) {
+    const renderResults = (data) => {
         const categories = Array.isArray(data.categories) ? data.categories : [];
         const blogs = Array.isArray(data.blogs) ? data.blogs : [];
+        searchResults.innerHTML = `${renderSection('Categories', categories, 'category')}${renderSection('Blogs', blogs, 'blog')}`;
+        searchResults.classList.remove('d-none');
+    };
 
-        let html = '';
-        html += renderSection('Categories', categories, 'category');
-        html += renderSection('Blogs', blogs, 'blog');
+    searchInput.addEventListener('input', () => {
+        const keyword = searchInput.value.trim();
+        window.clearTimeout(debounce);
 
-        $searchResults.html(html).removeClass('d-none');
-    }
-
-    $searchInput.on('keyup', function () {
-        const keyword = $(this).val().trim();
-
-        if (searchRequest && searchRequest.readyState !== 4) {
-            searchRequest.abort();
-        }
+        if (controller) controller.abort();
 
         if (keyword.length < 2) {
             hideSearchResults();
             return;
         }
 
-        searchRequest = $.ajax({
-            url: `{{ route('home.search') }}`,
-            method: 'GET',
-            data: { q: keyword },
-            dataType: 'json',
-            success: function (response) {
-                renderResults(response);
-            },
-            error: function (xhr, status) {
-                if (status === 'abort') {
-                    return;
-                }
+        debounce = window.setTimeout(async () => {
+            controller = new AbortController();
 
-                hideSearchResults();
+            try {
+                const response = await fetch(`{{ route('home.search') }}?q=${encodeURIComponent(keyword)}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    signal: controller.signal,
+                });
+
+                if (!response.ok) throw new Error('Request failed');
+
+                renderResults(await response.json());
+            } catch (error) {
+                if (error.name !== 'AbortError') hideSearchResults();
             }
-        });
+        }, 200);
     });
 
-    $(document).on('click', function (event) {
-        if (!$(event.target).closest('.header-search-wrapper').length) {
-            hideSearchResults();
-        }
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.header-search-wrapper')) hideSearchResults();
     });
-
 });
 </script>
-    
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3230339294601454"
-     crossorigin="anonymous"></script>
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3230339294601454" crossorigin="anonymous"></script>
 <!-- Bootstrap 5 JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- GSAP Library -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
 
 <!-- Custom Animations -->
-<script src="{{ asset('/js/animations.js') }}"></script>
+@vite(['resources/js/animations.js'])
 @stack('scripts')
 
 </body>
