@@ -10,6 +10,7 @@ class HomeController extends Controller
     private const RECENT_BLOG_LIMIT = 12;
     private const INITIAL_CATEGORY_LIMIT = 12;
     private const CATEGORY_LOAD_LIMIT = 6;
+    private const SEARCH_RESULT_LIMIT = 6;
 
     public function index()
     {
@@ -60,6 +61,40 @@ class HomeController extends Controller
             'html' => view('partials.category-cards', compact('categories'))->render(),
             'nextOffset' => $nextOffset,
             'hasMore' => $nextOffset < $totalCategories,
+        ]);
+    }
+
+    public function search()
+    {
+        $country = session('country') ?? 183;
+        $keyword = trim((string) request('q', ''));
+
+        if (mb_strlen($keyword) < 2) {
+            return response()->json([
+                'categories' => [],
+                'blogs' => [],
+            ]);
+        }
+
+        $categories = Category::query()
+            ->where('status', 1)
+            ->where('country_id', $country)
+            ->where('name', 'like', "%{$keyword}%")
+            ->orderBy('name')
+            ->limit(self::SEARCH_RESULT_LIMIT)
+            ->get(['name', 'slug']);
+
+        $blogs = Blog::query()
+            ->where('status', 1)
+            ->where('country_id', $country)
+            ->where('title', 'like', "%{$keyword}%")
+            ->latest('published_at')
+            ->limit(self::SEARCH_RESULT_LIMIT)
+            ->get(['title', 'slug']);
+
+        return response()->json([
+            'categories' => $categories,
+            'blogs' => $blogs,
         ]);
     }
 }
