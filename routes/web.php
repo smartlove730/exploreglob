@@ -11,7 +11,8 @@ use App\Http\Controllers\{
     BlogController,
     PageController,
     CountryController,
-    NewsletterSubscriptionController
+    NewsletterSubscriptionController,
+    ImageConversionController
 };
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -29,6 +30,8 @@ Route::get('/category/{slug}', [CategoryController::class, 'show'])->name('categ
 Route::get('/blogs/{id}', [BlogController::class, 'index'])->name('blogs.index');
 Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'store'])->name('newsletter.subscribe');
+
+Route::get('/tools/convert-category-images', [ImageConversionController::class, 'convertCategoryImages'])->name('tools.convert-category-images');
 
 // Static Pages
 Route::get('/contact', [PageController::class, 'contact'])->name('contact');
