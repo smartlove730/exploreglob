@@ -296,7 +296,7 @@ $originalUrl=[];
                    
               }
             }
-         dd(, $data);
+         dd($data);
     // Normalize the structure
     return [
         'title' => $data['title'] ?? '',
