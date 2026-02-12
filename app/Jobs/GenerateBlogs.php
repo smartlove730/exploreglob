@@ -239,7 +239,7 @@ The content should sound insightful, helpful, and written by a human, suitable f
     private function normalizeAiResponse($aiResponse, $categoryName){
     // Safely extract the raw text from Gemini's nested response structure
     $rawText = $aiResponse['candidates'][0]['content']['parts'][0]['text'] ?? null;
-
+Log::info('AI Response Raw Text',  $rawText );
     if (!$rawText) {
         return [
             'title' => '',
