@@ -135,7 +135,7 @@
      <select class="form-select form-select-sm" style="width:200px" onchange="if(this.value){window.location=this.value}">
         <option value="">🌍 Select Country</option>
         @foreach($countries as $country)
-        @if($country->code == 'us')
+        @if($country->code == 'US')
           <option value="{{ url('country/'.$country->code) }}" @selected(($country->id ?? null) == (session('country') ?? 183))>
             {{ $country->name }}
           </option>
