@@ -47,55 +47,71 @@ class GenerateBlogs implements ShouldQueue
  
         foreach ($categories as $category) {
         
-        $PromptGenforcat = "Generate a prompt for blog of trending article genration on Latest newses on category {$category->name} Target Audience will be people of USA. output should be in json form as following format. 
-        {
-        'prompt':''
-        }";
+        // $PromptGenforcat = "Generate a prompt for blog of trending article genration on Latest newses on category {$category->name} Target Audience will be people of USA. output should be in json form as following format. 
+        // {
+        // 'prompt':''
+        // }";
 
-         // Call Gemini API to generate prompt
-            $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
+        //  // Call Gemini API to generate prompt
+        //     $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
             
-            if (!$apiKey) {
-                Log::error('Gemini API key not configured');
-                throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
-            }
+        //     if (!$apiKey) {
+        //         Log::error('Gemini API key not configured');
+        //         throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
+        //     }
 
-            $model = config('gemini.model', 'gemma-3-27b');
-            $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        //     $model = config('gemini.model', 'gemma-3-27b');
+        //     $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
            
-            $result = Http::timeout(180)
-                ->withHeaders([
-                    'Content-Type' => 'application/json',
-                ])
-                ->post($apiUrl, [
-                    'contents' => [['parts' => [['text' => $PromptGenforcat]]]]
-                ]);
+        //     $result = Http::timeout(180)
+        //         ->withHeaders([
+        //             'Content-Type' => 'application/json',
+        //         ])
+        //         ->post($apiUrl, [
+        //             'contents' => [['parts' => [['text' => $PromptGenforcat]]]]
+        //         ]);
 
-            if (!$result->successful()) {
-                Log::error('AI API request for prompt generation failed', [
-                    'status' => $result->status(),
-                    'response' => $result->body()
-                ]);
-                throw new \Exception('AI API request for prompt generation failed');
-            }
-            $responseJson = $result->json();
+        //     if (!$result->successful()) {
+        //         Log::error('AI API request for prompt generation failed', [
+        //             'status' => $result->status(),
+        //             'response' => $result->body()
+        //         ]);
+        //         throw new \Exception('AI API request for prompt generation failed');
+        //     }
+        //     $responseJson = $result->json();
             
-            $promptData = $this->normalizeAiResponse($responseJson,null);
+        //     $promptData = $this->normalizeAiResponse($responseJson,null);
             
-            $prompt1 = $promptData['prompt'] ?? null;
+        //     $prompt1 = $promptData['prompt'] ?? null;
 
-            if (!$prompt1) {
-                Log::error('Failed to generate prompt from AI response', [
-                    'response' => $responseJson
-                ]);
-                throw new \Exception('Failed to generate prompt from AI response');
-            }
+        //     if (!$prompt1) {
+        //         Log::error('Failed to generate prompt from AI response', [
+        //             'response' => $responseJson
+        //         ]);
+        //         throw new \Exception('Failed to generate prompt from AI response');
+        //     }
 
             // Now use the generated prompt to create the blog content
 
 
-        $prompt = $prompt1 ."   Try to include specific personal anecdotes, expert commentary that a standard AI wouldn't naturally produce. Google values 'Information Gain'—the idea that your site provides something the 100 other sites on the same topic don't. Prefers deeper, comprehensive guides (1,000+ words) that provide 'unique information' not easily found elsewhere. Ensure all posts are polished. Any significant grammatical errors or 'unnatural' phrasing (often seen in unedited AI text) is a red flag for quality.
-  Content should be human written, insightful, and helpful, suitable for a  {$category->name} news. Use realistic and educational examples, not overly generic text deep content should be there. it should be unique and not copied from anywhere. it should be in depth and comprehensive. it should be engaging and informative. it should be well researched and provide value to the reader. it should be original and not plagiarized. it should be written in a clear and concise manner. it should be formatted properly with headings, subheadings, and bullet points where appropriate. it should be optimized for SEO with relevant keywords and meta descriptions. it should be promoted on social media and other platforms to reach a wider audience. it shouldd be capable of outranking other newses on the same topic by providing more comprehensive and valuable information. it should be elligible for adsense and should not violate any of Google's content policies.
+        $prompt = "Generate a trending blog topic related to {$category->name}. Write a high-quality SEO optimized blog article.
+
+Topic: {$category->name}
+
+Requirements:
+- Minimum 1500 words
+- H1 title
+- Multiple H2 sections
+- Include bullet points
+- Include FAQ section
+- Include conclusion
+- Natural human writing style
+- Avoid repetitive phrases
+- Provide practical examples
+- Target audience: USA readers
+- Focus on information gain
+
+Return JSON in this schema:
 Format your response strictly as JSON using this exact schema: 
 {
   'title': '',
@@ -285,7 +301,7 @@ $originalUrl=[];
  $response = Http::withHeaders([
                 'Authorization' => $apiKey
             ])->get('https://api.pexels.com/v1/search', [
-                'query' => $categoryName ,
+                'query' => $data['title'] ?? $categoryName,
                 'per_page' => 79,
                 'orientation' => 'landscape'
             ]);
