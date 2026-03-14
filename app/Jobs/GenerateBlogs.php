@@ -133,7 +133,7 @@ Format your response strictly as JSON using this exact schema:
   ],
   'hashtags': [] 
 }
-The content should sound insightful, helpful, and written by a human, suitable for a design or technology blog. Use realistic and educational examples, not overly generic text.";
+The content should sound insightful, helpful, and written by a human. Use realistic and educational examples, not overly generic text.";
           
             // Get API key from config/environment
             $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
