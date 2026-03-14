@@ -10,6 +10,7 @@
 @section('content')
 @php
     use Illuminate\Support\Facades\Storage;
+    use Illuminate\Support\Str;
  
 @endphp
 <!-- Hero Section -->
@@ -28,11 +29,29 @@
 
         @forelse($categories as $index => $category)
     @php
-         $categoryFolder = 'categories/' . $category->name;
-        $images = Storage::disk('public')->files($categoryFolder);
-    $randomImage = count($images) > 0
-            ? asset('storage/' . $images[array_rand($images)])
-            : asset('images/default-category.webp');
+        $defaultFallback = 'https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=1200';
+
+        $randomImage = null;
+
+        if (!empty($category->image) && Storage::disk('public')->exists($category->image)) {
+            $randomImage = asset('storage/' . ltrim($category->image, '/'));
+        }
+
+        if (!$randomImage) {
+            $categoryFolder = 'categories/' . trim($category->name);
+            $images = Storage::disk('public')->files($categoryFolder);
+            $images = array_values(array_filter($images, function ($path) {
+                return Str::endsWith(Str::lower($path), ['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+            }));
+
+            if (count($images) > 0) {
+                $randomImage = asset('storage/' . $images[array_rand($images)]);
+            }
+        }
+
+        if (!$randomImage) {
+            $randomImage = $defaultFallback;
+        }
 @endphp
             <div class="col-md-4 col-sm-6">
                 <div class="category-card">
