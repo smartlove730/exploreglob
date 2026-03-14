@@ -14,7 +14,15 @@
     $coverImage = $blog->featured_image ?? $content['cover_image'] ;
    
     $sections = $content['sections'] ?? [];
-    $hashtags = $content['hashtags'] ?? [];
+    $hashtags = collect($content['hashtags'] ?? [])
+        ->map(fn ($tag) => ltrim(trim((string) $tag), "# \t\n\r\0\x0B"))
+        ->filter()
+        ->values()
+        ->all();
+    $cleanSeoKeywords = collect(preg_split('/\s*,\s*/', (string) ($blog->seo_keywords ?? ''), -1, PREG_SPLIT_NO_EMPTY))
+        ->map(fn ($keyword) => ltrim(trim($keyword), "# \t\n\r\0\x0B"))
+        ->filter()
+        ->implode(', ');
     $relatedBlogs = $content['related_blogs'] ?? [];
     $encodedShareTitle = rawurlencode($blog->title);
     $encodedShareUrl = rawurlencode(request()->fullUrl());
@@ -50,7 +58,7 @@
 @include('partials.seo', [
     'seo_title'       => $blog->seo_title,
     'seo_description' => $blog->seo_description,
-    'seo_keywords'    => $blog->seo_keywords,
+    'seo_keywords'    => $cleanSeoKeywords,
     'og_image'        => is_array(json_decode($blog->featured_image, true)) 
                             ? json_decode($blog->featured_image, true)[0] 
                             : $randomImage,
@@ -111,6 +119,7 @@
                     @php
                     
                         $sectionContent = $section['content'];
+                        $sectionContent = preg_replace('/^\s*#{1,6}\s*/m', '• ', $sectionContent);
                         $sectionContent = preg_replace('/\\*\\*--(.*?)--\\*\\*/s', '<strong>$1</strong>', $sectionContent);
                         $sectionContent = preg_replace('/\\*--(.*?)--\\*/s', '<em>$1</em>', $sectionContent);
                         $sectionContent = preg_replace('/\*\*(.*?)\*\*/s', '<strong>$1</strong>', $sectionContent);
@@ -132,7 +141,7 @@
     @if(!empty($hashtags))
         <div class="hashtags-container">
             @foreach($hashtags as $tag)
-                <span class="hashtag">#{{ $tag }}</span>
+                <span class="hashtag">{{ $tag }}</span>
             @endforeach
         </div>
     @endif
