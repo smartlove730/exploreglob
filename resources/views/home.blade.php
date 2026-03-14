@@ -46,8 +46,13 @@
 @endphp
                 <div class="col-md-6 col-lg-4">
                     <div class="animated-card">
-                       
-                      <img src="{{ is_array(json_decode($blog->featured_image, true)) ? json_decode($blog->featured_image, true)[0] : $randomImage }}"
+                      @php
+                          $featuredImages = json_decode($blog->featured_image, true);
+                          $featuredImageUrl = is_array($featuredImages) && !empty($featuredImages[0])
+                              ? $featuredImages[0]
+                              : $randomImage;
+                      @endphp
+                      <img src="{{ $featuredImageUrl }}"
      class="card-img-top"
      alt="{{ $blog->title }}" loading="lazy" > <div class="card-body d-flex flex-column">
                             <h5 class="card-title">
