@@ -118,7 +118,7 @@
         </li>
         @foreach($travelNavCategories ?? [] as $navCategory)
         <li class="nav-item">
-          <a class="nav-link" href="{{ route('travel.category', $navCategory->slug) }}">{{ $navCategory->name }}</a>
+          <a class="nav-link" href="{{ url('/travel/' . $navCategory->slug) }}">{{ $navCategory->name }}</a>
         </li>
         @endforeach
         <li class="nav-item">
@@ -180,7 +180,7 @@
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterCategories as $footerCategory)
                         <li>
-                            <a href="{{ route('travel.category', $footerCategory->slug) }}" class="text-decoration-none text-white">
+                            <a href="{{ url('/travel/' . $footerCategory->slug) }}" class="text-decoration-none text-white">
                                 {{ $footerCategory->name }}
                             </a>
                         </li>
@@ -195,7 +195,7 @@
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterBlogs as $footerBlog)
                         <li>
-                            <a href="{{ route('travel.blog', ['subcategory' => $footerBlog->category?->slug ?? 'travel', 'slug' => $footerBlog->slug]) }}" class="text-decoration-none text-white">
+                            <a href="{{ url('/travel/' . ($footerBlog->category?->slug ?? 'travel') . '/' . $footerBlog->slug) }}" class="text-decoration-none text-white">
                                 {{ \Illuminate\Support\Str::limit($footerBlog->title, 45) }}
                             </a>
                         </li>
