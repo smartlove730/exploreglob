@@ -3,18 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
-use App\Models\Blog; 
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
+use App\Models\Blog;
 class CategoryController extends Controller
 {
     public function index()
     {
-            $country = session('country');
-            $minBlogs = (int) env('CATEGORY_MIN_BLOGS', 3);
-           
+        $country = session('country');
+        $minBlogs = (int) env('CATEGORY_MIN_BLOGS', 3);
         $countryId = $country ?? 183;
         $travelRoot = Category::travelRoot($countryId);
 
@@ -44,14 +39,13 @@ class CategoryController extends Controller
         return view('categories.show', compact('category', 'blogs'));
     }
 
-  public function syncCategoryImages()
-{
-    // Dispatch the job to the queue
-    \App\Jobs\SyncCategoryImagesJob::dispatch();
+    public function syncCategoryImages()
+    {
+        \App\Jobs\SyncCategoryImagesJob::dispatch();
 
-    return response()->json([
-        'status' => 'success',
-        'message' => 'Image synchronization started in the background.'
-    ]);
-}
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Image synchronization started in the background.',
+        ]);
+    }
 }
