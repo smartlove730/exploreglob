@@ -31,9 +31,8 @@
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Category</label>
-            <select name="category_id" class="form-select">
-                <option value="">-- None --</option>
+            <label class="form-label">Travel Subcategory</label>
+            <select name="category_id" class="form-select" required>
                 @foreach($categories as $c)
                     <option value="{{ $c->id }}" @if($isEdit && $blog->category_id == $c->id) selected @endif>{{ $c->name }}</option>
                 @endforeach
@@ -42,8 +41,7 @@
 
         <div class="mb-3">
             <label class="form-label">Country</label>
-            <select name="country_id" class="form-select">
-                <option value="">-- None --</option>
+            <select name="country_id" class="form-select" required>
                 @foreach($countries as $co)
                     <option value="{{ $co->id }}" @if($isEdit && $blog->country_id == $co->id) selected @endif>{{ $co->name }}</option>
                 @endforeach

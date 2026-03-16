@@ -10,7 +10,7 @@ class BlogSeeder extends Seeder
 {
     public function run()
     {
-        $categories = Category::all();
+        $categories = Category::travelSubcategories()->get();
         $tags = Tag::all();
 
         foreach ($categories as $category) {

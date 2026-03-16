@@ -71,12 +71,13 @@ class GenerateScheduledBlogs extends Command
      */
     private function generateForSpecific($countryId, $categoryId, $limit)
     {
-        $category = Category::where('id', $categoryId)
+        $category = Category::travelSubcategories($countryId)
+            ->where('id', $categoryId)
             ->where('country_id', $countryId)
             ->first();
 
         if (!$category) {
-            throw new \Exception("Category {$categoryId} not found for country {$countryId}");
+            throw new \Exception("Travel category {$categoryId} not found for country {$countryId}");
         }
 
         for ($i = 0; $i < $limit; $i++) {
@@ -93,11 +94,12 @@ class GenerateScheduledBlogs extends Command
         // $categories = Category::where('country_id', $countryId)
         //     ->where('status', 1)
         //     ->get();
-    $categories =    Category::where('country_id', $countryId)
-    ->where('status', 1)
-    ->inRandomOrder()
-    ->limit(5)
-    ->get();
+    $categories = Category::travelSubcategories($countryId)
+        ->where('country_id', $countryId)
+        ->where('status', 1)
+        ->inRandomOrder()
+        ->limit(5)
+        ->get();
 
         if ($categories->isEmpty()) {
             $this->warn("No active categories found for country ID: {$countryId}");
@@ -121,6 +123,12 @@ class GenerateScheduledBlogs extends Command
     {
         $category = Category::findOrFail($categoryId);
         $countries = Country::where('status', 1)->get();
+
+        $travelRoot = Category::travelRoot($category->country_id);
+        if (!$travelRoot || $category->parent_id !== $travelRoot->id) {
+            $this->warn("Category {$categoryId} is not a Travel subcategory");
+            return;
+        }
 
         if ($countries->isEmpty()) {
             $this->warn("No active countries found");
@@ -160,6 +168,7 @@ class GenerateScheduledBlogs extends Command
         foreach ($countries as $country) {
             $categories = Category::where('country_id', $country->id)
                 ->where('status', 1)
+                ->travelSubcategories($country->id)
                 ->get();
 
             foreach ($categories as $category) {

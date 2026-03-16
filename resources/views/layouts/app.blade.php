@@ -114,8 +114,13 @@
           <a class="nav-link" href="{{ route('home') }}">Home</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ route('categories.index') }}">Categories</a>
+          <a class="nav-link" href="{{ route('travel.index') }}">Travel</a>
         </li>
+        @foreach($travelNavCategories ?? [] as $navCategory)
+        <li class="nav-item">
+          <a class="nav-link" href="{{ route('travel.category', $navCategory->slug) }}">{{ $navCategory->name }}</a>
+        </li>
+        @endforeach
         <li class="nav-item">
           <a class="nav-link" href="{{ route('contact') }}">Contact</a>
         </li>
@@ -126,7 +131,7 @@
           type="search"
           id="header-search-input"
           class="form-control form-control-sm"
-          placeholder="Search categories and blogs..."
+          placeholder="Search travel categories and blogs..."
           autocomplete="off"
         >
         <div id="header-search-results" class="header-search-dropdown d-none"></div>
@@ -171,11 +176,11 @@
             </div>
 
             <div class="col-12 col-md-6 col-lg-3">
-                <h5 class="footer-title">Top Categories</h5>
+                <h5 class="footer-title">Top Travel Categories</h5>
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterCategories as $footerCategory)
                         <li>
-                            <a href="{{ route('category.show', $footerCategory->slug) }}" class="text-decoration-none text-white">
+                            <a href="{{ route('travel.category', $footerCategory->slug) }}" class="text-decoration-none text-white">
                                 {{ $footerCategory->name }}
                             </a>
                         </li>
@@ -186,11 +191,11 @@
             </div>
 
             <div class="col-12 col-md-6 col-lg-3">
-                <h5 class="footer-title">Top Blogs</h5>
+                <h5 class="footer-title">Top Travel Blogs</h5>
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterBlogs as $footerBlog)
                         <li>
-                            <a href="{{ route('blog.show', $footerBlog->slug) }}" class="text-decoration-none text-white">
+                            <a href="{{ route('travel.blog', ['subcategory' => $footerBlog->category?->slug ?? 'travel', 'slug' => $footerBlog->slug]) }}" class="text-decoration-none text-white">
                                 {{ \Illuminate\Support\Str::limit($footerBlog->title, 45) }}
                             </a>
                         </li>
@@ -232,7 +237,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!items.length) return `${html}<div class="header-search-empty">No results found</div>`;
 
         items.forEach((item) => {
-            const url = type === 'category' ? `{{ url('/category') }}/${item.slug}` : `{{ url('/blog') }}/${item.slug}`;
+            const url = type === 'category'
+                ? `{{ url('/travel') }}/${item.slug}`
+                : `{{ url('/travel') }}/${item.category_slug || 'travel'}/${item.slug}`;
             const title = type === 'category' ? item.name : item.title;
             html += `<a class="header-search-item" href="${url}">${escapeHtml(title)}</a>`;
         });
@@ -243,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderResults = (data) => {
         const categories = Array.isArray(data.categories) ? data.categories : [];
         const blogs = Array.isArray(data.blogs) ? data.blogs : [];
-        searchResults.innerHTML = `${renderSection('Categories', categories, 'category')}${renderSection('Blogs', blogs, 'blog')}`;
+        searchResults.innerHTML = `${renderSection('Travel Categories', categories, 'category')}${renderSection('Blogs', blogs, 'blog')}`;
         searchResults.classList.remove('d-none');
     };
 

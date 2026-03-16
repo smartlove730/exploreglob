@@ -43,7 +43,19 @@ class GenerateBlogs implements ShouldQueue
         ini_set('max_execution_time', 30000);
         set_time_limit(30000);
 
-        $categories = Category::with('country')->where('country_id', $this->countryId)->where('id', $this->categoryID)->get();
+        $categories = Category::travelSubcategories($this->countryId)
+            ->where('country_id', $this->countryId)
+            ->where('id', $this->categoryID)
+            ->with('country')
+            ->get();
+
+        if ($categories->isEmpty()) {
+            Log::warning('Skipping blog generation for non-travel category', [
+                'country_id' => $this->countryId,
+                'category_id' => $this->categoryID,
+            ]);
+            return;
+        }
  
         foreach ($categories as $category) {
         

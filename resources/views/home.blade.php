@@ -1,9 +1,9 @@
 @extends('layouts.app')
 @section('SeoTags')
     @include('partials.seo', [
-        'seo_title' => 'Explore Global Explorer - Your Gateway to Worldwide Stories',
-        'seo_description' => 'Dive into a world of captivating blogs and articles from various countries and categories. Discover, read, and share stories that inspire and inform.',
-        'seo_keywords' => 'global blogs, international stories, travel blogs, cultural articles, worldwide news, global explorer, country-specific blogs',
+        'seo_title' => 'Global Explorer | Travel Stories, Guides, and Tips',
+        'seo_description' => 'Discover travel guides, destination highlights, and practical tips for your next journey. Read inspiring travel stories on Global Explorer.',
+        'seo_keywords' => 'travel blogs, travel guides, destinations, travel tips, itineraries, budget travel, adventure travel',
         'og_image' => asset('images/home-og-image.jpg'),
     ])  
 @endsection
@@ -16,8 +16,8 @@
 <section class="hero-section">
     <div class="container">
         <div class="hero-content">
-            <h1 class="hero-title">Discover Amazing Stories</h1>
-            <p class="hero-subtitle">Explore engaging content across multiple categories and countries. Your next favorite read is just a click away!</p>
+            <h1 class="hero-title">Discover Travel Stories</h1>
+            <p class="hero-subtitle">Explore guides, destinations, and tips crafted for your next adventure.</p>
             <a href="#latest-blogs" class="btn btn-primary btn-lg mt-3">
                 Explore Now ↓
             </a>
@@ -29,7 +29,7 @@
     <!-- Most Recent Blogs Section -->
     @if(isset($blogs) && $blogs->count() > 0)
     <section class="mb-5">
-        <h2 class="section-title">Most Recent Blogs</h2>
+        <h2 class="section-title">Latest Travel Blogs</h2>
         <div class="row g-4">
             @foreach($blogs as $index => $blog)
                  
@@ -56,7 +56,7 @@
      class="card-img-top"
      alt="{{ $blog->title }}" loading="lazy" > <div class="card-body d-flex flex-column">
                             <h5 class="card-title">
-                                <a href="{{ route('blog.show', $blog->slug) }}">
+                                <a href="{{ route('travel.blog', ['subcategory' => $blog->category->slug, 'slug' => $blog->slug]) }}">
                                     {{ $blog->title }}
                                 </a>
                             </h5>
@@ -67,7 +67,7 @@
                                 <small class="text-muted">
                                     📅 {{ \Carbon\Carbon::parse($blog->published_at)->format('M d, Y') }}
                                 </small>
-                                <a href="{{ route('blog.show', $blog->slug) }}" class="btn btn-primary btn-sm">
+                                  <a href="{{ route('travel.blog', ['subcategory' => $blog->category->slug, 'slug' => $blog->slug]) }}" class="btn btn-primary btn-sm">
                                     Read More →
                                 </a>
                             </div>
@@ -82,7 +82,7 @@
     <!-- Categories Section -->
     @if(isset($categories) && count($categories) > 0)
     <section class="mt-5 pt-5">
-        <h2 class="section-title">Browse Categories</h2>
+        <h2 class="section-title">Browse Travel Categories</h2>
         <div class="row g-4" id="category-grid">
             @include('partials.category-cards', ['categories' => $categories])
         </div>

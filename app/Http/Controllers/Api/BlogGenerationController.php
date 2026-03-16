@@ -49,6 +49,14 @@ class BlogGenerationController extends Controller
                 ], 404);
             }
 
+            $travelRoot = Category::travelRoot($countryId);
+            if (!$travelRoot || $category->parent_id !== $travelRoot->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Category is not a Travel subcategory'
+                ], 422);
+            }
+
             // Dispatch job to queue
             GenerateBlogs::dispatch($countryId, $categoryId);
 
@@ -110,6 +118,7 @@ class BlogGenerationController extends Controller
 
             $categories = Category::where('country_id', $countryId)
                 ->where('status', 1)
+                ->travelSubcategories($countryId)
                 ->get();
 
             if ($categories->isEmpty()) {
@@ -184,6 +193,14 @@ class BlogGenerationController extends Controller
 
             $category = Category::findOrFail($categoryId);
             $countries = Country::where('status', 1)->get();
+
+            $travelRoot = Category::travelRoot($category->country_id);
+            if (!$travelRoot || $category->parent_id !== $travelRoot->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Category is not a Travel subcategory'
+                ], 422);
+            }
 
             if ($countries->isEmpty()) {
                 return response()->json([

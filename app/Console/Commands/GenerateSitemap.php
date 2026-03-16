@@ -30,27 +30,26 @@ class GenerateSitemap extends Command
     public function handle(): int
     {
         $baseUrl = 'https://explore-glob.blog';
+        $countryId = 183;
+        $travelRoot = Category::travelRoot($countryId);
 
-        $urls = collect([
-            [
-                'loc' => $this->buildUrl($baseUrl, '/'),
-                'lastmod' => now(),
+        $urls = collect([]);
+
+        if ($travelRoot) {
+            $urls->push([
+                'loc' => $this->buildUrl($baseUrl, '/travel'),
+                'lastmod' => $travelRoot->updated_at ?? now(),
                 'changefreq' => 'daily',
                 'priority' => '1.0',
-            ],
-            ['loc' => $this->buildUrl($baseUrl, '/categories'), 'lastmod' => now(), 'changefreq' => 'daily', 'priority' => '0.8'],
-            ['loc' => $this->buildUrl($baseUrl, '/about'), 'lastmod' => now(), 'changefreq' => 'monthly', 'priority' => '0.6'],
-            ['loc' => $this->buildUrl($baseUrl, '/contact'), 'lastmod' => now(), 'changefreq' => 'monthly', 'priority' => '0.6'],
-            ['loc' => $this->buildUrl($baseUrl, '/privacy-policy'), 'lastmod' => now(), 'changefreq' => 'yearly', 'priority' => '0.4'],
-            ['loc' => $this->buildUrl($baseUrl, '/terms'), 'lastmod' => now(), 'changefreq' => 'yearly', 'priority' => '0.4'],
-        ]);
+            ]);
+        }
 
         $categoryUrls = Category::query()
+            ->travelSubcategories($countryId)
             ->where('status', 1)
-            ->where('country_id', 183)
             ->get(['slug', 'updated_at'])
             ->map(fn (Category $category) => [
-                'loc' => $this->buildUrl($baseUrl, '/category/' . $category->slug),
+                'loc' => $this->buildUrl($baseUrl, '/travel/' . $category->slug),
                 'lastmod' => $category->updated_at,
                 'changefreq' => 'weekly',
                 'priority' => '0.7',
@@ -58,10 +57,12 @@ class GenerateSitemap extends Command
 
         $blogUrls = Blog::query()
             ->where('status', 1)
-            ->where('country_id', 183)
-            ->get(['slug', 'updated_at'])
+            ->where('country_id', $countryId)
+            ->inTravelSubcategories($countryId)
+            ->with('category:id,slug')
+            ->get(['slug', 'updated_at', 'category_id'])
             ->map(fn (Blog $blog) => [
-                'loc' => $this->buildUrl($baseUrl, '/blog/' . $blog->slug),
+                'loc' => $this->buildUrl($baseUrl, '/travel/' . ($blog->category?->slug ?? 'travel') . '/' . $blog->slug),
                 'lastmod' => $blog->updated_at,
                 'changefreq' => 'weekly',
                 'priority' => '0.9',

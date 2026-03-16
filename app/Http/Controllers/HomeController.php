@@ -18,18 +18,19 @@ class HomeController extends Controller
         $country = session('country')?? 183;
         $minBlogs = (int) env('CATEGORY_MIN_BLOGS', 3);
 
-        $blogs = Cache::remember("home:blogs:country:{$country}", now()->addMinutes(10), function () use ($country) {
+        $blogs = Cache::remember("home:blogs:country:{$country}:travel", now()->addMinutes(10), function () use ($country) {
             return Blog::with('category')
                 ->where('status', 1)
                 ->when($country, fn($q) => $q->where('country_id', $country))
+                ->inTravelSubcategories($country)
                 ->latest()
                 ->take(self::RECENT_BLOG_LIMIT)
                 ->get();
         });
 
-        $categoriesWithExtra = Cache::remember("home:categories:country:{$country}:min:{$minBlogs}", now()->addMinutes(10), function () use ($country, $minBlogs) {
-            return Category::where('status', 1)
-                ->where('country_id', $country)
+        $categoriesWithExtra = Cache::remember("home:categories:country:{$country}:min:{$minBlogs}:travel", now()->addMinutes(10), function () use ($country, $minBlogs) {
+            return Category::travelSubcategories($country)
+                ->where('status', 1)
                 ->withCount(['blogs' => fn($q) => $q->where('status', 1)])
                 ->having('blogs_count', '>=', $minBlogs)
                 ->orderBy('name')
@@ -49,8 +50,8 @@ class HomeController extends Controller
         $minBlogs = (int) env('CATEGORY_MIN_BLOGS', 3);
         $offset = max((int) request('offset', 0), 0);
 
-        $categoriesWithExtra = Category::where('status', 1)
-            ->where('country_id', $country)
+        $categoriesWithExtra = Category::travelSubcategories($country)
+            ->where('status', 1)
             ->withCount(['blogs' => fn($q) => $q->where('status', 1)])
             ->skip($offset)
             ->take(self::CATEGORY_LOAD_LIMIT + 1)
@@ -81,9 +82,8 @@ class HomeController extends Controller
             ]);
         }
 
-        $categories = Category::query()
+        $categories = Category::travelSubcategories($country)
             ->where('status', 1)
-            ->where('country_id', $country)
             ->where('name', 'like', "%{$keyword}%")
             ->orderBy('name')
             ->limit(self::SEARCH_RESULT_LIMIT)
@@ -92,10 +92,18 @@ class HomeController extends Controller
         $blogs = Blog::query()
             ->where('status', 1)
             ->where('country_id', $country)
+            ->inTravelSubcategories($country)
             ->where('title', 'like', "%{$keyword}%")
             ->latest('published_at')
             ->limit(self::SEARCH_RESULT_LIMIT)
-            ->get(['title', 'slug']);
+            ->with('category:id,slug')
+            ->get()
+            ->map(fn (Blog $blog) => [
+                'title' => $blog->title,
+                'slug' => $blog->slug,
+                'category_slug' => $blog->category?->slug,
+            ])
+            ->values();
 
         return response()->json([
             'categories' => $categories,

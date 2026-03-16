@@ -22,7 +22,9 @@ class BlogController extends Controller
     // Return HTML form for modal create
     public function createModal()
     {
-        $categories = Category::all();
+        $categories = Category::travelSubcategories()
+            ->orderBy('name')
+            ->get();
         $countries = Country::all();
         return view('admin.blogs.partials.form', compact('categories', 'countries'));
     }
@@ -30,7 +32,9 @@ class BlogController extends Controller
     // Return HTML form for modal edit
     public function editModal(Blog $blog)
     {
-        $categories = Category::all();
+        $categories = Category::travelSubcategories()
+            ->orderBy('name')
+            ->get();
         $countries = Country::all();
         return view('admin.blogs.partials.form', compact('blog', 'categories', 'countries'));
     }
@@ -47,8 +51,8 @@ class BlogController extends Controller
             'slug' => 'nullable|string|max:255',
             'excerpt' => 'nullable|string',
             'content' => 'nullable|string',
-            'category_id' => 'nullable|integer',
-            'country_id' => 'nullable|integer',
+            'category_id' => 'required|integer',
+            'country_id' => 'required|integer',
             'featured_image' => 'nullable|string',
             'seo_title' => 'nullable|string|max:255',
             'seo_description' => 'nullable|string',
@@ -58,6 +62,20 @@ class BlogController extends Controller
         ]);
 
         $data['slug'] = Str::slug($data['title']);
+
+        $category = Category::find($data['category_id']);
+        if (!$category) {
+            return back()->withErrors(['category_id' => 'Selected category not found.'])->withInput();
+        }
+
+        if ((int) $category->country_id !== (int) $data['country_id']) {
+            return back()->withErrors(['category_id' => 'Category does not match the selected country.'])->withInput();
+        }
+
+        $travelRoot = Category::travelRoot($category->country_id);
+        if (!$travelRoot || $category->parent_id !== $travelRoot->id) {
+            return back()->withErrors(['category_id' => 'Category must be a Travel subcategory.'])->withInput();
+        }
 
         Blog::create($data);
 
@@ -76,8 +94,8 @@ class BlogController extends Controller
             'slug' => 'nullable|string|max:255',
             'excerpt' => 'nullable|string',
             'content' => 'nullable|string',
-            'category_id' => 'nullable|integer',
-            'country_id' => 'nullable|integer',
+            'category_id' => 'required|integer',
+            'country_id' => 'required|integer',
             'featured_image' => 'nullable|string',
             'seo_title' => 'nullable|string|max:255',
             'seo_description' => 'nullable|string',
@@ -87,6 +105,20 @@ class BlogController extends Controller
         ]);
 
         $data['slug'] = Str::slug($data['title']);
+
+        $category = Category::find($data['category_id']);
+        if (!$category) {
+            return back()->withErrors(['category_id' => 'Selected category not found.'])->withInput();
+        }
+
+        if ((int) $category->country_id !== (int) $data['country_id']) {
+            return back()->withErrors(['category_id' => 'Category does not match the selected country.'])->withInput();
+        }
+
+        $travelRoot = Category::travelRoot($category->country_id);
+        if (!$travelRoot || $category->parent_id !== $travelRoot->id) {
+            return back()->withErrors(['category_id' => 'Category must be a Travel subcategory.'])->withInput();
+        }
 
         $blog->update($data);
 

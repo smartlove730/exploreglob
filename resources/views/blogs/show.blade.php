@@ -198,7 +198,7 @@
                         <div class="card-body">
                             <h5 class="card-title">{{ $related['title'] }}</h5>
                             <p class="card-text text-muted">{{ Str::limit($related['excerpt'] ?? '', 100) }}</p>
-                            <a href="{{ url('/blog/' . ($related['slug'] ?? '#')) }}" class="btn btn-primary btn-sm">
+                            <a href="{{ !empty($related['slug']) ? route('travel.blog', ['subcategory' => $blog->category->slug, 'slug' => $related['slug']]) : '#' }}" class="btn btn-primary btn-sm">
                                 Read More →
                             </a>
                         </div>

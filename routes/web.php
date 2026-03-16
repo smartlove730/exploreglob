@@ -23,11 +23,18 @@ Route::get('/search', [HomeController::class, 'search'])->name('home.search');
 Route::get('/country/{code}', [CountryController::class, 'setCountry'])->name('country.set');
 
 // Categories
-Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
-Route::get('/category/{slug}', [CategoryController::class, 'show'])->name('category.show');
+Route::get('/travel', [CategoryController::class, 'index'])->name('travel.index');
+Route::get('/travel/{subcategory}', [CategoryController::class, 'show'])->name('travel.category');
+Route::get('/categories', function () {
+    return redirect()->route('travel.index', [], 301);
+})->name('categories.index');
+Route::get('/category/{slug}', function ($slug) {
+    return redirect()->route('travel.category', ['subcategory' => $slug], 301);
+})->name('category.show');
 
 // Blogs
 Route::get('/blogs/{id}', [BlogController::class, 'index'])->name('blogs.index');
+Route::get('/travel/{subcategory}/{slug}', [BlogController::class, 'showByCategory'])->name('travel.blog');
 Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'store'])->name('newsletter.subscribe');
 

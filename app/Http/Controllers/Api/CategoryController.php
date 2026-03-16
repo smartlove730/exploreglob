@@ -18,7 +18,7 @@ class CategoryController extends Controller
         $countryId = $request->input('country_id');
         
         $categories = Category::with('country')
-            ->when($countryId, fn($q) => $q->where('country_id', $countryId))
+            ->travelVisible($countryId)
             ->where('status', 1)
             ->get();
 
@@ -37,7 +37,11 @@ class CategoryController extends Controller
     {
         $category = Category::with(['country', 'blogs' => function($query) {
             $query->where('status', 1)->latest()->limit(10);
-        }])->findOrFail($id);
+        }])
+            ->travelVisible(null)
+            ->where('status', 1)
+            ->where('id', $id)
+            ->firstOrFail();
 
         return response()->json([
             'success' => true,

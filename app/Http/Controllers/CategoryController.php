@@ -15,22 +15,30 @@ class CategoryController extends Controller
             $country = session('country');
             $minBlogs = (int) env('CATEGORY_MIN_BLOGS', 3);
            
-        $categories = Category::where('status', 1)
-            ->where('country_id', 183)
-            ->when($country, fn($q) => $q->where('country_id',$country))
+        $countryId = $country ?? 183;
+        $travelRoot = Category::travelRoot($countryId);
+
+        $categories = Category::travelSubcategories($countryId)
+            ->where('status', 1)
             ->withCount(['blogs' => fn($q) => $q->where('status', 1)])
             ->having('blogs_count', '>=', $minBlogs)
+            ->orderBy('name')
             ->get();
 
-        return view('categories.index', compact('categories'));
+        return view('categories.index', compact('categories', 'travelRoot'));
     }
 
     public function show($slug)
     {
-        $category = Category::where('slug', $slug)->firstOrFail();
+        $countryId = session('country') ?? 183;
+        $category = Category::travelSubcategories($countryId)
+            ->where('status', 1)
+            ->where('slug', $slug)
+            ->firstOrFail();
 
         $blogs = Blog::where('category_id', $category->id)
             ->where('status', 1)
+            ->latest('published_at')
             ->paginate(10);
 
         return view('categories.show', compact('category', 'blogs'));

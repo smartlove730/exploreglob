@@ -14,23 +14,47 @@ class BlogController extends Controller
 {
     public function index(Request $request)
     {  
-        $blogs = Blog::where('status', 1)->where('category_id', $request->id)->latest()->paginate(10);
+        $countryId = session('country') ?? 183;
+        $categoryId = (int) $request->id;
+
+        $category = Category::travelSubcategories($countryId)
+            ->where('status', 1)
+            ->where('id', $categoryId)
+            ->firstOrFail();
+
+        $blogs = Blog::where('status', 1)
+            ->where('category_id', $category->id)
+            ->with('category')
+            ->latest('published_at')
+            ->paginate(10);
       
-        return view('blogs.index', compact('blogs'));
+        return view('blogs.index', compact('blogs', 'category'));
     }
 
-    public function show($slug)
+    public function showByCategory($subcategory, $slug)
     {
+        $countryId = session('country') ?? 183;
+        $category = Category::travelSubcategories($countryId)
+            ->where('status', 1)
+            ->where('slug', $subcategory)
+            ->firstOrFail();
+
        // 1. Define a unique cache key based on the slug
-    $cacheKey = "blog_post_{$slug}";
+    $cacheKey = "blog_post_{$category->id}_{$slug}";
 
     // 2. Wrap the logic in Cache::remember
     // 3600 seconds = 1 hour. You can adjust this as needed.
-    $data = Cache::remember($cacheKey, 3600, function () use ($slug) {
-        $blog = Blog::where('slug', $slug)->with('category')->firstOrFail();
+    $data = Cache::remember($cacheKey, 3600, function () use ($slug, $category) {
+        $blog = Blog::where('slug', $slug)
+            ->where('category_id', $category->id)
+            ->where('status', 1)
+            ->with('category')
+            ->firstOrFail();
 
         $related = Blog::where('category_id', $blog->category_id)
+            ->where('status', 1)
             ->where('id', '!=', $blog->id)
+            ->latest('published_at')
             ->limit(5)
             ->get();
 
@@ -46,7 +70,26 @@ class BlogController extends Controller
     // 3. Pass the cached data array to the view
     return view('blogs.show', $data);
 
-       
+    }
+
+    public function show($slug)
+    {
+        $blog = Blog::with('category')->where('slug', $slug)->where('status', 1)->firstOrFail();
+        $category = $blog->category;
+
+        if (!$category) {
+            abort(404);
+        }
+
+        $travelRoot = Category::travelRoot($category->country_id);
+        if (!$travelRoot || $category->parent_id !== $travelRoot->id) {
+            abort(404);
+        }
+
+        return redirect()->route('travel.blog', [
+            'subcategory' => $category->slug,
+            'slug' => $blog->slug,
+        ], 301);
     }
 
     public function store(Request $request)
@@ -58,12 +101,13 @@ class BlogController extends Controller
         $categories = Category::with('country')
             ->where('country_id', $countryId)
             ->where('status', 1)
+            ->travelSubcategories($countryId)
             ->get();
 
         if ($categories->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'No active categories found for this country'
+                'message' => 'No active travel categories found for this country'
             ], 404);
         }
 

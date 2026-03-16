@@ -8,8 +8,8 @@
 <section class="hero-section" style="min-height: 40vh;">
     <div class="container">
         <div class="hero-content">
-            <h1 class="hero-title">All Blogs</h1>
-            <p class="hero-subtitle">Discover our complete collection of articles and stories</p>
+            <h1 class="hero-title">Travel Blogs</h1>
+            <p class="hero-subtitle">Discover our complete collection of travel articles and stories</p>
         </div>
     </div>
 </section>
@@ -33,7 +33,7 @@
 
           <div class="card-body d-flex flex-column">
             <h5 class="card-title">
-              <a href="{{ route('blog.show', $blog->slug) }}">
+              <a href="{{ route('travel.blog', ['subcategory' => $blog->category->slug, 'slug' => $blog->slug]) }}">
                 {{ $blog->title }}
               </a>
             </h5>
@@ -46,7 +46,7 @@
               <small class="text-muted">
                 📅 {{ \Carbon\Carbon::parse($blog->published_at)->format('M d, Y') }}
               </small>
-              <a href="{{ route('blog.show', $blog->slug) }}" class="btn btn-primary btn-sm">
+               <a href="{{ route('travel.blog', ['subcategory' => $blog->category->slug, 'slug' => $blog->slug]) }}" class="btn btn-primary btn-sm">
                 Read More →
               </a>
             </div>
