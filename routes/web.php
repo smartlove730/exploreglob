@@ -2,9 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
 use App\Http\Controllers\{
     HomeController,
     CategoryController,
@@ -49,16 +46,15 @@ Route::get('/terms', [PageController::class, 'terms'])->name('terms');
 Route::get('/terms-and-conditions', [PageController::class, 'terms'])->name('terms.alternate');
 Route::get('/about', [PageController::class, 'about'])->name('about');
 Route::get('/about-us', [PageController::class, 'about'])->name('about.alternate');
-Route::get('/addblog', [BlogController::class, 'store'])->name('store');
-Route::get('/genimage', [BlogController::class, 'genImage'])->name('genImage');
+Route::post('/addblog', [BlogController::class, 'store'])->name('store');
+Route::post('/genimage', [BlogController::class, 'genImage'])->name('genImage');
 
 // Admin routes (simple Blade-based admin)
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\BlogController as AdminBlogController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
-use Illuminate\Support\Facades\Auth;
 
-Route::get('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
+Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
 // Admin auth
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');
