@@ -33,7 +33,7 @@
 
           <div class="card-body d-flex flex-column">
             <h5 class="card-title">
-              <a href="{{ route('travel.blog', ['subcategory' => $blog->category->slug, 'slug' => $blog->slug]) }}">
+              <a href="{{ url('/travel/' . ($blog->category->slug ?? 'travel') . '/' . $blog->slug) }}">
                 {{ $blog->title }}
               </a>
             </h5>
@@ -46,7 +46,7 @@
               <small class="text-muted">
                 📅 {{ \Carbon\Carbon::parse($blog->published_at)->format('M d, Y') }}
               </small>
-               <a href="{{ route('travel.blog', ['subcategory' => $blog->category->slug, 'slug' => $blog->slug]) }}" class="btn btn-primary btn-sm">
+               <a href="{{ url('/travel/' . ($blog->category->slug ?? 'travel') . '/' . $blog->slug) }}" class="btn btn-primary btn-sm">
                 Read More →
               </a>
             </div>

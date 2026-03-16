@@ -101,7 +101,7 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top shadow-sm">
   <div class="container">
       <img src="{{ asset('e.avif') }}" alt="Global Explorer logo" style="height:20px!important;" loading="eager" decoding="async">
-    <a class="navbar-brand fw-bold" href="{{ route('home') }}">  Global Explorer</a>
+    <a class="navbar-brand fw-bold" href="{{ url('/') }}">  Global Explorer</a>
  
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
       data-bs-target="#navbarNav">
@@ -111,18 +111,18 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav me-auto  d-none d-lg-flex">
         <li class="nav-item">
-          <a class="nav-link" href="{{ route('home') }}">Home</a>
+          <a class="nav-link" href="{{ url('/') }}">Home</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ route('travel.index') }}">Travel</a>
+          <a class="nav-link" href="{{ url('/travel') }}">Travel</a>
         </li>
         @foreach($travelNavCategories ?? [] as $navCategory)
         <li class="nav-item">
-          <a class="nav-link" href="{{ route('travel.category', $navCategory->slug) }}">{{ $navCategory->name }}</a>
+          <a class="nav-link" href="{{ url('/travel/' . $navCategory->slug) }}">{{ $navCategory->name }}</a>
         </li>
         @endforeach
         <li class="nav-item">
-          <a class="nav-link" href="{{ route('contact') }}">Contact</a>
+          <a class="nav-link" href="{{ url('/contact') }}">Contact</a>
         </li>
       </ul>
 
@@ -159,7 +159,7 @@
     <div class="container">
         <div class="row g-4">
             <div class="col-12 col-md-6 col-lg-3">
-                <a href="{{ route('home') }}" class="footer-brand text-decoration-none d-inline-flex align-items-center gap-2 mb-3">
+                <a href="{{ url('/') }}" class="footer-brand text-decoration-none d-inline-flex align-items-center gap-2 mb-3">
                     <img src="{{ asset('e.avif') }}" alt="Global Explorer logo" class="footer-logo"> 
                 </a>
                 
@@ -168,10 +168,10 @@
             <div class="col-12 col-md-6 col-lg-3">
                 <h5 class="footer-title">Company</h5>
                 <ul class="footer-links list-unstyled mb-0">
-                    <li><a href="{{ route('about') }}" class="text-decoration-none text-white">About Us</a></li>
-                    <li><a href="{{ route('contact') }}" class="text-decoration-none text-white">Contact</a></li>
-                    <li><a href="{{ route('policy') }}" class="text-decoration-none text-white">Privacy Policy</a></li>
-                    <li><a href="{{ route('terms') }}" class="text-decoration-none text-white">Terms & Conditions</a></li>
+                    <li><a href="{{ url('/about') }}" class="text-decoration-none text-white">About Us</a></li>
+                    <li><a href="{{ url('/contact') }}" class="text-decoration-none text-white">Contact</a></li>
+                    <li><a href="{{ url('/policy') }}" class="text-decoration-none text-white">Privacy Policy</a></li>
+                    <li><a href="{{ url('/terms') }}" class="text-decoration-none text-white">Terms & Conditions</a></li>
                 </ul>
             </div>
 
@@ -180,7 +180,7 @@
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterCategories as $footerCategory)
                         <li>
-                            <a href="{{ route('travel.category', $footerCategory->slug) }}" class="text-decoration-none text-white">
+                            <a href="{{ url('/travel/' . $footerCategory->slug) }}" class="text-decoration-none text-white">
                                 {{ $footerCategory->name }}
                             </a>
                         </li>
@@ -195,7 +195,7 @@
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterBlogs as $footerBlog)
                         <li>
-                            <a href="{{ route('travel.blog', ['subcategory' => $footerBlog->category?->slug ?? 'travel', 'slug' => $footerBlog->slug]) }}" class="text-decoration-none text-white">
+                            <a href="{{ url('/travel/' . ($footerBlog->category?->slug ?? 'travel') . '/' . $footerBlog->slug) }}" class="text-decoration-none text-white">
                                 {{ \Illuminate\Support\Str::limit($footerBlog->title, 45) }}
                             </a>
                         </li>
@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
             controller = new AbortController();
 
             try {
-                const response = await fetch(`{{ route('home.search') }}?q=${encodeURIComponent(keyword)}`, {
+                const response = await fetch(`{{ url('/search') }}?q=${encodeURIComponent(keyword)}`, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
