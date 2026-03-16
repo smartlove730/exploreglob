@@ -23,7 +23,7 @@ Route::get('/country/{code}', [CountryController::class, 'setCountry'])->name('c
 Route::get('/travel', [CategoryController::class, 'index'])->name('travel.index');
 Route::get('/travel/{subcategory}', [CategoryController::class, 'show'])->name('travel.category');
 Route::get('/categories', function () {
-    return redirect()->route('travel.index', [], 301);
+    return redirect('/travel', 301);
 })->name('categories.index');
 Route::get('/category/{slug}', function ($slug) {
     return redirect('/travel/' . $slug, 301);

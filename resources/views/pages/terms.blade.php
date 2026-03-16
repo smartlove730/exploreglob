@@ -35,7 +35,7 @@
                         <p>We may update these terms periodically. Continued use of the platform after changes means you accept the revised terms.</p>
 
                         <h2 class="mb-4 mt-5">Contact</h2>
-                        <p>If you have questions about these terms, please <a href="{{ route('contact') }}" class="text-decoration-none" style="color: var(--primary-color); font-weight: 600;">contact us</a>.</p>
+                        <p>If you have questions about these terms, please <a href="{{ url('/contact') }}" class="text-decoration-none" style="color: var(--primary-color); font-weight: 600;">contact us</a>.</p>
                     </div>
                 </div>
             </div>

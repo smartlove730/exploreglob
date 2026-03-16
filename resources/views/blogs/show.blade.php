@@ -220,7 +220,7 @@
                 @if(session('newsletter_success'))
                     <div class="alert alert-success">{{ session('newsletter_success') }}</div>
                 @endif
-                <form class="row g-3 justify-content-center" method="POST" action="{{ route('newsletter.subscribe') }}">
+                <form class="row g-3 justify-content-center" method="POST" action="{{ url('/newsletter/subscribe') }}">
                     @csrf
                     <input type="hidden" name="blog_id" value="{{ $blog->id }}">
                     <div class="col-md-5">

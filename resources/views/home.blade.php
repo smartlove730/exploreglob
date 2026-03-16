@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
         loader.classList.remove('d-none');
 
         try {
-            const response = await fetch(`{{ route('home.categories.load') }}?offset=${offset}`, {
+            const response = await fetch(`{{ url('/home/categories/load') }}?offset=${offset}`, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json',

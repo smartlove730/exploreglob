@@ -26,7 +26,7 @@
                             </ul>
                         </div>
                     @endif
-                    <form method="POST" action="{{ route('contact.submit') }}">
+                    <form method="POST" action="{{ url('/contact/submit') }}">
                         @csrf
                         <div class="mb-4">
                             <label for="name" class="form-label fw-bold">Your Name</label>
