@@ -43,7 +43,7 @@
                         <div class="bg-light p-4 rounded mt-5 text-center">
                             <h3 class="h4">Join Our Journey</h3>
                             <p>Global Explorer is a constantly evolving project. If you are a writer, a developer, or a curious traveler with a story to tell, we’d love to hear from you.</p>
-                            <a href="{{ route('contact') }}" class="btn btn-primary px-4 py-2 mt-2">Get In Touch</a>
+                            <a href="{{ url('/contact') }}" class="btn btn-primary px-4 py-2 mt-2">Get In Touch</a>
                         </div>
                     </div>
                 </div>

@@ -64,7 +64,7 @@
                     <p class="card-text mb-4">
                         {{ $category->description ?? 'Explore amazing blogs in this category' }}
                     </p>
-                    <a href="{{ route('travel.category', $category->slug) }}" class="btn btn-primary">
+                    <a href="{{ url('/travel/' . $category->slug) }}" class="btn btn-primary">
                         Explore Blogs →
                     </a>
                 </div>

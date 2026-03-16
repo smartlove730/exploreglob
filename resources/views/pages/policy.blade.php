@@ -52,7 +52,7 @@
                     
                     <div class="blog-section">
                         <h3>Contact Us</h3>
-                        <p>If you have any questions about this Privacy Policy, please <a href="{{ route('contact') }}" class="text-decoration-none" style="color: var(--primary-color); font-weight: 600;">contact us</a>.</p>
+                        <p>If you have any questions about this Privacy Policy, please <a href="{{ url('/contact') }}" class="text-decoration-none" style="color: var(--primary-color); font-weight: 600;">contact us</a>.</p>
                     </div>
                 </div>
             </div>
