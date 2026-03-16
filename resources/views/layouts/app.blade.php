@@ -195,7 +195,7 @@
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterBlogs as $footerBlog)
                         <li>
-                            <a href="{{ route('travel.blog', ['subcategory' => $footerBlog->category?->slug ?? 'travel', 'slug' => $footerBlog->slug]) }}" class="text-decoration-none text-white">
+                            <a href="{{ url('/travel/' . ($footerBlog->category?->slug ?? 'travel') . '/' . $footerBlog->slug) }}" class="text-decoration-none text-white">
                                 {{ \Illuminate\Support\Str::limit($footerBlog->title, 45) }}
                             </a>
                         </li>

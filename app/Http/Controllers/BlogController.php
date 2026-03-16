@@ -80,10 +80,7 @@ class BlogController extends Controller
             abort(404);
         }
 
-        return redirect()->route('travel.blog', [
-            'subcategory' => $category->slug,
-            'slug' => $blog->slug,
-        ], 301);
+        return redirect('/travel/' . $category->slug . '/' . $blog->slug, 301);
     }
 
     public function store(Request $request)
