@@ -1,19 +1,18 @@
 <?php
 
 namespace App\Http\Controllers;
-use Illuminate\Http\Request;
-use App\Models\{Blog, Category};
+
 use App\Jobs\GenerateBlogs;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Http;
-use Gemini\Laravel\Facades\Gemini;
+use App\Models\Blog;
+use App\Models\Category;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use App\Helpers\TextHumanizer;
+use Illuminate\Support\Facades\Http;
 
 class BlogController extends Controller
 {
     public function index(Request $request)
-    {  
+    {
         $countryId = session('country') ?? 183;
         $categoryId = (int) $request->id;
 
@@ -27,7 +26,7 @@ class BlogController extends Controller
             ->with('category')
             ->latest('published_at')
             ->paginate(10);
-      
+
         return view('blogs.index', compact('blogs', 'category'));
     }
 
@@ -39,37 +38,32 @@ class BlogController extends Controller
             ->where('slug', $subcategory)
             ->firstOrFail();
 
-       // 1. Define a unique cache key based on the slug
-    $cacheKey = "blog_post_{$category->id}_{$slug}";
+        $cacheKey = "blog_post_{$category->id}_{$slug}";
 
-    // 2. Wrap the logic in Cache::remember
-    // 3600 seconds = 1 hour. You can adjust this as needed.
-    $data = Cache::remember($cacheKey, 3600, function () use ($slug, $category) {
-        $blog = Blog::where('slug', $slug)
-            ->where('category_id', $category->id)
-            ->where('status', 1)
-            ->with('category')
-            ->firstOrFail();
+        $data = Cache::remember($cacheKey, 3600, function () use ($slug, $category) {
+            $blog = Blog::where('slug', $slug)
+                ->where('category_id', $category->id)
+                ->where('status', 1)
+                ->with('category')
+                ->firstOrFail();
 
-        $related = Blog::where('category_id', $blog->category_id)
-            ->where('status', 1)
-            ->where('id', '!=', $blog->id)
-            ->latest('published_at')
-            ->limit(5)
-            ->get();
+            $related = Blog::where('category_id', $blog->category_id)
+                ->where('status', 1)
+                ->where('id', '!=', $blog->id)
+                ->latest('published_at')
+                ->limit(5)
+                ->get();
 
-        return [
-            'blog' => $blog,
-            'related' => $related,
-            'seo_title' => $blog->seo_title ?? $blog->title,
-            'seo_description' => $blog->seo_description ?? str($blog->content)->limit(160),
-            'og_image' => $blog->featured_image,
-        ];
-    });
+            return [
+                'blog' => $blog,
+                'related' => $related,
+                'seo_title' => $blog->seo_title ?? $blog->title,
+                'seo_description' => $blog->seo_description ?? str($blog->content)->limit(160),
+                'og_image' => $blog->featured_image,
+            ];
+        });
 
-    // 3. Pass the cached data array to the view
-    return view('blogs.show', $data);
-
+        return view('blogs.show', $data);
     }
 
     public function show($slug)
@@ -77,12 +71,12 @@ class BlogController extends Controller
         $blog = Blog::with('category')->where('slug', $slug)->where('status', 1)->firstOrFail();
         $category = $blog->category;
 
-        if (!$category) {
+        if (! $category) {
             abort(404);
         }
 
         $travelRoot = Category::travelRoot($category->country_id);
-        if (!$travelRoot || $category->parent_id !== $travelRoot->id) {
+        if (! $travelRoot || $category->parent_id !== $travelRoot->id) {
             abort(404);
         }
 
@@ -94,9 +88,8 @@ class BlogController extends Controller
 
     public function store(Request $request)
     {
-        // Get country_id from request or use default
-        $countryId = $request->input('country_id', 183);
-        $limit = $request->input('limit', 1);
+        $countryId = (int) $request->input('country_id', 183);
+        $limit = max((int) $request->input('limit', 1), 1);
 
         $categories = Category::with('country')
             ->where('country_id', $countryId)
@@ -107,7 +100,7 @@ class BlogController extends Controller
         if ($categories->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'No active travel categories found for this country'
+                'message' => 'No active travel categories found for this country',
             ], 404);
         }
 
@@ -125,81 +118,35 @@ class BlogController extends Controller
             'data' => [
                 'country_id' => $countryId,
                 'categories_count' => $categories->count(),
-                'jobs_dispatched' => $dispatched
-            ]
+                'jobs_dispatched' => $dispatched,
+            ],
         ]);
     }
 
+    public function genImage()
+    {
+        $prompt = 'Abstract futuristic cityscape with glowing data streams connecting various technological elements like AI brains, IoT devices, and cloud servers, symbolizing interconnectedness and innovation.';
 
-    public function genImage(){
-        $prompt='Abstract futuristic cityscape with glowing data streams connecting various technological elements like AI brains, IoT devices, and cloud servers, symbolizing interconnectedness and innovation.'; 
-        
         $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
-        
-        if (!$apiKey) {
+
+        if (! $apiKey) {
             return response()->json(['error' => 'API key not configured'], 500);
         }
-        
+
         $result = Http::timeout(120)
             ->withHeaders([
                 'Content-Type' => 'application/json',
                 'x-goog-api-key' => $apiKey,
             ])
-            ->post("https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict", [
+            ->post('https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict', [
                 'instances' => [
-                    ['prompt' => $prompt]
+                    ['prompt' => $prompt],
                 ],
                 'parameters' => [
-                    'sampleCount' => 4
-                ]
+                    'sampleCount' => 4,
+                ],
             ]);
 
-        $aiRaw = $result->json();
-
-        return response()->json($aiRaw);
+        return response()->json($result->json());
     }
-
-  
-
-function normalizeAiResponse(array $aiResponse): array
-{
-    // Step 1: Extract the raw text JSON from AI response
-    $rawText = $aiResponse['candidates'][0]['content']['parts'][0]['text'] ?? null;
-
-    if (!$rawText) {
-        return ['error' => 'Invalid AI response structure'];
-    }
-
-    // Step 2: Remove markdown code fences if present
-    $rawText = trim($rawText);
-    $rawText = preg_replace('/^```json\s*/', '', $rawText);
-    $rawText = preg_replace('/\s*```$/', '', $rawText);
-
-    // Step 3: Decode JSON
-    $data = json_decode($rawText, true);
-    if (!$data) {
-        return ['error' => 'Invalid JSON in AI response', 'raw' => $rawText];
-    }
-
-    // Step 4: Normalize nested content arrays
-    $normalizedContent = [];
-
-    if (isset($data['content']) && is_array($data['content'])) {
-        foreach ($data['content'] as $item) {
-            // If the item has its own 'content', merge it recursively
-            if (isset($item['content']) && is_array($item['content'])) {
-                $normalizedContent = array_merge($normalizedContent, $item['content']);
-            } else {
-                $normalizedContent[] = $item;
-            }
-        }
-    }
-
-    // Step 5: Return normalized structure
-    return [
-        'title' => $data['title'] ?? null,
-        'content' => $normalizedContent
-    ];
-}
-
 }
