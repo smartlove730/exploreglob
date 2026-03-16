@@ -26,7 +26,7 @@ Route::get('/categories', function () {
     return redirect()->route('travel.index', [], 301);
 })->name('categories.index');
 Route::get('/category/{slug}', function ($slug) {
-    return redirect()->route('travel.category', ['subcategory' => $slug], 301);
+    return redirect('/travel/' . $slug, 301);
 })->name('category.show');
 
 // Blogs
