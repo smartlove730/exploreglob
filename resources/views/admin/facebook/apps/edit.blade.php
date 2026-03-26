@@ -9,7 +9,7 @@
         <form method="POST" action="{{ route('admin.facebook.apps.update', $app) }}">
             @csrf
             @method('PUT')
-            @include('admin.facebook.apps.partials.form', ['app' => $app])
+            @include('admin.facebook.apps.partials.form', ['facebookApp' => $app])
         </form>
     </div>
 </div>
