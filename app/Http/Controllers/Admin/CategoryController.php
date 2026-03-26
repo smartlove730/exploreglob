@@ -39,11 +39,16 @@ class CategoryController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'country_id' => 'nullable|integer',
+            'image' => 'nullable|file|image|max:5120',
+            'country_id' => 'nullable|integer|exists:countries,id',
             'status' => 'nullable|boolean',
         ]);
 
         $data['slug'] = Str::slug($data['name']);
+
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('categories', 'public');
+        }
 
         Category::create($data);
 
@@ -61,8 +66,8 @@ class CategoryController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'image' =>      'nullable|file',
-            'country_id' => 'nullable|integer',
+            'image' => 'nullable|file|image|max:5120',
+            'country_id' => 'nullable|integer|exists:countries,id',
             'status' => 'nullable|boolean',
         ]);
 
