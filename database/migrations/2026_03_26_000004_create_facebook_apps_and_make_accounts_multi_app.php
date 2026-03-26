@@ -35,7 +35,10 @@ return new class extends Migration {
                 ->constrained('facebook_apps')
                 ->cascadeOnDelete();
 
+            $table->dropForeign(['user_id']);
             $table->dropUnique('facebook_accounts_user_id_unique');
+            $table->index('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             $table->unique(['user_id', 'facebook_app_id']);
         });
 
@@ -54,7 +57,10 @@ return new class extends Migration {
 
         Schema::table('facebook_accounts', function (Blueprint $table) {
             $table->dropUnique('facebook_accounts_user_id_facebook_app_id_unique');
+            $table->dropForeign(['user_id']);
+            $table->dropIndex(['user_id']);
             $table->unique('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             $table->dropConstrainedForeignId('facebook_app_id');
         });
 
