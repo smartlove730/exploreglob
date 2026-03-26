@@ -24,11 +24,6 @@
                     <label class="form-label">Image URL (optional)</label>
                     <input type="url" name="image_url" class="form-control" value="{{ old('image_url') }}" placeholder="https://example.com/image.jpg">
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Schedule At (optional)</label>
-                    <input type="datetime-local" name="scheduled_at" class="form-control" value="{{ old('scheduled_at') }}">
-                    <small class="text-muted">Leave empty to post immediately.</small>
-                </div>
                 <button class="btn btn-primary">Save & Queue Post</button>
             </form>
         @endif

@@ -33,7 +33,6 @@ class FacebookPostController extends Controller
         $data = $request->validate([
             'message' => 'required|string|max:60000',
             'image_url' => 'nullable|url|max:2048',
-            'scheduled_at' => 'nullable|date|after:now',
         ]);
 
         $activePage = Auth::user()?->facebookAccount?->pages()->where('is_active', true)->first();
@@ -42,26 +41,17 @@ class FacebookPostController extends Controller
             return back()->with('error', 'Select an active page in Facebook Settings first.');
         }
 
-        $status = filled($data['scheduled_at'] ?? null)
-            ? FacebookPost::STATUS_SCHEDULED
-            : FacebookPost::STATUS_PENDING;
-
         $post = FacebookPost::create([
             'page_id' => $activePage->id,
             'message' => $data['message'],
             'image_url' => $data['image_url'] ?? null,
-            'scheduled_at' => $data['scheduled_at'] ?? null,
-            'status' => $status,
+            'scheduled_at' => null,
+            'status' => FacebookPost::STATUS_PENDING,
         ]);
 
-        if ($status === FacebookPost::STATUS_PENDING) {
-            PublishFacebookPostJob::dispatch($post->id);
-            return redirect()->route('admin.facebook.posts')->with('success', 'Facebook post queued for immediate publishing.');
-        }
+        PublishFacebookPostJob::dispatch($post->id);
 
-        PublishFacebookPostJob::dispatch($post->id)->delay($post->scheduled_at);
-
-        return redirect()->route('admin.facebook.posts')->with('success', 'Facebook post scheduled successfully.');
+        return redirect()->route('admin.facebook.posts')->with('success', 'Facebook post queued for immediate publishing.');
     }
 
     public function retry(FacebookPost $post): RedirectResponse
