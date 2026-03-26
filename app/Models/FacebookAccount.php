@@ -10,6 +10,7 @@ class FacebookAccount extends Model
 {
     protected $fillable = [
         'user_id',
+        'facebook_app_id',
         'long_lived_user_token',
         'token_expires_at',
     ];
@@ -21,6 +22,11 @@ class FacebookAccount extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function app(): BelongsTo
+    {
+        return $this->belongsTo(FacebookApp::class, "facebook_app_id");
     }
 
     public function pages(): HasMany

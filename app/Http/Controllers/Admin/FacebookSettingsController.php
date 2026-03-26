@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacebookAccount;
+use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Services\FacebookGraphService;
 use Illuminate\Http\RedirectResponse;
@@ -18,21 +19,37 @@ class FacebookSettingsController extends Controller
     {
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $account = FacebookAccount::with('pages')
-            ->where('user_id', Auth::id())
-            ->first();
+        $apps = FacebookApp::where('is_active', true)->orderBy('name')->get();
+        $selectedAppId = (int) $request->integer('app_id');
+
+        $accountQuery = FacebookAccount::with(['pages', 'app'])
+            ->where('user_id', Auth::id());
+
+        if ($selectedAppId > 0) {
+            $accountQuery->where('facebook_app_id', $selectedAppId);
+        }
+
+        $account = $accountQuery->first();
 
         return view('admin.facebook.settings', [
+            'apps' => $apps,
+            'selectedAppId' => $selectedAppId,
             'account' => $account,
             'pages' => $account?->pages ?? collect(),
         ]);
     }
 
-    public function redirectToFacebook(): RedirectResponse
+    public function redirectToFacebook(Request $request): RedirectResponse
     {
-        return redirect()->away($this->facebookGraphService->getOAuthRedirectUrl());
+        $app = FacebookApp::where('is_active', true)
+            ->whereKey($request->integer('app_id'))
+            ->firstOrFail();
+
+        session(['facebook_auth_app_id' => $app->id]);
+
+        return redirect()->away($this->facebookGraphService->getOAuthRedirectUrl($app));
     }
 
     public function callback(Request $request): RedirectResponse
@@ -41,12 +58,18 @@ class FacebookSettingsController extends Controller
             'code' => 'required|string',
         ]);
 
+        $appId = (int) session('facebook_auth_app_id');
+        $app = FacebookApp::where('is_active', true)->findOrFail($appId);
+
         try {
-            $shortToken = $this->facebookGraphService->exchangeCodeForToken($request->string('code')->toString());
-            $tokenData = $this->facebookGraphService->exchangeForLongLivedToken($shortToken);
+            $shortToken = $this->facebookGraphService->exchangeCodeForToken($app, $request->string('code')->toString());
+            $tokenData = $this->facebookGraphService->exchangeForLongLivedToken($app, $shortToken);
 
             $account = FacebookAccount::updateOrCreate(
-                ['user_id' => Auth::id()],
+                [
+                    'user_id' => Auth::id(),
+                    'facebook_app_id' => $app->id,
+                ],
                 [
                     'long_lived_user_token' => $tokenData['access_token'],
                     'token_expires_at' => now()->addSeconds($tokenData['expires_in']),
@@ -55,26 +78,25 @@ class FacebookSettingsController extends Controller
 
             $pages = $this->facebookGraphService->fetchManagedPages($tokenData['access_token']);
             $this->facebookGraphService->upsertPages($account, $pages);
+            session()->forget('facebook_auth_app_id');
 
-            $target = \Illuminate\Support\Facades\Route::has('admin.facebook.settings')
-                ? route('admin.facebook.settings')
-                : url('/admin/facebook/settings');
+            $target = route('admin.facebook.settings', ['app_id' => $app->id]);
 
             return redirect($target)->with('success', 'Facebook account connected and pages synced successfully.');
         } catch (Throwable $exception) {
             Log::error('Facebook OAuth callback failed', ['error' => $exception->getMessage()]);
 
-            $target = \Illuminate\Support\Facades\Route::has('admin.facebook.settings')
-                ? route('admin.facebook.settings')
-                : url('/admin/facebook/settings');
+            $target = route('admin.facebook.settings', ['app_id' => $app->id]);
 
             return redirect($target)->with('error', 'Facebook connection failed. Please try again.');
         }
     }
 
-    public function syncPages(): RedirectResponse
+    public function syncPages(Request $request): RedirectResponse
     {
-        $account = FacebookAccount::where('user_id', Auth::id())->first();
+        $account = FacebookAccount::where('user_id', Auth::id())
+            ->where('facebook_app_id', $request->integer('app_id'))
+            ->first();
 
         if (!$account) {
             return back()->with('error', 'Connect Facebook first.');

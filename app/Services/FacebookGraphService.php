@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\FacebookAccount;
+use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -11,23 +12,23 @@ class FacebookGraphService
 {
     private string $apiVersion = 'v19.0';
 
-    public function getOAuthRedirectUrl(): string
+    public function getOAuthRedirectUrl(FacebookApp $app): string
     {
         $query = http_build_query([
-            'client_id' => config('services.facebook.app_id'),
-            'redirect_uri' => config('services.facebook.redirect_uri'),
+            'client_id' => $app->app_id,
+            'redirect_uri' => $app->redirect_uri,
             'scope' => 'pages_show_list,pages_read_engagement,pages_manage_posts',
         ]);
 
         return "https://www.facebook.com/{$this->apiVersion}/dialog/oauth?{$query}";
     }
 
-    public function exchangeCodeForToken(string $code): string
+    public function exchangeCodeForToken(FacebookApp $app, string $code): string
     {
         $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/oauth/access_token", [
-            'client_id' => config('services.facebook.app_id'),
-            'client_secret' => config('services.facebook.app_secret'),
-            'redirect_uri' => config('services.facebook.redirect_uri'),
+            'client_id' => $app->app_id,
+            'client_secret' => $app->app_secret,
+            'redirect_uri' => $app->redirect_uri,
             'code' => $code,
         ]);
 
@@ -38,12 +39,12 @@ class FacebookGraphService
         return $response['access_token'];
     }
 
-    public function exchangeForLongLivedToken(string $shortToken): array
+    public function exchangeForLongLivedToken(FacebookApp $app, string $shortToken): array
     {
         $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/oauth/access_token", [
             'grant_type' => 'fb_exchange_token',
-            'client_id' => config('services.facebook.app_id'),
-            'client_secret' => config('services.facebook.app_secret'),
+            'client_id' => $app->app_id,
+            'client_secret' => $app->app_secret,
             'fb_exchange_token' => $shortToken,
         ]);
 
@@ -57,13 +58,17 @@ class FacebookGraphService
         ];
     }
 
-    public function refreshLongLivedToken(string $longLivedToken): array
+    public function refreshLongLivedToken(FacebookAccount $account): array
     {
+        if (!$account->app) {
+            throw new RuntimeException('Facebook account is not linked to an app.');
+        }
+
         $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/oauth/access_token", [
             'grant_type' => 'fb_exchange_token',
-            'client_id' => config('services.facebook.app_id'),
-            'client_secret' => config('services.facebook.app_secret'),
-            'fb_exchange_token' => $longLivedToken,
+            'client_id' => $account->app->app_id,
+            'client_secret' => $account->app->app_secret,
+            'fb_exchange_token' => $account->long_lived_user_token,
         ]);
 
         if (!$response->ok() || !isset($response['access_token'])) {
