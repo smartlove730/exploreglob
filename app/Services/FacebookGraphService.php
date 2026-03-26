@@ -125,8 +125,10 @@ class FacebookGraphService
             $account->pages()->updateOrCreate(
                 ['page_id' => $page['id']],
                 [
+                    'facebook_app_id' => $account->facebook_app_id,
                     'page_name' => $page['name'],
                     'page_access_token' => $page['access_token'],
+                    'is_active' => true,
                 ]
             );
         }

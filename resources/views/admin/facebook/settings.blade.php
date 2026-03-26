@@ -63,31 +63,19 @@
                                 <tr>
                                     <th>Page</th>
                                     <th>Status</th>
-                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($pages as $page)
                                     <tr>
                                         <td>{{ $page->page_name }}<br><small class="text-muted">ID: {{ $page->page_id }}</small></td>
-                                        <td>
-                                            @if($page->is_active)
-                                                <span class="badge text-bg-success">Active</span>
-                                            @else
-                                                <span class="badge text-bg-secondary">Inactive</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <form method="POST" action="{{ route('admin.facebook.pages.activate', $page) }}">
-                                                @csrf
-                                                <button class="btn btn-sm btn-outline-primary" {{ $page->is_active ? 'disabled' : '' }}>Set Active</button>
-                                            </form>
-                                        </td>
+                                        <td><span class="badge text-bg-success">Active</span></td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
+                    <p class="small text-muted mb-0">All synced pages are marked active and available for posting.</p>
                 @endif
             </div>
         </div>

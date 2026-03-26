@@ -13,7 +13,7 @@ return new class extends Migration {
             $table->string('page_id')->unique();
             $table->string('page_name');
             $table->text('page_access_token');
-            $table->boolean('is_active')->default(false);
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
 
             $table->index(['facebook_account_id', 'is_active']);
