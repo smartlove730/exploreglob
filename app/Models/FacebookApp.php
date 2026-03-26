@@ -23,4 +23,9 @@ class FacebookApp extends Model
     {
         return $this->hasMany(FacebookAccount::class);
     }
+
+    public function pages(): HasMany
+    {
+        return $this->hasMany(FacebookPage::class, 'facebook_app_id');
+    }
 }

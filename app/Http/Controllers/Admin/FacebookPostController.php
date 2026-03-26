@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Jobs\PublishFacebookPostJob;
 use App\Models\FacebookApp;
+use App\Models\FacebookPage;
 use App\Models\FacebookPost;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,17 +28,24 @@ class FacebookPostController extends Controller
         $apps = FacebookApp::where('is_active', true)->orderBy('name')->get();
         $selectedAppId = (int) $request->integer('app_id');
 
-        $activePageQuery = Auth::user()?->facebookAccounts()
-            ->when($selectedAppId > 0, fn ($query) => $query->where('facebook_app_id', $selectedAppId))
-            ->with(['pages' => fn ($query) => $query->where('is_active', true)])
-            ->get()
-            ->flatMap(fn ($account) => $account->pages)
-            ->first();
+        if ($selectedAppId === 0 && $apps->isNotEmpty()) {
+            $selectedAppId = (int) $apps->first()->id;
+        }
+
+        $pages = FacebookPage::query()
+            ->where('is_active', true)
+            ->whereHas('facebookAccount', function ($query) use ($selectedAppId) {
+                $query->where('user_id', Auth::id())
+                    ->when($selectedAppId > 0, fn ($inner) => $inner->where('facebook_app_id', $selectedAppId));
+            })
+            ->orderBy('page_name')
+            ->get();
 
         return view('admin.facebook.create-post', [
             'apps' => $apps,
             'selectedAppId' => $selectedAppId,
-            'activePage' => $activePageQuery,
+            'pages' => $pages,
+            'selectedPageId' => (int) old('page_id', $request->integer('page_id')),
         ]);
     }
 
@@ -45,23 +53,24 @@ class FacebookPostController extends Controller
     {
         $data = $request->validate([
             'app_id' => 'required|integer|exists:facebook_apps,id',
+            'page_id' => 'required|integer|exists:facebook_pages,id',
             'message' => 'required|string|max:60000',
             'image_url' => 'nullable|url|max:2048',
         ]);
 
-        $activePage = Auth::user()?->facebookAccounts()
+        $page = FacebookPage::query()
+            ->whereKey($data['page_id'])
             ->where('facebook_app_id', $data['app_id'])
-            ->with(['pages' => fn ($query) => $query->where('is_active', true)])
-            ->get()
-            ->flatMap(fn ($account) => $account->pages)
+            ->where('is_active', true)
+            ->whereHas('facebookAccount', fn ($query) => $query->where('user_id', Auth::id()))
             ->first();
 
-        if (!$activePage) {
-            return back()->with('error', 'Select an active page in Facebook Settings first.');
+        if (!$page) {
+            return back()->withInput()->with('error', 'Selected page is not valid for this app/user.');
         }
 
         $post = FacebookPost::create([
-            'page_id' => $activePage->id,
+            'page_id' => $page->id,
             'message' => $data['message'],
             'image_url' => $data['image_url'] ?? null,
             'scheduled_at' => null,

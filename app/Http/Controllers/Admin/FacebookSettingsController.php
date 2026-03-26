@@ -120,9 +120,8 @@ class FacebookSettingsController extends Controller
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
-        $account->pages()->update(['is_active' => false]);
         $page->update(['is_active' => true]);
 
-        return back()->with('success', 'Active page updated.');
+        return back()->with('success', 'Page marked as active.');
     }
 }

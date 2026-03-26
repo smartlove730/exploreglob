@@ -55,6 +55,7 @@ use App\Http\Controllers\Admin\BlogController as AdminBlogController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\FacebookSettingsController;
 use App\Http\Controllers\Admin\FacebookPostController;
+use App\Http\Controllers\Admin\FacebookAppController;
 
 Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
 
@@ -69,6 +70,8 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::get('connect', [FacebookSettingsController::class, 'redirectToFacebook'])->name('connect');
         Route::post('sync-pages', [FacebookSettingsController::class, 'syncPages'])->name('sync-pages');
         Route::post('pages/{page}/activate', [FacebookSettingsController::class, 'activatePage'])->name('pages.activate');
+
+        Route::resource('apps', FacebookAppController::class)->except(['show']);
 
         Route::get('posts', [FacebookPostController::class, 'index'])->name('posts');
         Route::get('posts/create', [FacebookPostController::class, 'create'])->name('posts.create');

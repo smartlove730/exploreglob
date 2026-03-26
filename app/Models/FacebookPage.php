@@ -10,6 +10,7 @@ class FacebookPage extends Model
 {
     protected $fillable = [
         'facebook_account_id',
+        'facebook_app_id',
         'page_id',
         'page_name',
         'page_access_token',
@@ -23,6 +24,11 @@ class FacebookPage extends Model
     public function facebookAccount(): BelongsTo
     {
         return $this->belongsTo(FacebookAccount::class);
+    }
+
+    public function app(): BelongsTo
+    {
+        return $this->belongsTo(FacebookApp::class, 'facebook_app_id');
     }
 
     public function posts(): HasMany
