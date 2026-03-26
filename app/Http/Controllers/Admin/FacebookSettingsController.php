@@ -56,11 +56,19 @@ class FacebookSettingsController extends Controller
             $pages = $this->facebookGraphService->fetchManagedPages($tokenData['access_token']);
             $this->facebookGraphService->upsertPages($account, $pages);
 
-            return redirect()->route('admin.facebook.settings')->with('success', 'Facebook account connected and pages synced successfully.');
+            $target = \Illuminate\Support\Facades\Route::has('admin.facebook.settings')
+                ? route('admin.facebook.settings')
+                : url('/admin/facebook/settings');
+
+            return redirect($target)->with('success', 'Facebook account connected and pages synced successfully.');
         } catch (Throwable $exception) {
             Log::error('Facebook OAuth callback failed', ['error' => $exception->getMessage()]);
 
-            return redirect()->route('admin.facebook.settings')->with('error', 'Facebook connection failed. Please try again.');
+            $target = \Illuminate\Support\Facades\Route::has('admin.facebook.settings')
+                ? route('admin.facebook.settings')
+                : url('/admin/facebook/settings');
+
+            return redirect($target)->with('error', 'Facebook connection failed. Please try again.');
         }
     }
 

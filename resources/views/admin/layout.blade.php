@@ -13,6 +13,10 @@
     </style>
 </head>
 <body>
+@php
+    $facebookSettingsUrl = Route::has('admin.facebook.settings') ? route('admin.facebook.settings') : url('/admin/facebook/settings');
+    $facebookPostsUrl = Route::has('admin.facebook.posts') ? route('admin.facebook.posts') : url('/admin/facebook/posts');
+@endphp
 @if(auth()->check())
 <div class="d-flex">
     <nav class="navbar navbar-dark bg-dark d-lg-none w-100 position-fixed top-0 z-3">
@@ -34,8 +38,8 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">Dashboard</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.blogs.*') ? 'active' : '' }}" href="{{ route('admin.blogs.index') }}">Blogs</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}">Categories</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.settings') ? 'active' : '' }}" href="{{ route('admin.facebook.settings') }}">Facebook Settings</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.posts*') ? 'active' : '' }}" href="{{ route('admin.facebook.posts') }}">Facebook Posts</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.settings') ? 'active' : '' }}" href="{{ $facebookSettingsUrl }}">Facebook Settings</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.posts*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Facebook Posts</a></li>
             </ul>
 
             <form method="POST" action="{{ route('admin.logout') }}" class="mt-auto pt-3 border-top border-secondary">
