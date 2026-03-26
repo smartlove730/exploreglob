@@ -76,6 +76,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::get('posts', [FacebookPostController::class, 'index'])->name('posts');
         Route::get('posts/create', [FacebookPostController::class, 'create'])->name('posts.create');
         Route::post('posts', [FacebookPostController::class, 'store'])->name('posts.store');
+        Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
         Route::post('posts/{post}/retry', [FacebookPostController::class, 'retry'])->name('posts.retry');
     });
 

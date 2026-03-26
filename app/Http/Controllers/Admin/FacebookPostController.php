@@ -7,9 +7,13 @@ use App\Jobs\PublishFacebookPostJob;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Models\FacebookPost;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class FacebookPostController extends Controller
@@ -116,6 +120,104 @@ class FacebookPostController extends Controller
         PublishFacebookPostJob::dispatch($post->id);
 
         return back()->with('success', 'Post retry queued.');
+    }
+
+    public function generateCaption(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'prompt' => 'required|string|max:5000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
+
+            if (!$apiKey) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gemini API key is not configured.',
+                ], 500);
+            }
+
+            $model = config('gemini.model', 'gemma-3-27b');
+            $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+
+            $aiPrompt = "Write a social media caption for the following prompt:\n\n{$request->string('prompt')->trim()}\n\nRequirements:\n- Caption should be engaging and human sounding.\n- Add relevant trending hashtags at the end.\n- Keep total length under 2000 characters.\n\nReturn only JSON in this exact schema:\n{\n  \"caption\": \"\"\n}";
+
+            $response = Http::timeout(120)
+                ->withHeaders([
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($apiUrl, [
+                    'contents' => [['parts' => [['text' => $aiPrompt]]]],
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Caption generation request failed', [
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to generate caption from AI API.',
+                ], 500);
+            }
+
+            $caption = $this->extractCaptionFromAiResponse($response->json());
+
+            if ($caption === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'AI returned an invalid response format.',
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Caption generated successfully.',
+                'data' => [
+                    'caption' => $caption,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Caption generation error', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unexpected error while generating caption.',
+            ], 500);
+        }
+    }
+
+    private function extractCaptionFromAiResponse(array $aiResponse): string
+    {
+        $rawText = $aiResponse['candidates'][0]['content']['parts'][0]['text'] ?? '';
+
+        if ($rawText === '') {
+            return '';
+        }
+
+        $rawText = trim($rawText);
+        $rawText = preg_replace('/^```json\s*/', '', $rawText) ?? $rawText;
+        $rawText = preg_replace('/\s*```$/', '', $rawText) ?? $rawText;
+
+        $decoded = json_decode($rawText, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return trim((string) ($decoded['caption'] ?? ''));
+        }
+
+        return '';
     }
 
     private function assertPublicHttpsImageUrl(string $imageUrl): void
