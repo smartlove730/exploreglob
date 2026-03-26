@@ -59,8 +59,25 @@
                     <small class="text-muted d-block">Instagram requires an HTTPS image URL and max 2,200 caption characters.</small>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label">Prompt for AI Caption</label>
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            name="prompt"
+                            id="ai_prompt"
+                            class="form-control"
+                            value="{{ old('prompt') }}"
+                            placeholder="e.g. New hiking guide in California for weekend travelers"
+                        >
+                        <button type="button" class="btn btn-outline-primary" id="generate_caption_btn" data-generate-url="{{ route('admin.facebook.posts.generate-caption') }}">
+                            Generate Caption
+                        </button>
+                    </div>
+                    <small id="generate_caption_status" class="text-muted d-block mt-1"></small>
+                </div>
+                <div class="mb-3">
                     <label class="form-label">Message / Caption</label>
-                    <textarea name="message" rows="6" class="form-control" required>{{ old('message') }}</textarea>
+                    <textarea name="message" id="message" rows="6" class="form-control" required>{{ old('message') }}</textarea>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Image URL (optional)</label>
@@ -72,3 +89,64 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const promptInput = document.getElementById('ai_prompt');
+    const messageInput = document.getElementById('message');
+    const generateBtn = document.getElementById('generate_caption_btn');
+    const statusNode = document.getElementById('generate_caption_status');
+
+    if (!promptInput || !messageInput || !generateBtn || !statusNode) {
+        return;
+    }
+
+    generateBtn.addEventListener('click', async () => {
+        const prompt = promptInput.value.trim();
+
+        if (!prompt) {
+            statusNode.textContent = 'Please enter a prompt first.';
+            statusNode.classList.remove('text-muted', 'text-success');
+            statusNode.classList.add('text-danger');
+            return;
+        }
+
+        statusNode.textContent = 'Generating caption...';
+        statusNode.classList.remove('text-danger', 'text-success');
+        statusNode.classList.add('text-muted');
+        generateBtn.disabled = true;
+
+        try {
+            const response = await fetch(generateBtn.dataset.generateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ prompt }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Failed to generate caption.');
+            }
+
+            messageInput.value = result.data.caption || '';
+            statusNode.textContent = 'Caption generated and filled in the message field.';
+            statusNode.classList.remove('text-muted', 'text-danger');
+            statusNode.classList.add('text-success');
+        } catch (error) {
+            statusNode.textContent = error.message || 'Unexpected error while generating caption.';
+            statusNode.classList.remove('text-muted', 'text-success');
+            statusNode.classList.add('text-danger');
+        } finally {
+            generateBtn.disabled = false;
+        }
+    });
+});
+</script>
+@endpush

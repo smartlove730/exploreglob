@@ -124,5 +124,6 @@ document.addEventListener('click', async (e) => {
     }
 });
 </script>
+@stack('scripts')
 </body>
 </html>
