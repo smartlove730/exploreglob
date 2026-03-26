@@ -10,6 +10,7 @@ use App\Models\FacebookPost;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class FacebookPostController extends Controller
 {
@@ -56,7 +57,13 @@ class FacebookPostController extends Controller
             'page_id' => 'required|integer|exists:facebook_pages,id',
             'message' => 'required|string|max:60000',
             'image_url' => 'nullable|url|max:2048',
+            'platforms' => 'required|array|min:1',
+            'platforms.*' => 'required|string|in:facebook,instagram',
         ]);
+
+        if (!empty($data['image_url'])) {
+            $this->assertPublicHttpsImageUrl($data['image_url']);
+        }
 
         $page = FacebookPage::query()
             ->whereKey($data['page_id'])
@@ -69,17 +76,32 @@ class FacebookPostController extends Controller
             return back()->withInput()->with('error', 'Selected page is not valid for this app/user.');
         }
 
+        $platforms = collect($data['platforms'])->unique()->values()->all();
+
+        if (in_array('instagram', $platforms, true) && mb_strlen($data['message']) > 2200) {
+            throw ValidationException::withMessages([
+                'message' => 'Instagram caption must be 2,200 characters or fewer.',
+            ]);
+        }
+
+        if (in_array('instagram', $platforms, true) && empty($data['image_url'])) {
+            throw ValidationException::withMessages([
+                'image_url' => 'An HTTPS public image URL is required for Instagram posting.',
+            ]);
+        }
+
         $post = FacebookPost::create([
             'page_id' => $page->id,
             'message' => $data['message'],
             'image_url' => $data['image_url'] ?? null,
+            'platforms' => $platforms,
             'scheduled_at' => null,
             'status' => FacebookPost::STATUS_PENDING,
         ]);
 
         PublishFacebookPostJob::dispatch($post->id);
 
-        return redirect()->route('admin.facebook.posts')->with('success', 'Facebook post queued for immediate publishing.');
+        return redirect()->route('admin.facebook.posts')->with('success', 'Post queued for publishing.');
     }
 
     public function retry(FacebookPost $post): RedirectResponse
@@ -94,5 +116,29 @@ class FacebookPostController extends Controller
         PublishFacebookPostJob::dispatch($post->id);
 
         return back()->with('success', 'Post retry queued.');
+    }
+
+    private function assertPublicHttpsImageUrl(string $imageUrl): void
+    {
+        $host = parse_url($imageUrl, PHP_URL_HOST);
+        $scheme = parse_url($imageUrl, PHP_URL_SCHEME);
+
+        if ($scheme !== 'https' || !$host) {
+            throw ValidationException::withMessages([
+                'image_url' => 'Image URL must be publicly accessible and use HTTPS.',
+            ]);
+        }
+
+        if (in_array($host, ['localhost', '127.0.0.1'], true)) {
+            throw ValidationException::withMessages([
+                'image_url' => 'Image URL must not point to localhost.',
+            ]);
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) && !filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            throw ValidationException::withMessages([
+                'image_url' => 'Image URL must be publicly reachable.',
+            ]);
+        }
     }
 }

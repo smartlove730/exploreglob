@@ -16,6 +16,7 @@ class FacebookPost extends Model
         'page_id',
         'message',
         'image_url',
+        'platforms',
         'status',
         'scheduled_at',
         'posted_at',
@@ -24,6 +25,7 @@ class FacebookPost extends Model
     ];
 
     protected $casts = [
+        'platforms' => 'array',
         'scheduled_at' => 'datetime',
         'posted_at' => 'datetime',
         'response_json' => 'array',

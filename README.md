@@ -60,6 +60,34 @@ A modern, scalable blogging platform built with Laravel that automatically gener
 - **[Setup Guide](SETUP.md)** - Complete installation and configuration instructions
 - **[API Documentation](API_DOCUMENTATION.md)** - API endpoints for cron jobs and automation
 
+
+## 📣 Facebook + Instagram Publishing
+
+The admin social posting flow now supports publishing to Facebook, Instagram, or both in one queued workflow.
+
+### Required Meta Permissions
+
+Make sure your Meta app is approved for:
+
+- `instagram_basic`
+- `instagram_content_publish`
+- `pages_manage_posts`
+- `pages_read_engagement`
+
+### Example Request Payload (Both Platforms)
+
+```json
+{
+  "app_id": 1,
+  "page_id": 12,
+  "message": "New post caption",
+  "image_url": "https://cdn.example.com/posts/post-01.jpg",
+  "platforms": ["facebook", "instagram"]
+}
+```
+
+> Instagram publishing requires a publicly accessible HTTPS `image_url` and caption length up to 2,200 characters.
+
 ## 🔌 API Endpoints
 
 The platform provides RESTful API endpoints for automated blog generation:

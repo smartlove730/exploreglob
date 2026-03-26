@@ -1,10 +1,10 @@
 @extends('admin.layout')
 
-@section('title', 'Create Facebook Post')
+@section('title', 'Create Social Post')
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Create Facebook Post</h1>
+    <h1 class="h3 mb-0">Create Social Post</h1>
     <a class="btn btn-outline-secondary" href="{{ route('admin.facebook.posts') }}">View History</a>
 </div>
 
@@ -47,7 +47,19 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Message</label>
+                    <label class="form-label d-block">Platforms</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="platforms[]" id="platform_facebook" value="facebook" {{ in_array('facebook', old('platforms', ['facebook']), true) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="platform_facebook">Facebook</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="platforms[]" id="platform_instagram" value="instagram" {{ in_array('instagram', old('platforms', []), true) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="platform_instagram">Instagram</label>
+                    </div>
+                    <small class="text-muted d-block">Instagram requires an HTTPS image URL and max 2,200 caption characters.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Message / Caption</label>
                     <textarea name="message" rows="6" class="form-control" required>{{ old('message') }}</textarea>
                 </div>
                 <div class="mb-3">

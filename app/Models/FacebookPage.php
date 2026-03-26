@@ -14,6 +14,7 @@ class FacebookPage extends Model
         'page_id',
         'page_name',
         'page_access_token',
+        'instagram_business_account_id',
         'is_active',
     ];
 

@@ -6,18 +6,24 @@ use App\Models\FacebookAccount;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 class FacebookGraphService
 {
     private string $apiVersion = 'v19.0';
+
+    public function __construct(private readonly InstagramService $instagramService)
+    {
+    }
 
     public function getOAuthRedirectUrl(FacebookApp $app): string
     {
         $query = http_build_query([
             'client_id' => $app->app_id,
             'redirect_uri' => $app->redirect_uri,
-            'scope' => 'pages_show_list,pages_read_engagement,pages_manage_posts',
+            'scope' => 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish',
         ]);
 
         return "https://www.facebook.com/{$this->apiVersion}/dialog/oauth?{$query}";
@@ -122,12 +128,28 @@ class FacebookGraphService
                 continue;
             }
 
+            $instagramBusinessAccountId = null;
+
+            try {
+                $instagramBusinessAccountId = $this->instagramService->fetchInstagramBusinessAccountId(
+                    (string) $page['id'],
+                    (string) $page['access_token']
+                );
+            } catch (Throwable $exception) {
+                Log::warning('Unable to resolve Instagram business account for Facebook page', [
+                    'facebook_account_id' => $account->id,
+                    'page_id' => $page['id'],
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+
             $account->pages()->updateOrCreate(
                 ['page_id' => $page['id']],
                 [
                     'facebook_app_id' => $account->facebook_app_id,
                     'page_name' => $page['name'],
                     'page_access_token' => $page['access_token'],
+                    'instagram_business_account_id' => $instagramBusinessAccountId,
                     'is_active' => true,
                 ]
             );

@@ -4,9 +4,11 @@ namespace App\Jobs;
 
 use App\Models\FacebookPost;
 use App\Services\FacebookGraphService;
+use App\Services\InstagramService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 class PublishFacebookPostJob implements ShouldQueue
@@ -17,7 +19,7 @@ class PublishFacebookPostJob implements ShouldQueue
     {
     }
 
-    public function handle(FacebookGraphService $facebookGraphService): void
+    public function handle(FacebookGraphService $facebookGraphService, InstagramService $instagramService): void
     {
         $post = FacebookPost::with('page')->find($this->facebookPostId);
 
@@ -25,29 +27,62 @@ class PublishFacebookPostJob implements ShouldQueue
             return;
         }
 
+        $platforms = collect($post->platforms ?: ['facebook'])
+            ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
+            ->values()
+            ->all();
+
+        if (empty($platforms)) {
+            $platforms = ['facebook'];
+        }
+
+        $responses = [];
+
         try {
-            $response = $facebookGraphService->publishToPage(
-                $post->page,
-                $post->message,
-                $post->image_url
-            );
+            foreach ($platforms as $platform) {
+                if ($platform === 'facebook') {
+                    $responses['facebook'] = $facebookGraphService->publishToPage(
+                        $post->page,
+                        $post->message,
+                        $post->image_url
+                    );
+
+                    continue;
+                }
+
+                if (!$post->image_url) {
+                    throw new RuntimeException('Instagram publishing requires an HTTPS image URL.');
+                }
+
+                $responses['instagram'] = $instagramService->publishImageWithCaption(
+                    $post->page,
+                    $post->image_url,
+                    $post->message,
+                    3
+                );
+            }
 
             $post->update([
                 'status' => FacebookPost::STATUS_POSTED,
                 'posted_at' => now(),
                 'attempts' => $post->attempts + 1,
-                'response_json' => $response,
+                'response_json' => $responses,
             ]);
         } catch (Throwable $exception) {
-            Log::error('Facebook post failed', [
+            Log::error('Social post failed', [
                 'facebook_post_id' => $post->id,
+                'platforms' => $platforms,
+                'responses' => $responses,
                 'error' => $exception->getMessage(),
             ]);
 
             $post->update([
                 'status' => FacebookPost::STATUS_FAILED,
                 'attempts' => $post->attempts + 1,
-                'response_json' => ['error' => $exception->getMessage()],
+                'response_json' => [
+                    'partial_responses' => $responses,
+                    'error' => $exception->getMessage(),
+                ],
             ]);
 
             throw $exception;
