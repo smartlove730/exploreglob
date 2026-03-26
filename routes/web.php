@@ -53,8 +53,13 @@ Route::post('/genimage', [BlogController::class, 'genImage'])->name('genImage');
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\BlogController as AdminBlogController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Admin\FacebookSettingsController;
+use App\Http\Controllers\Admin\FacebookPostController;
 
 Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
+
+Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('admin.facebook.callback');
+
 // Admin auth
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');
@@ -73,5 +78,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('categories/create-modal', [AdminCategoryController::class, 'createModal'])->name('categories.createModal');
             Route::get('categories/{category}/edit-modal', [AdminCategoryController::class, 'editModal'])->name('categories.editModal');
             Route::resource('categories', AdminCategoryController::class);
+
+            Route::get('facebook/settings', [FacebookSettingsController::class, 'index'])->name('facebook.settings');
+            Route::get('facebook/connect', [FacebookSettingsController::class, 'redirectToFacebook'])->name('facebook.connect');
+            Route::post('facebook/sync-pages', [FacebookSettingsController::class, 'syncPages'])->name('facebook.sync-pages');
+            Route::post('facebook/pages/{page}/activate', [FacebookSettingsController::class, 'activatePage'])->name('facebook.pages.activate');
+
+            Route::get('facebook/posts', [FacebookPostController::class, 'index'])->name('facebook.posts');
+            Route::get('facebook/posts/create', [FacebookPostController::class, 'create'])->name('facebook.posts.create');
+            Route::post('facebook/posts', [FacebookPostController::class, 'store'])->name('facebook.posts.store');
+            Route::post('facebook/posts/{post}/retry', [FacebookPostController::class, 'retry'])->name('facebook.posts.retry');
     });
 });
