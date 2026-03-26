@@ -14,6 +14,7 @@
             <table class="table align-middle">
                 <thead>
                     <tr>
+                        <th>App</th>
                         <th>Page</th>
                         <th>Message</th>
                         <th>Status</th>
@@ -25,6 +26,7 @@
                 <tbody>
                     @forelse($posts as $post)
                         <tr>
+                            <td>{{ $post->page?->facebookAccount?->app?->name ?? "-" }}</td>
                             <td>{{ $post->page?->page_name }}</td>
                             <td>{{ \Illuminate\Support\Str::limit($post->message, 100) }}</td>
                             <td><span class="badge text-bg-{{ $post->status === 'posted' ? 'success' : ($post->status === 'failed' ? 'danger' : 'secondary') }}">{{ ucfirst($post->status) }}</span></td>
@@ -42,7 +44,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-muted">No posts yet.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted">No posts yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

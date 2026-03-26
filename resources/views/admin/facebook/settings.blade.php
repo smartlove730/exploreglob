@@ -5,10 +5,31 @@
 @section('content')
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <h1 class="h3 mb-0">Facebook Settings</h1>
-    <div class="d-flex gap-2">
-        <a href="{{ route('admin.facebook.connect') }}" class="btn btn-primary">Connect Facebook</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <form method="GET" action="{{ route('admin.facebook.settings') }}" class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label">Facebook App</label>
+                <select name="app_id" class="form-select" onchange="this.form.submit()">
+                    <option value="">Select an app</option>
+                    @foreach($apps as $app)
+                        <option value="{{ $app->id }}" {{ $selectedAppId === $app->id ? 'selected' : '' }}>{{ $app->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-6 d-flex gap-2">
+                <a href="{{ route('admin.facebook.connect', ['app_id' => $selectedAppId]) }}" class="btn btn-primary {{ $selectedAppId ? '' : 'disabled' }}">Connect Facebook</a>
+            </div>
+        </form>
+
         @if($account)
-            <form method="POST" action="{{ route('admin.facebook.sync-pages') }}">@csrf<button class="btn btn-outline-secondary">Sync Pages</button></form>
+            <form method="POST" action="{{ route('admin.facebook.sync-pages') }}" class="mt-2">
+                @csrf
+                <input type="hidden" name="app_id" value="{{ $selectedAppId }}">
+                <button class="btn btn-outline-secondary">Sync Pages</button>
+            </form>
         @endif
     </div>
 </div>
@@ -34,7 +55,7 @@
                 <h2 class="h5 mb-3">Managed Facebook Pages</h2>
 
                 @if($pages->isEmpty())
-                    <p class="text-muted mb-0">No pages available yet. Connect and sync your Facebook account.</p>
+                    <p class="text-muted mb-0">No pages available yet. Select app, connect, and sync.</p>
                 @else
                     <div class="table-responsive">
                         <table class="table align-middle">

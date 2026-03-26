@@ -19,11 +19,12 @@ class RefreshFacebookTokensCommand extends Command
         $accounts = FacebookAccount::query()
             ->whereNotNull('token_expires_at')
             ->where('token_expires_at', '<=', now()->addDays(7))
+                        ->with('app')
             ->get();
 
         foreach ($accounts as $account) {
             try {
-                $tokenData = $facebookGraphService->refreshLongLivedToken($account->long_lived_user_token);
+                $tokenData = $facebookGraphService->refreshLongLivedToken($account);
 
                 $account->update([
                     'long_lived_user_token' => $tokenData['access_token'],

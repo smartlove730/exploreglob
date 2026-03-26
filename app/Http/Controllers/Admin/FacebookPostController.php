@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\PublishFacebookPostJob;
+use App\Models\FacebookApp;
 use App\Models\FacebookPost;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ class FacebookPostController extends Controller
 {
     public function index()
     {
-        $posts = FacebookPost::with('page')
+        $posts = FacebookPost::with(['page.facebookAccount.app'])
             ->whereHas('page.facebookAccount', fn ($query) => $query->where('user_id', Auth::id()))
             ->latest()
             ->paginate(20);
@@ -21,21 +22,39 @@ class FacebookPostController extends Controller
         return view('admin.facebook.posts', compact('posts'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        $activePage = Auth::user()?->facebookAccount?->pages()->where('is_active', true)->first();
+        $apps = FacebookApp::where('is_active', true)->orderBy('name')->get();
+        $selectedAppId = (int) $request->integer('app_id');
 
-        return view('admin.facebook.create-post', compact('activePage'));
+        $activePageQuery = Auth::user()?->facebookAccounts()
+            ->when($selectedAppId > 0, fn ($query) => $query->where('facebook_app_id', $selectedAppId))
+            ->with(['pages' => fn ($query) => $query->where('is_active', true)])
+            ->get()
+            ->flatMap(fn ($account) => $account->pages)
+            ->first();
+
+        return view('admin.facebook.create-post', [
+            'apps' => $apps,
+            'selectedAppId' => $selectedAppId,
+            'activePage' => $activePageQuery,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
+            'app_id' => 'required|integer|exists:facebook_apps,id',
             'message' => 'required|string|max:60000',
             'image_url' => 'nullable|url|max:2048',
         ]);
 
-        $activePage = Auth::user()?->facebookAccount?->pages()->where('is_active', true)->first();
+        $activePage = Auth::user()?->facebookAccounts()
+            ->where('facebook_app_id', $data['app_id'])
+            ->with(['pages' => fn ($query) => $query->where('is_active', true)])
+            ->get()
+            ->flatMap(fn ($account) => $account->pages)
+            ->first();
 
         if (!$activePage) {
             return back()->with('error', 'Select an active page in Facebook Settings first.');
