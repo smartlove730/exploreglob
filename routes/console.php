@@ -27,3 +27,10 @@ Schedule::command('sitemap:generate')
     ->dailyAt('01:00')
     ->withoutOverlapping()
     ->runInBackground();
+
+
+// Refresh Facebook long-lived tokens daily
+Schedule::command('facebook:refresh-tokens')
+    ->dailyAt('03:00')
+    ->withoutOverlapping()
+    ->runInBackground();
