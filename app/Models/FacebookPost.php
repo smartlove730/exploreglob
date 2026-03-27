@@ -4,18 +4,23 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FacebookPost extends Model
 {
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_SCHEDULED = 'scheduled';
-    public const STATUS_POSTED = 'posted';
-    public const STATUS_FAILED = 'failed';
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_PUBLISHED = 'published';
+    public const STATUS_PENDING = 'draft';
+    public const STATUS_SCHEDULED = 'draft';
+    public const STATUS_POSTED = 'published';
+    public const STATUS_FAILED = 'draft';
 
     protected $fillable = [
         'page_id',
         'message',
         'image_url',
+        'facebook_post_id',
+        'instagram_media_id',
         'platforms',
         'status',
         'scheduled_at',
@@ -34,5 +39,10 @@ class FacebookPost extends Model
     public function page(): BelongsTo
     {
         return $this->belongsTo(FacebookPage::class, 'page_id');
+    }
+
+    public function images(): HasMany
+    {
+        return $this->hasMany(PostImage::class, 'post_id');
     }
 }

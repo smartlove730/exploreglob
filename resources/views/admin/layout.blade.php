@@ -15,7 +15,7 @@
 <body>
 @php
     $facebookSettingsUrl = Route::has('admin.facebook.settings') ? route('admin.facebook.settings') : url('/admin/facebook/settings');
-    $facebookPostsUrl = Route::has('admin.facebook.posts') ? route('admin.facebook.posts') : url('/admin/facebook/posts');
+    $facebookPostsUrl = Route::has('admin.posts.index') ? route('admin.posts.index') : url('/admin/posts');
     $facebookAppsUrl = Route::has('admin.facebook.apps.index') ? route('admin.facebook.apps.index') : url('/admin/facebook/apps');
 @endphp
 @if(auth()->check())
@@ -41,7 +41,7 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}">Categories</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.apps.*') ? 'active' : '' }}" href="{{ $facebookAppsUrl }}">Facebook Apps</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.settings') ? 'active' : '' }}" href="{{ $facebookSettingsUrl }}">Facebook Settings</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.posts*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Facebook Posts</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
             </ul>
 
             <form method="POST" action="{{ route('admin.logout') }}" class="mt-auto pt-3 border-top border-secondary">
