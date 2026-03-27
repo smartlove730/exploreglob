@@ -60,8 +60,11 @@ use App\Http\Controllers\Admin\FacebookAppController;
 use App\Http\Controllers\Admin\DriveApiKeyController;
 use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\GoogleController;
+use App\Http\Controllers\Admin\AutomationConfigController;
+use App\Http\Controllers\AutomationController;
 
 Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
+Route::get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
 
 Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('admin.facebook.callback');
 Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('admin.google.callback');
@@ -106,6 +109,19 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
+    });
+
+Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
+    ->prefix('admin')
+    ->name('admin.automations.')
+    ->group(function () {
+        Route::get('automations', [AutomationConfigController::class, 'index'])->name('index');
+        Route::get('automations/create', [AutomationConfigController::class, 'create'])->name('create');
+        Route::post('automations', [AutomationConfigController::class, 'store'])->name('store');
+        Route::get('automations/{automation}/edit', [AutomationConfigController::class, 'edit'])->name('edit');
+        Route::put('automations/{automation}', [AutomationConfigController::class, 'update'])->name('update');
+        Route::delete('automations/{automation}', [AutomationConfigController::class, 'destroy'])->name('destroy');
+        Route::post('automations/{automation}/toggle', [AutomationConfigController::class, 'toggle'])->name('toggle');
     });
 
 // Admin auth
