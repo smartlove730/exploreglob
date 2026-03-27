@@ -55,6 +55,7 @@ class AutomationService
             $drivePayload = $this->driveService->fetchImagesFromDriveLink($config->drive_link, $config->driveApiKey);
             $folderId = (string) ($drivePayload['folder_id'] ?? '');
             $images = collect($drivePayload['images'] ?? []);
+            $platforms = $this->normalizePlatforms($config->platforms);
 
             $unusedImage = $this->resolveUnusedImage($config, $images);
 
@@ -65,8 +66,11 @@ class AutomationService
             }
 
             $imageUrl = (string) ($unusedImage['download_url'] ?? $unusedImage['preview_url'] ?? '');
+            if (in_array('instagram', $platforms, true)) {
+                $imageUrl = $this->driveService->prepareInstagramEligibleImage($unusedImage, $config->driveApiKey);
+            }
+
             $caption = $this->aiCaptionService->generateCaption($config->prompt, $imageUrl);
-            $platforms = $this->normalizePlatforms($config->platforms);
 
             /** @var FacebookPage|null $page */
             $page = $config->page;
