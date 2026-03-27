@@ -40,16 +40,39 @@ class InstagramService
         return $instagramBusinessAccountId;
     }
 
-    public function createMediaContainer(string $igUserId, string $pageAccessToken, string $imageUrl, string $caption): string
+    public function createMediaContainer(string $igUserId, string $pageAccessToken, string $imageUrl, string $caption, bool $isCarouselItem = false): string
+    {
+        $payload = [
+            'image_url' => $imageUrl,
+            'caption' => $caption,
+            'access_token' => $pageAccessToken,
+        ];
+
+        if ($isCarouselItem) {
+            $payload['is_carousel_item'] = 'true';
+            unset($payload['caption']);
+        }
+
+        $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$igUserId}/media", $payload);
+
+        if (!$response->ok() || !isset($response['id'])) {
+            throw new RuntimeException('Unable to create Instagram media container: '.$response->body());
+        }
+
+        return (string) $response['id'];
+    }
+
+    public function createCarouselContainer(string $igUserId, string $pageAccessToken, array $children, string $caption): string
     {
         $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$igUserId}/media", [
-            'image_url' => $imageUrl,
+            'media_type' => 'CAROUSEL',
+            'children' => implode(',', $children),
             'caption' => $caption,
             'access_token' => $pageAccessToken,
         ]);
 
         if (!$response->ok() || !isset($response['id'])) {
-            throw new RuntimeException('Unable to create Instagram media container: '.$response->body());
+            throw new RuntimeException('Unable to create Instagram carousel container: '.$response->body());
         }
 
         return (string) $response['id'];
@@ -80,6 +103,34 @@ class InstagramService
 
         return [
             'creation_id' => $creationId,
+            'publish_response' => $published,
+        ];
+    }
+
+    public function publishCarouselWithCaption(FacebookPage $page, array $imageUrls, string $caption, int $publishDelaySeconds = 3): array
+    {
+        if (count($imageUrls) < 2) {
+            throw new RuntimeException('Instagram carousel requires at least two images.');
+        }
+
+        $igUserId = $this->ensureInstagramBusinessAccountId($page);
+        $children = [];
+
+        foreach ($imageUrls as $imageUrl) {
+            $children[] = $this->createMediaContainer($igUserId, $page->page_access_token, $imageUrl, $caption, true);
+        }
+
+        sleep(max(2, min(6, $publishDelaySeconds)));
+
+        $carouselContainerId = $this->createCarouselContainer($igUserId, $page->page_access_token, $children, $caption);
+
+        sleep(max(2, min(6, $publishDelaySeconds)));
+
+        $published = $this->publishMedia($igUserId, $page->page_access_token, $carouselContainerId);
+
+        return [
+            'children_creation_ids' => $children,
+            'creation_id' => $carouselContainerId,
             'publish_response' => $published,
         ];
     }
