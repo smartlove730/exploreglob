@@ -12,6 +12,7 @@ use App\Models\FacebookPage;
 use App\Models\FacebookPost;
 use App\Models\GoogleAccount;
 use App\Models\GoogleLocation;
+use App\Services\DriveService;
 use App\Services\GoogleDriveService;
 use App\Services\GoogleService;
 use App\Services\MetaPostService;
@@ -29,7 +30,8 @@ class PostController extends Controller
     public function __construct(
         private readonly MetaPostService $metaPostService,
         private readonly GoogleDriveService $googleDriveService,
-        private readonly GoogleService $googleService
+        private readonly GoogleService $googleService,
+        private readonly DriveService $driveService,
     )
     {
     }
@@ -120,6 +122,7 @@ class PostController extends Controller
 
         $this->syncImages($post, $request, []);
         $publishImageUrl = $this->resolvePublishImageUrl($post);
+        $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
 
         if (in_array('instagram', $data['platforms'], true) && !$publishImageUrl) {
             throw ValidationException::withMessages(['images' => 'Instagram requires at least one image URL or upload.']);
@@ -173,6 +176,7 @@ class PostController extends Controller
 
         $this->syncImages($post, $request, $data['remove_images'] ?? []);
         $publishImageUrl = $this->resolvePublishImageUrl($post);
+        $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
         $googleLocationId = $this->resolveGoogleLocationId($data);
 
         $isImagePost = ($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_IMAGE;
@@ -422,7 +426,7 @@ class PostController extends Controller
                 $publishResult = $this->metaPostService->publishCombined(
                     $page,
                     $data['caption'],
-                    collect($preparedImages)->pluck('public_url')->all(),
+                    collect($preparedImages)->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms))->all(),
                     $platforms
                 );
 
@@ -485,6 +489,7 @@ class PostController extends Controller
 
         foreach ($preparedImages as $imageMeta) {
             $imageUrl = $imageMeta['public_url'];
+            $imageUrl = $this->ensureInstagramEligibleImage($imageUrl, $platforms);
             $this->assertPublicHttpsImageUrl($imageUrl);
 
             try {
@@ -676,6 +681,24 @@ class PostController extends Controller
         }
 
         return Storage::disk('public')->url($firstImage->image_path);
+    }
+
+    private function ensureInstagramEligibleImage(?string $imageUrl, array $platforms): ?string
+    {
+        if (!$imageUrl || !in_array('instagram', $platforms, true)) {
+            return $imageUrl;
+        }
+
+        try {
+            return $this->driveService->prepareInstagramEligibleFromUrl($imageUrl);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to normalize image for Instagram in manual flow; using original URL.', [
+                'image_url' => $imageUrl,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $imageUrl;
+        }
     }
 
     private function assertPublicHttpsImageUrl(string $imageUrl): void
