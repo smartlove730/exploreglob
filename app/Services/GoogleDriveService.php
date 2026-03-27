@@ -24,7 +24,7 @@ class GoogleDriveService
         ]);
     }
 
-    public function listPublicFolderImages(string $folderId, ?string $apiKey = null): array
+    public function listPublicFolderImages(string $folderId, ?string $apiKey = null, ?string $accessToken = null): array
     {
         $apiKey = $apiKey ?: config('services.google_drive.api_key');
 
@@ -38,18 +38,29 @@ class GoogleDriveService
         $pageToken = null;
 
         do {
-            $response = Http::timeout(30)
-                ->get('https://www.googleapis.com/drive/v3/files', [
-                    'key' => $apiKey,
+            $request = Http::timeout(30);
+
+            if ($accessToken) {
+                $request = $request->withToken($accessToken);
+            }
+
+            $query = [
                     'q' => "'{$folderId}' in parents and mimeType contains 'image/' and trashed = false",
                     'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey)',
                     'pageSize' => 200,
                     'pageToken' => $pageToken,
                     'supportsAllDrives' => 'true',
                     'includeItemsFromAllDrives' => 'true',
-                ]);
+                ];
+
+            if (!$accessToken) {
+                $query['key'] = $apiKey;
+            }
+
+            $response = $request->get('https://www.googleapis.com/drive/v3/files', $query);
 
             if (!$response->successful()) {
+
                 throw ValidationException::withMessages([
                     'folder_url' => 'Unable to fetch images from Google Drive. Make sure the folder is shared publicly.',
                 ]);
@@ -108,20 +119,25 @@ class GoogleDriveService
         return 'https://drive.usercontent.google.com/download?'.http_build_query($query);
     }
 
-    public function fetchImageBinary(string $fileId, string $apiKey, string $resourceKey = ''): array
+    public function fetchImageBinary(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): array
     {
-        $query = [
-            'alt' => 'media',
-            'key' => $apiKey,
-        ];
+        $query = ['alt' => 'media'];
+
+        if (!$accessToken && $apiKey) {
+            $query['key'] = $apiKey;
+        }
 
         if ($resourceKey !== '') {
             $query['resourceKey'] = $resourceKey;
         }
 
-        $response = Http::timeout(30)
-            ->withHeaders(['Accept' => 'image/*'])
-            ->get("https://www.googleapis.com/drive/v3/files/{$fileId}", $query);
+        $request = Http::timeout(30)->withHeaders(['Accept' => 'image/*']);
+
+        if ($accessToken) {
+            $request = $request->withToken($accessToken);
+        }
+
+        $response = $request->get("https://www.googleapis.com/drive/v3/files/{$fileId}", $query);
 
         if (!$response->successful()) {
             throw ValidationException::withMessages([

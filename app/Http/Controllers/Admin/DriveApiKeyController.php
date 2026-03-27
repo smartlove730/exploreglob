@@ -62,7 +62,7 @@ class DriveApiKeyController extends Controller
     {
         return $request->validate([
             'name' => 'required|string|max:255',
-            'api_key' => 'required|string|max:255',
+            'api_key' => 'nullable|string|max:255',
             'description' => 'nullable|string|max:5000',
             'email' => 'nullable|email|max:255',
             'redirect_url' => 'nullable|url|max:2048',

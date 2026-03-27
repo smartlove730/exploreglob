@@ -10,10 +10,13 @@ return new class extends Migration {
         Schema::create('drive_api_keys', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('api_key');
+            $table->string('api_key')->nullable();
             $table->text('description')->nullable();
             $table->string('email')->nullable();
             $table->string('redirect_url')->nullable();
+            $table->text('oauth_access_token')->nullable();
+            $table->text('oauth_refresh_token')->nullable();
+            $table->timestamp('oauth_expires_at')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

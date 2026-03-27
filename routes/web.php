@@ -59,10 +59,12 @@ use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\FacebookAppController;
 use App\Http\Controllers\Admin\DriveApiKeyController;
 use App\Http\Controllers\Admin\DriveFolderController;
+use App\Http\Controllers\Admin\GoogleController;
 
 Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
 
 Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('admin.facebook.callback');
+Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('admin.google.callback');
 Route::get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
 
 
@@ -80,6 +82,16 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::resource('drive-folders', DriveFolderController::class)->except(['show']);
 
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
+    });
+
+Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
+    ->prefix('admin/google')
+    ->name('admin.google.')
+    ->group(function () {
+        Route::get('settings', [GoogleController::class, 'index'])->name('settings');
+        Route::get('connect', [GoogleController::class, 'redirect'])->name('connect');
+        Route::post('sync-locations', [GoogleController::class, 'syncLocations'])->name('sync-locations');
+        Route::post('locations/{location}/default', [GoogleController::class, 'setDefaultLocation'])->name('locations.default');
     });
 
 Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
