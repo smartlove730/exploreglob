@@ -10,12 +10,15 @@ class RunAutomationJob implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public ?int $automationConfigId = null)
+    public function __construct(
+        public ?int $automationConfigId = null,
+        public bool $forceRun = false,
+    )
     {
     }
 
     public function handle(AutomationService $automationService): void
     {
-        $automationService->runAllAutomations($this->automationConfigId);
+        $automationService->runAllAutomations($this->automationConfigId, $this->forceRun);
     }
 }

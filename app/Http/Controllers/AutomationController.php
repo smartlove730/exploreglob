@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\RunAutomationJob;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class AutomationController extends Controller
 {
-    public function run(?int $automationConfigId = null): Response
+    public function run(Request $request, ?int $automationConfigId = null): Response
     {
-        RunAutomationJob::dispatch($automationConfigId);
+        $forceRun = $request->boolean('force', false);
+        RunAutomationJob::dispatch($automationConfigId, $forceRun);
 
-        return response('Automation started', 200);
+        return response($forceRun ? 'Automation started (forced).' : 'Automation started', 200);
     }
 }

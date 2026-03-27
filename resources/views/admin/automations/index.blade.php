@@ -16,7 +16,11 @@
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
-        <p class="small text-muted">Run all manually: <code>{{ url('/run-automations') }}</code> | Run one config: <code>{{ url('/run-automations/{id}') }}</code></p>
+        <p class="small text-muted">
+            Run all manually: <code>{{ url('/run-automations') }}</code> |
+            Run one config: <code>{{ url('/run-automations/{id}') }}</code> |
+            Force run (ignore schedule/limit): <code>{{ url('/run-automations/{id}?force=1') }}</code>
+        </p>
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>

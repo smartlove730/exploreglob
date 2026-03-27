@@ -24,9 +24,9 @@ class AutomationService
     ) {
     }
 
-    public function runAllAutomations(?int $automationConfigId = null): void
+    public function runAllAutomations(?int $automationConfigId = null, bool $forceRun = false): void
     {
-        Cache::lock('automation:run-all', 300)->block(5, function () use ($automationConfigId) {
+        Cache::lock('automation:run-all', 300)->block(5, function () use ($automationConfigId, $forceRun) {
             $configs = AutomationConfig::query()
                 ->with(['page.facebookAccount', 'driveApiKey'])
                 ->where('is_active', true)
@@ -34,16 +34,17 @@ class AutomationService
                 ->get();
 
             foreach ($configs as $config) {
-                $this->runSingleAutomation($config);
+                $this->runSingleAutomation($config, $forceRun);
                 sleep(2); // soft rate-limit between external API calls
             }
         });
     }
 
-    private function runSingleAutomation(AutomationConfig $config): void
+    private function runSingleAutomation(AutomationConfig $config, bool $forceRun = false): void
     {
-        if (!$this->canRunNow($config)) {
-            $this->logSkipped($config, 'Skipped due to schedule or post limit constraints.');
+        $blockReason = $this->getRunBlockReason($config, $forceRun);
+        if ($blockReason !== null) {
+            $this->logSkipped($config, $blockReason);
 
             return;
         }
@@ -159,8 +160,12 @@ class AutomationService
         return $imageUrl;
     }
 
-    private function canRunNow(AutomationConfig $config): bool
+    private function getRunBlockReason(AutomationConfig $config, bool $forceRun = false): ?string
     {
+        if ($forceRun) {
+            return null;
+        }
+
         $todayCount = AutomationPostLog::query()
             ->where('automation_config_id', $config->id)
             ->where('status', 'success')
@@ -168,17 +173,22 @@ class AutomationService
             ->count();
 
         if ($todayCount >= max(1, (int) $config->post_limit_per_day)) {
-            return false;
+            return "Skipped: daily post limit reached ({$todayCount}/{$config->post_limit_per_day}).";
         }
 
         if (!$config->last_run_at) {
-            return true;
+            return null;
         }
 
         $runsPerDay = max(1, (int) $config->runs_per_day);
         $minIntervalMinutes = (int) floor(1440 / $runsPerDay);
+        $nextRunAt = $config->last_run_at->copy()->addMinutes(max(1, $minIntervalMinutes));
 
-        return $config->last_run_at->lte(now()->subMinutes(max(1, $minIntervalMinutes)));
+        if ($nextRunAt->isFuture()) {
+            return 'Skipped: next run available at '.$nextRunAt->toDateTimeString().'.';
+        }
+
+        return null;
     }
 
     private function resolveUnusedImage(AutomationConfig $config, Collection $images): ?array
