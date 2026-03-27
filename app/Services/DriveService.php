@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DriveApiKey;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -53,24 +54,28 @@ class DriveService
             $driveToken
         );
 
-        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
-            throw new RuntimeException('GD extension is required to normalize Instagram images.');
+        return $this->normalizeBinaryToInstagramJpegUrl(
+            (string) ($binary['content'] ?? ''),
+            $fileId
+        );
+    }
+
+    public function prepareInstagramEligibleFromUrl(string $sourceUrl): string
+    {
+        if ($sourceUrl === '') {
+            throw new RuntimeException('Empty image URL cannot be normalized for Instagram.');
         }
 
-        $imageResource = @imagecreatefromstring((string) ($binary['content'] ?? ''));
-        if (!$imageResource) {
-            throw new RuntimeException('Unsupported image format for Instagram publishing.');
+        $response = Http::timeout(45)
+            ->withOptions(['allow_redirects' => true])
+            ->withHeaders(['Accept' => 'image/*'])
+            ->get($sourceUrl);
+
+        if (!$response->successful()) {
+            throw new RuntimeException('Unable to download image for Instagram normalization.');
         }
 
-        $normalized = $this->normalizeInstagramDimensions($imageResource);
-        $jpegBinary = $this->encodeJpegBinary($normalized, 90);
-
-        imagedestroy($normalized);
-
-        $path = 'automation/instagram/'.Str::uuid()->toString().'-'.$fileId.'.jpg';
-        Storage::disk('public')->put($path, $jpegBinary);
-
-        return $this->forceHttpsUrl(url(Storage::disk('public')->url($path)));
+        return $this->normalizeBinaryToInstagramJpegUrl($response->body(), 'url-image');
     }
 
     private function normalizeInstagramDimensions(\GdImage $source): \GdImage
@@ -139,5 +144,26 @@ class DriveService
         }
 
         return $httpsUrl;
+    }
+
+    private function normalizeBinaryToInstagramJpegUrl(string $binaryContent, string $seed): string
+    {
+        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+            throw new RuntimeException('GD extension is required to normalize Instagram images.');
+        }
+
+        $imageResource = @imagecreatefromstring($binaryContent);
+        if (!$imageResource) {
+            throw new RuntimeException('Unsupported image format for Instagram publishing.');
+        }
+
+        $normalized = $this->normalizeInstagramDimensions($imageResource);
+        $jpegBinary = $this->encodeJpegBinary($normalized, 90);
+        imagedestroy($normalized);
+
+        $path = 'automation/instagram/'.Str::uuid()->toString().'-'.$seed.'.jpg';
+        Storage::disk('public')->put($path, $jpegBinary);
+
+        return $this->forceHttpsUrl(url(Storage::disk('public')->url($path)));
     }
 }

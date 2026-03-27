@@ -4,7 +4,10 @@ namespace App\Services;
 
 use App\Models\AutomationConfig;
 use App\Models\AutomationPostLog;
+use App\Models\DriveImagePost;
 use App\Models\FacebookPage;
+use App\Models\FacebookPost;
+use App\Models\PostImage;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -83,6 +86,36 @@ class AutomationService
             $result = $this->metaPostService->publish($page, $caption, $imageUrl, $platforms);
 
             DB::transaction(function () use ($config, $unusedImage, $platforms, $result, $caption, $imageUrl, $folderId) {
+                $facebookPost = FacebookPost::create([
+                    'page_id' => $config->page_id,
+                    'message' => $caption,
+                    'image_url' => $imageUrl,
+                    'platforms' => $platforms,
+                    'status' => FacebookPost::STATUS_PUBLISHED,
+                    'posted_at' => now(),
+                    'facebook_post_id' => $result['facebook_post_id'] ?? null,
+                    'instagram_media_id' => $result['instagram_media_id'] ?? null,
+                    'response_json' => $result['response_json'] ?? null,
+                ]);
+
+                PostImage::create([
+                    'post_id' => $facebookPost->id,
+                    'image_path' => $this->resolveImagePathForHistory($imageUrl),
+                ]);
+
+                DriveImagePost::create([
+                    'page_id' => $config->page_id,
+                    'drive_file_id' => (string) ($unusedImage['id'] ?? ''),
+                    'drive_folder_id' => $folderId,
+                    'image_url' => $imageUrl,
+                    'caption' => $caption,
+                    'platforms' => $platforms,
+                    'facebook_post_id' => $result['facebook_post_id'] ?? null,
+                    'instagram_media_id' => $result['instagram_media_id'] ?? null,
+                    'response_json' => $result['response_json'] ?? null,
+                    'posted_at' => now(),
+                ]);
+
                 AutomationPostLog::create([
                     'automation_config_id' => $config->id,
                     'page_id' => $config->page_id,
@@ -112,6 +145,18 @@ class AutomationService
 
             $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), $exception->getMessage());
         }
+    }
+
+    private function resolveImagePathForHistory(string $imageUrl): string
+    {
+        $path = (string) parse_url($imageUrl, PHP_URL_PATH);
+        $storagePrefix = '/storage/';
+
+        if ($path !== '' && str_contains($path, $storagePrefix)) {
+            return ltrim(substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix)), '/');
+        }
+
+        return $imageUrl;
     }
 
     private function canRunNow(AutomationConfig $config): bool
