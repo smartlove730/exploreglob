@@ -8,29 +8,53 @@
     <a class="btn btn-outline-secondary" href="{{ route('admin.posts.index') }}">View History</a>
 </div>
 
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-        <form method="GET" action="{{ route('admin.posts.create') }}" class="mb-3 row g-3">
-            <div class="col-md-6">
+        <h2 class="h5">Google Drive Folder Images</h2>
+        <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images, then post one or many with generated captions.</p>
+
+        <form id="driveFilterForm" class="row g-3">
+            @csrf
+            <div class="col-md-4">
                 <label class="form-label">Facebook App</label>
-                <select name="app_id" class="form-select" onchange="this.form.submit()">
+                <select name="app_id" id="drive_app_id" class="form-select" required>
                     <option value="">Select an app</option>
                     @foreach($apps as $app)
                         <option value="{{ $app->id }}" {{ $selectedAppId === $app->id ? 'selected' : '' }}>{{ $app->name }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label class="form-label">Facebook Page (Active)</label>
-                <select name="page_id" class="form-select" onchange="this.form.submit()">
+                <select name="page_id" id="drive_page_id" class="form-select" required>
                     <option value="">Select a page</option>
                     @foreach($pages as $page)
                         <option value="{{ $page->id }}" {{ $selectedPageId === $page->id ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
                     @endforeach
                 </select>
             </div>
+            <div class="col-md-4">
+                <label class="form-label">Google Drive Folder URL</label>
+                <div class="input-group">
+                    <input type="url" name="folder_url" id="drive_folder_url" class="form-control" placeholder="https://drive.google.com/drive/folders/..." required>
+                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}">Fetch Images</button>
+                </div>
+            </div>
         </form>
 
+        <div class="d-none mt-3" id="post_selected_container">
+            <button type="button" class="btn btn-success" id="post_selected_btn">Post Selected</button>
+            <small class="text-muted ms-2" id="selected_count_text">0 selected</small>
+        </div>
+
+        <div id="drive_status" class="small mt-3"></div>
+        <div id="drive_images_grid" class="row g-3 mt-1"></div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5">Manual Post (existing flow)</h2>
         @if($pages->isEmpty())
             <div class="alert alert-warning mb-0">No active pages found for selected app. Connect/sync pages in Facebook Settings.</div>
         @else
@@ -56,13 +80,12 @@
                         <input class="form-check-input" type="checkbox" name="platforms[]" value="instagram">
                         <label class="form-check-label">Instagram</label>
                     </div>
-                    <small class="text-muted d-block">Instagram requires at least one image (uploaded or URL).</small>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Prompt for AI Caption</label>
                     <div class="input-group">
-                        <input type="text" name="prompt" id="ai_prompt" class="form-control" value="{{ old('prompt') }}" placeholder="e.g. New hiking guide in California for weekend travelers">
-                        <button type="button" class="btn btn-outline-primary" id="generate_caption_btn" data-generate-url="{{ route('admin.facebook.posts.generate-caption') }}">Generate Caption</button>
+                        <input type="text" name="prompt" id="ai_prompt" class="form-control" value="{{ old('prompt') }}">
+                        <button type="button" class="btn btn-outline-primary generate-caption-btn" data-target-caption="#message" data-target-prompt="#ai_prompt" data-status="#generate_caption_status" data-generate-url="{{ route('admin.facebook.posts.generate-caption') }}">Generate Caption</button>
                     </div>
                     <small id="generate_caption_status" class="text-muted d-block mt-1"></small>
                 </div>
@@ -72,16 +95,57 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Image URL (optional)</label>
-                    <input type="url" name="image_url" class="form-control" value="{{ old('image_url') }}" placeholder="https://example.com/image.jpg">
+                    <input type="url" name="image_url" class="form-control" value="{{ old('image_url') }}">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Upload Images</label>
                     <input type="file" name="images[]" class="form-control" accept="image/*" multiple>
-                    <small class="text-muted">You can upload multiple images.</small>
                 </div>
                 <button class="btn btn-primary">Publish Post</button>
             </form>
         @endif
+    </div>
+</div>
+
+<div class="modal fade" id="drivePostModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="drivePostModalTitle">Post Image</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="drive_modal_preview" class="row g-2 mb-3"></div>
+                <div class="mb-3">
+                    <label class="form-label">Prompt</label>
+                    <div class="input-group">
+                        <input type="text" id="drive_modal_prompt" class="form-control" placeholder="Write prompt for caption generation">
+                        <button type="button" class="btn btn-outline-primary generate-caption-btn" data-target-caption="#drive_modal_caption" data-target-prompt="#drive_modal_prompt" data-status="#drive_modal_caption_status" data-generate-url="{{ route('admin.facebook.posts.generate-caption') }}">Generate Caption</button>
+                    </div>
+                    <small id="drive_modal_caption_status" class="text-muted d-block mt-1"></small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Caption</label>
+                    <textarea id="drive_modal_caption" class="form-control" rows="4"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label d-block">Platforms</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input drive-platform" type="checkbox" value="facebook" id="drive_platform_facebook" checked>
+                        <label class="form-check-label" for="drive_platform_facebook">Facebook</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input drive-platform" type="checkbox" value="instagram" id="drive_platform_instagram">
+                        <label class="form-check-label" for="drive_platform_instagram">Instagram</label>
+                    </div>
+                </div>
+                <div class="small" id="drive_modal_status"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="drive_modal_post_btn" data-publish-url="{{ route('admin.posts.drive.publish') }}">Post</button>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
@@ -89,49 +153,307 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const promptInput = document.getElementById('ai_prompt');
-    const messageInput = document.getElementById('message');
-    const generateBtn = document.getElementById('generate_caption_btn');
-    const statusNode = document.getElementById('generate_caption_status');
+    const state = {
+        folderId: null,
+        images: [],
+        selectedIds: new Set(),
+        modalImages: [],
+    };
 
-    if (!promptInput || !messageInput || !generateBtn || !statusNode) return;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    const fetchBtn = document.getElementById('fetch_drive_images_btn');
+    const statusNode = document.getElementById('drive_status');
+    const gridNode = document.getElementById('drive_images_grid');
+    const postSelectedContainer = document.getElementById('post_selected_container');
+    const selectedCountText = document.getElementById('selected_count_text');
+    const postSelectedBtn = document.getElementById('post_selected_btn');
+    const modalEl = document.getElementById('drivePostModal');
+    const modal = new bootstrap.Modal(modalEl);
 
-    generateBtn.addEventListener('click', async () => {
-        const prompt = promptInput.value.trim();
-        if (!prompt) {
-            statusNode.textContent = 'Please enter a prompt first.';
-            statusNode.className = 'text-danger d-block mt-1';
+    const appIdInput = document.getElementById('drive_app_id');
+    const pageIdInput = document.getElementById('drive_page_id');
+    const folderUrlInput = document.getElementById('drive_folder_url');
+
+    const modalTitle = document.getElementById('drivePostModalTitle');
+    const modalPreview = document.getElementById('drive_modal_preview');
+    const modalCaption = document.getElementById('drive_modal_caption');
+    const modalPrompt = document.getElementById('drive_modal_prompt');
+    const modalStatus = document.getElementById('drive_modal_status');
+    const modalPostBtn = document.getElementById('drive_modal_post_btn');
+
+    const setStatus = (message, type = 'muted') => {
+        statusNode.className = `small mt-3 text-${type}`;
+        statusNode.textContent = message;
+    };
+
+    const setModalStatus = (message, type = 'muted') => {
+        modalStatus.className = `small text-${type}`;
+        modalStatus.textContent = message;
+    };
+
+    const getImageById = (id) => state.images.find((img) => img.id === id);
+
+    const renderGrid = () => {
+        gridNode.innerHTML = '';
+
+        if (!state.images.length) {
             return;
         }
 
-        statusNode.textContent = 'Generating caption...';
-        statusNode.className = 'text-muted d-block mt-1';
-        generateBtn.disabled = true;
+        state.images.forEach((image) => {
+            const isChecked = state.selectedIds.has(image.id);
+            const postedBadge = image.is_posted
+                ? `<span class="badge text-bg-success">Posted (${(image.posted_platforms || []).join(', ')})</span>`
+                : '<span class="badge text-bg-secondary">Not posted</span>';
+
+            const col = document.createElement('div');
+            col.className = 'col-md-3';
+            col.innerHTML = `
+                <div class="card h-100">
+                    <img src="${image.preview_url}" class="card-img-top" style="height: 180px; object-fit: cover;" alt="${image.name}">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input drive-image-select" type="checkbox" value="${image.id}" id="drive_img_${image.id}" ${isChecked ? 'checked' : ''}>
+                                <label class="form-check-label small" for="drive_img_${image.id}">Select</label>
+                            </div>
+                            ${postedBadge}
+                        </div>
+                        <div class="small text-muted text-truncate mb-2" title="${image.name}">${image.name}</div>
+                        <button type="button" class="btn btn-primary btn-sm w-100 drive-single-post-btn" data-id="${image.id}">Post</button>
+                    </div>
+                </div>
+            `;
+            gridNode.appendChild(col);
+        });
+
+        updateSelectedUi();
+    };
+
+    const updateSelectedUi = () => {
+        const count = state.selectedIds.size;
+        selectedCountText.textContent = `${count} selected`;
+        postSelectedContainer.classList.toggle('d-none', count === 0);
+    };
+
+    const openPostModal = (images) => {
+        state.modalImages = images;
+        modalTitle.textContent = images.length > 1 ? `Post ${images.length} Selected Images` : 'Post Image';
+        modalCaption.value = '';
+        modalPrompt.value = '';
+        setModalStatus('');
+
+        modalPreview.innerHTML = images.map((img) => `
+            <div class="col-md-3 col-6">
+                <div class="border rounded p-1 h-100">
+                    <img src="${img.preview_url}" class="img-fluid rounded" alt="${img.name}" style="width: 100%; height: 120px; object-fit: cover;">
+                    <div class="small text-muted text-truncate mt-1" title="${img.name}">${img.name}</div>
+                </div>
+            </div>
+        `).join('');
+
+        modal.show();
+    };
+
+    fetchBtn?.addEventListener('click', async () => {
+        const appId = appIdInput.value;
+        const pageId = pageIdInput.value;
+        const folderUrl = folderUrlInput.value.trim();
+
+        if (!appId || !pageId || !folderUrl) {
+            setStatus('App, page, and folder URL are required.', 'danger');
+            return;
+        }
+
+        setStatus('Fetching images from Google Drive...', 'muted');
+        fetchBtn.disabled = true;
 
         try {
-            const response = await fetch(generateBtn.dataset.generateUrl, {
+            const response = await fetch(fetchBtn.dataset.fetchUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                 },
-                credentials: 'same-origin',
-                body: JSON.stringify({ prompt }),
+                body: JSON.stringify({ app_id: appId, page_id: pageId, folder_url: folderUrl }),
             });
 
             const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.message || 'Failed to generate caption.');
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Failed to fetch images.');
+            }
 
-            messageInput.value = result.data.caption || '';
-            statusNode.textContent = 'Caption generated successfully.';
-            statusNode.className = 'text-success d-block mt-1';
+            state.folderId = result.data.folder_id;
+            state.images = result.data.images || [];
+            state.selectedIds.clear();
+
+            renderGrid();
+            setStatus(`Loaded ${state.images.length} image(s).`, 'success');
         } catch (error) {
-            statusNode.textContent = error.message || 'Unexpected error while generating caption.';
-            statusNode.className = 'text-danger d-block mt-1';
+            state.images = [];
+            state.selectedIds.clear();
+            renderGrid();
+            setStatus(error.message || 'Unexpected error while fetching images.', 'danger');
         } finally {
-            generateBtn.disabled = false;
+            fetchBtn.disabled = false;
         }
+    });
+
+    gridNode?.addEventListener('change', (event) => {
+        const checkbox = event.target.closest('.drive-image-select');
+        if (!checkbox) return;
+
+        if (checkbox.checked) {
+            state.selectedIds.add(checkbox.value);
+        } else {
+            state.selectedIds.delete(checkbox.value);
+        }
+
+        updateSelectedUi();
+    });
+
+    gridNode?.addEventListener('click', (event) => {
+        const postBtn = event.target.closest('.drive-single-post-btn');
+        if (!postBtn) return;
+
+        const image = getImageById(postBtn.dataset.id);
+        if (!image) return;
+
+        openPostModal([image]);
+    });
+
+    postSelectedBtn?.addEventListener('click', () => {
+        const selectedImages = [...state.selectedIds]
+            .map((id) => getImageById(id))
+            .filter(Boolean);
+
+        if (!selectedImages.length) {
+            setStatus('Select at least one image first.', 'danger');
+            return;
+        }
+
+        openPostModal(selectedImages);
+    });
+
+    modalPostBtn?.addEventListener('click', async () => {
+        const appId = appIdInput.value;
+        const pageId = pageIdInput.value;
+        const caption = modalCaption.value.trim();
+        const platforms = [...document.querySelectorAll('.drive-platform:checked')].map((node) => node.value);
+
+        if (!caption) {
+            setModalStatus('Caption is required.', 'danger');
+            return;
+        }
+
+        if (!platforms.length) {
+            setModalStatus('Select at least one platform.', 'danger');
+            return;
+        }
+
+        if (!state.modalImages.length) {
+            setModalStatus('No images selected.', 'danger');
+            return;
+        }
+
+        const payload = {
+            app_id: appId,
+            page_id: pageId,
+            folder_id: state.folderId,
+            caption,
+            platforms,
+            images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url })),
+        };
+
+        modalPostBtn.disabled = true;
+        setModalStatus('Posting images...', 'muted');
+
+        try {
+            const response = await fetch(modalPostBtn.dataset.publishUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Failed to publish image(s).');
+            }
+
+            const postedIds = new Set((result.data.results || []).filter((row) => row.success).map((row) => row.file_id));
+
+            state.images = state.images.map((image) => {
+                if (!postedIds.has(image.id)) {
+                    return image;
+                }
+
+                return {
+                    ...image,
+                    is_posted: true,
+                    posted_platforms: [...new Set([...(image.posted_platforms || []), ...platforms])],
+                };
+            });
+
+            state.selectedIds.clear();
+            renderGrid();
+            setStatus(result.message || 'Images posted successfully.', 'success');
+            modal.hide();
+        } catch (error) {
+            setModalStatus(error.message || 'Unexpected error while posting images.', 'danger');
+        } finally {
+            modalPostBtn.disabled = false;
+        }
+    });
+
+    document.querySelectorAll('.generate-caption-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const promptInput = document.querySelector(button.dataset.targetPrompt);
+            const captionInput = document.querySelector(button.dataset.targetCaption);
+            const localStatus = document.querySelector(button.dataset.status);
+
+            if (!promptInput || !captionInput || !localStatus) return;
+
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                localStatus.textContent = 'Please enter a prompt first.';
+                localStatus.className = 'text-danger d-block mt-1';
+                return;
+            }
+
+            button.disabled = true;
+            localStatus.textContent = 'Generating caption...';
+            localStatus.className = 'text-muted d-block mt-1';
+
+            try {
+                const response = await fetch(button.dataset.generateUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ prompt }),
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message || 'Failed to generate caption.');
+
+                captionInput.value = result.data.caption || '';
+                localStatus.textContent = 'Caption generated successfully.';
+                localStatus.className = 'text-success d-block mt-1';
+            } catch (error) {
+                localStatus.textContent = error.message || 'Unexpected error while generating caption.';
+                localStatus.className = 'text-danger d-block mt-1';
+            } finally {
+                button.disabled = false;
+            }
+        });
     });
 });
 </script>
