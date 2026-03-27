@@ -60,6 +60,7 @@ class GoogleDriveService
 
             foreach ($files as $file) {
                 $id = (string) ($file['id'] ?? '');
+                $resourceKey = (string) ($file['resourceKey'] ?? '');
 
                 if ($id === '') {
                     continue;
@@ -70,8 +71,9 @@ class GoogleDriveService
                     'name' => (string) ($file['name'] ?? 'Untitled'),
                     'mime_type' => (string) ($file['mimeType'] ?? ''),
                     'web_view_link' => (string) ($file['webViewLink'] ?? ''),
-                    'preview_url' => $this->buildPreviewUrl($id, (string) ($file['resourceKey'] ?? '')),
-                    'download_url' => $this->buildDownloadUrl($id, (string) ($file['resourceKey'] ?? '')),
+                    'resource_key' => $resourceKey,
+                    'preview_url' => $this->buildPreviewUrl($id, $resourceKey),
+                    'download_url' => $this->buildDownloadUrl($id, $resourceKey),
                 ];
             }
 
@@ -104,5 +106,32 @@ class GoogleDriveService
         }
 
         return 'https://drive.usercontent.google.com/download?'.http_build_query($query);
+    }
+
+    public function fetchImageBinary(string $fileId, string $apiKey, string $resourceKey = ''): array
+    {
+        $query = [
+            'alt' => 'media',
+            'key' => $apiKey,
+        ];
+
+        if ($resourceKey !== '') {
+            $query['resourceKey'] = $resourceKey;
+        }
+
+        $response = Http::timeout(30)
+            ->withHeaders(['Accept' => 'image/*'])
+            ->get("https://www.googleapis.com/drive/v3/files/{$fileId}", $query);
+
+        if (!$response->successful()) {
+            throw ValidationException::withMessages([
+                'file_id' => 'Unable to load this Google Drive image.',
+            ]);
+        }
+
+        return [
+            'content' => $response->body(),
+            'content_type' => $response->header('Content-Type', 'image/jpeg'),
+        ];
     }
 }

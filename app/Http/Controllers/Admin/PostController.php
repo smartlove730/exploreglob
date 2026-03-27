@@ -242,7 +242,9 @@ class PostController extends Controller
             ->get()
             ->groupBy('drive_file_id');
 
-        $payload = collect($images)->map(function (array $image) use ($postedByImage) {
+        $driveApiKeyId = (int) $data['drive_api_key_id'];
+
+        $payload = collect($images)->map(function (array $image) use ($postedByImage, $driveApiKeyId) {
             $records = $postedByImage->get($image['id'], collect());
             $postedPlatforms = $records
                 ->flatMap(fn ($record) => $record->platforms ?? [])
@@ -252,6 +254,11 @@ class PostController extends Controller
                 ->all();
 
             return array_merge($image, [
+                'preview_url' => route('admin.posts.drive.image-proxy', [
+                    'file_id' => $image['id'],
+                    'drive_api_key_id' => $driveApiKeyId,
+                    'resource_key' => $image['resource_key'] ?? null,
+                ]),
                 'is_posted' => !empty($postedPlatforms),
                 'posted_platforms' => $postedPlatforms,
             ]);
@@ -341,6 +348,31 @@ class PostController extends Controller
                 'results' => $results,
             ],
         ], $successCount > 0 ? 200 : 422);
+    }
+
+    public function proxyDriveImage(Request $request)
+    {
+        $data = $request->validate([
+            'file_id' => 'required|string|max:255',
+            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
+            'resource_key' => 'nullable|string|max:255',
+        ]);
+
+        $driveApiKey = DriveApiKey::query()
+            ->whereKey((int) $data['drive_api_key_id'])
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $binary = $this->googleDriveService->fetchImageBinary(
+            (string) $data['file_id'],
+            (string) $driveApiKey->api_key,
+            (string) ($data['resource_key'] ?? '')
+        );
+
+        return response($binary['content'], 200, [
+            'Content-Type' => (string) $binary['content_type'],
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
     }
 
     private function validatePostRequest(Request $request, bool $isUpdate = false): array
