@@ -242,7 +242,9 @@ class PostController extends Controller
             ->get()
             ->groupBy('drive_file_id');
 
-        $payload = collect($images)->map(function (array $image) use ($postedByImage) {
+        $driveApiKeyId = (int) $data['drive_api_key_id'];
+
+        $payload = collect($images)->map(function (array $image) use ($postedByImage, $driveApiKeyId) {
             $records = $postedByImage->get($image['id'], collect());
             $postedPlatforms = $records
                 ->flatMap(fn ($record) => $record->platforms ?? [])
@@ -252,6 +254,12 @@ class PostController extends Controller
                 ->all();
 
             return array_merge($image, [
+                'preview_url' => route('admin.posts.drive.image-proxy', [
+                    'source_url' => $image['preview_url'],
+                    'drive_api_key_id' => $driveApiKeyId,
+                    'file_id' => $image['id'],
+                    'resource_key' => $image['resource_key'] ?? null,
+                ]),
                 'is_posted' => !empty($postedPlatforms),
                 'posted_platforms' => $postedPlatforms,
             ]);
@@ -311,6 +319,7 @@ class PostController extends Controller
             try {
                 $preparedImages[] = $this->storeDriveImageLocally(
                     (string) $imageData['id'],
+                    (string) $imageData['url'],
                     (string) ($imageData['resource_key'] ?? ''),
                     $driveApiKey
                 );
@@ -466,6 +475,7 @@ class PostController extends Controller
     public function proxyDriveImage(Request $request)
     {
         $data = $request->validate([
+            'source_url' => 'nullable|url|max:4096',
             'file_id' => 'required|string|max:255',
             'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'resource_key' => 'nullable|string|max:255',
@@ -476,11 +486,15 @@ class PostController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        $binary = $this->googleDriveService->fetchImageBinary(
-            (string) $data['file_id'],
-            (string) $driveApiKey->api_key,
-            (string) ($data['resource_key'] ?? '')
-        );
+        $binary = $this->downloadImageBinaryFromUrl((string) ($data['source_url'] ?? ''));
+
+        if (!$binary) {
+            $binary = $this->googleDriveService->fetchImageBinary(
+                (string) $data['file_id'],
+                (string) $driveApiKey->api_key,
+                (string) ($data['resource_key'] ?? '')
+            );
+        }
 
         return response($binary['content'], 200, [
             'Content-Type' => (string) $binary['content_type'],
@@ -574,9 +588,10 @@ class PostController extends Controller
         }
     }
 
-    private function storeDriveImageLocally(string $fileId, string $resourceKey, DriveApiKey $driveApiKey): array
+    private function storeDriveImageLocally(string $fileId, string $sourceUrl, string $resourceKey, DriveApiKey $driveApiKey): array
     {
-        $binary = $this->googleDriveService->fetchImageBinary($fileId, $driveApiKey->api_key, $resourceKey);
+        $binary = $this->downloadImageBinaryFromUrl($sourceUrl)
+            ?: $this->googleDriveService->fetchImageBinary($fileId, $driveApiKey->api_key, $resourceKey);
         $contentType = (string) ($binary['content_type'] ?? 'image/jpeg');
         $extension = match ($contentType) {
             'image/png' => 'png',
@@ -593,5 +608,35 @@ class PostController extends Controller
             'storage_path' => $storagePath,
             'public_url' => url(Storage::disk('public')->url($storagePath)),
         ];
+    }
+
+    private function downloadImageBinaryFromUrl(string $sourceUrl): ?array
+    {
+        if ($sourceUrl === '') {
+            return null;
+        }
+
+        $host = parse_url($sourceUrl, PHP_URL_HOST);
+        if (!is_string($host) || (!str_contains($host, 'googleusercontent.com') && !str_contains($host, 'google.com'))) {
+            return null;
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(45)
+                ->withOptions(['allow_redirects' => true])
+                ->withHeaders(['Accept' => 'image/*'])
+                ->get($sourceUrl);
+
+            if (!$response->successful()) {
+                return null;
+            }
+
+            return [
+                'content' => $response->body(),
+                'content_type' => $response->header('Content-Type', 'image/jpeg'),
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }
