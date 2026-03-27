@@ -51,4 +51,9 @@ class User extends Authenticatable
         return $this->hasMany(FacebookAccount::class);
     }
 
+    public function googleAccounts(): HasMany
+    {
+        return $this->hasMany(GoogleAccount::class);
+    }
+
 }

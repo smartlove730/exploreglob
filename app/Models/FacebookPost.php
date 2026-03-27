@@ -21,6 +21,7 @@ class FacebookPost extends Model
         'image_url',
         'facebook_post_id',
         'instagram_media_id',
+        'google_post_name',
         'platforms',
         'status',
         'scheduled_at',

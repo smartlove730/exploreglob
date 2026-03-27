@@ -9,7 +9,10 @@ use App\Models\DriveImagePost;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Models\FacebookPost;
+use App\Models\GoogleAccount;
+use App\Models\GoogleLocation;
 use App\Services\GoogleDriveService;
+use App\Services\GoogleService;
 use App\Services\MetaPostService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +26,8 @@ class PostController extends Controller
 {
     public function __construct(
         private readonly MetaPostService $metaPostService,
-        private readonly GoogleDriveService $googleDriveService
+        private readonly GoogleDriveService $googleDriveService,
+        private readonly GoogleService $googleService
     )
     {
     }
@@ -64,6 +68,9 @@ class PostController extends Controller
             'driveApiKeys' => DriveApiKey::query()->where('is_active', true)->orderBy('name')->get(),
             'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $request->integer('drive_api_key_id')),
             'driveFolders' => DriveFolder::query()->with('driveApiKey')->where('is_active', true)->orderBy('name')->get(),
+            'googleAccount' => GoogleAccount::query()->where('user_id', Auth::id())->first(),
+            'googleLocations' => GoogleLocation::query()->where('user_id', Auth::id())->orderByDesc('is_default')->orderBy('name')->get(),
+            'defaultGoogleLocationId' => old('google_location_id', optional(GoogleLocation::query()->where('user_id', Auth::id())->where('is_default', true)->first())->id),
         ]);
     }
 
@@ -75,6 +82,8 @@ class PostController extends Controller
         if (!$page) {
             return back()->withInput()->with('error', 'Selected page is not valid for this app/user.');
         }
+
+        $googleLocationId = $this->resolveGoogleLocationId($data);
 
         $post = FacebookPost::create([
             'page_id' => $page->id,
@@ -92,13 +101,14 @@ class PostController extends Controller
         }
 
         try {
-            $publishResult = $this->metaPostService->publish($page, $post->message, $publishImageUrl, $data['platforms']);
+            $publishResult = $this->metaPostService->publish($page, $post->message, $publishImageUrl, $data['platforms'], $googleLocationId);
 
             $post->update([
                 'status' => FacebookPost::STATUS_PUBLISHED,
                 'posted_at' => now(),
                 'facebook_post_id' => $publishResult['facebook_post_id'],
                 'instagram_media_id' => $publishResult['instagram_media_id'],
+                'google_post_name' => $publishResult['google_post_name'] ?? null,
                 'response_json' => $publishResult['response_json'],
                 'image_url' => $publishImageUrl,
             ]);
@@ -132,6 +142,7 @@ class PostController extends Controller
 
         $this->syncImages($post, $request, $data['remove_images'] ?? []);
         $publishImageUrl = $this->resolvePublishImageUrl($post);
+        $googleLocationId = $this->resolveGoogleLocationId($data);
 
         if ($post->status === FacebookPost::STATUS_PUBLISHED) {
             try {
@@ -151,12 +162,13 @@ class PostController extends Controller
             }
 
             try {
-                $publishResult = $this->metaPostService->publish($page, $post->message, $publishImageUrl, $data['platforms']);
+                $publishResult = $this->metaPostService->publish($page, $post->message, $publishImageUrl, $data['platforms'], $googleLocationId);
                 $post->update([
                     'status' => FacebookPost::STATUS_PUBLISHED,
                     'posted_at' => now(),
                     'facebook_post_id' => $publishResult['facebook_post_id'],
                     'instagram_media_id' => $publishResult['instagram_media_id'],
+                    'google_post_name' => $publishResult['google_post_name'] ?? null,
                     'response_json' => $publishResult['response_json'],
                     'image_url' => $publishImageUrl,
                 ]);
@@ -257,7 +269,14 @@ class PostController extends Controller
         }
 
         $folderId = $this->googleDriveService->extractFolderId($folderUrl);
-        $images = $this->googleDriveService->listPublicFolderImages($folderId, $driveApiKey->api_key);
+
+        $driveToken = null;
+        if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
+            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+            $driveToken = $driveApiKey->oauth_access_token;
+        }
+
+        $images = $this->googleDriveService->listPublicFolderImages($folderId, $driveApiKey->api_key, $driveToken);
 
         $postedByImage = DriveImagePost::query()
             ->where('page_id', $page->id)
@@ -307,7 +326,8 @@ class PostController extends Controller
             'caption' => 'required|string|max:60000',
             'post_mode' => 'nullable|string|in:separate,combined',
             'platforms' => 'required|array|min:1',
-            'platforms.*' => 'required|string|in:facebook,instagram',
+            'platforms.*' => 'required|string|in:facebook,instagram,google_business',
+            'google_location_id' => 'nullable|integer|exists:google_locations,id',
             'images' => 'required|array|min:1',
             'images.*.id' => 'required|string|max:255',
             'images.*.url' => 'required|url|max:2048',
@@ -382,7 +402,8 @@ class PostController extends Controller
                     'posted_at' => now(),
                     'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
                     'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
-                    'response_json' => $publishResult['response_json'] ?? null,
+                    'google_post_name' => $publishResult['google_post_name'] ?? null,
+                'response_json' => $publishResult['response_json'] ?? null,
                 ]);
 
                 foreach ($preparedImages as $imageMeta) {
@@ -434,7 +455,8 @@ class PostController extends Controller
             $this->assertPublicHttpsImageUrl($imageUrl);
 
             try {
-                $publishResult = $this->metaPostService->publish($page, $data['caption'], $imageUrl, $platforms);
+                $googleLocationId = $this->resolveGoogleLocationId($data);
+                $publishResult = $this->metaPostService->publish($page, $data['caption'], $imageUrl, $platforms, $googleLocationId);
 
                 $post = FacebookPost::create([
                     'page_id' => $page->id,
@@ -445,7 +467,8 @@ class PostController extends Controller
                     'posted_at' => now(),
                     'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
                     'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
-                    'response_json' => $publishResult['response_json'] ?? null,
+                    'google_post_name' => $publishResult['google_post_name'] ?? null,
+                'response_json' => $publishResult['response_json'] ?? null,
                 ]);
 
                 $post->images()->create(['image_path' => $imageMeta['storage_path']]);
@@ -509,13 +532,20 @@ class PostController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
+        $driveToken = null;
+        if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
+            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+            $driveToken = $driveApiKey->oauth_access_token;
+        }
+
         $binary = $this->downloadImageBinaryFromUrl((string) ($data['source_url'] ?? ''));
 
         if (!$binary) {
             $binary = $this->googleDriveService->fetchImageBinary(
                 (string) $data['file_id'],
                 (string) $driveApiKey->api_key,
-                (string) ($data['resource_key'] ?? '')
+                (string) ($data['resource_key'] ?? ''),
+                $driveToken
             );
         }
 
@@ -533,12 +563,38 @@ class PostController extends Controller
             'message' => 'required|string|max:60000',
             'image_url' => 'nullable|url|max:2048',
             'platforms' => 'required|array|min:1',
-            'platforms.*' => 'required|string|in:facebook,instagram',
+            'platforms.*' => 'required|string|in:facebook,instagram,google_business',
+            'google_location_id' => 'nullable|integer|exists:google_locations,id',
             'images' => 'nullable|array',
             'images.*' => 'image|max:5120',
             'remove_images' => $isUpdate ? 'nullable|array' : 'nullable',
             'remove_images.*' => 'integer|exists:post_images,id',
         ]);
+    }
+
+
+    private function resolveGoogleLocationId(array $data): ?int
+    {
+        $platforms = $data['platforms'] ?? [];
+
+        if (!in_array('google_business', $platforms, true)) {
+            return null;
+        }
+
+        $locationId = (int) ($data['google_location_id'] ?? 0);
+
+        $location = GoogleLocation::query()
+            ->where('user_id', Auth::id())
+            ->when($locationId > 0, fn ($query) => $query->whereKey($locationId), fn ($query) => $query->where('is_default', true))
+            ->first();
+
+        if (!$location) {
+            throw ValidationException::withMessages([
+                'google_location_id' => 'Select a Google Business location or set a default location first.',
+            ]);
+        }
+
+        return (int) $location->id;
     }
 
     private function resolveAuthorizedPage(int $appId, int $pageId): ?FacebookPage
@@ -613,8 +669,14 @@ class PostController extends Controller
 
     private function storeDriveImageLocally(string $fileId, string $sourceUrl, string $resourceKey, DriveApiKey $driveApiKey): array
     {
+        $driveToken = null;
+        if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
+            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+            $driveToken = $driveApiKey->oauth_access_token;
+        }
+
         $binary = $this->downloadImageBinaryFromUrl($sourceUrl)
-            ?: $this->googleDriveService->fetchImageBinary($fileId, $driveApiKey->api_key, $resourceKey);
+            ?: $this->googleDriveService->fetchImageBinary($fileId, $driveApiKey->api_key, $resourceKey, $driveToken);
         $contentType = (string) ($binary['content_type'] ?? 'image/jpeg');
         $extension = match ($contentType) {
             'image/png' => 'png',
