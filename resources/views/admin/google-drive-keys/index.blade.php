@@ -5,7 +5,10 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">Google Drive Keys</h1>
-    <a href="{{ route('admin.facebook.google-drive-keys.create') }}" class="btn btn-primary">Add Drive Key</a>
+    <div class="d-flex gap-2">
+        <a href="{{ route('admin.google.connect') }}" class="btn btn-primary">Connect via OAuth</a>
+        <a href="{{ route('admin.facebook.google-drive-keys.create') }}" class="btn btn-outline-secondary">Add Manually</a>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -17,6 +20,7 @@
                         <th>Name</th>
                         <th>Email</th>
                         <th>Description</th>
+                        <th>Auth Mode</th>
                         <th>Redirect URL</th>
                         <th>Status</th>
                         <th class="text-end">Actions</th>
@@ -28,7 +32,8 @@
                             <td>{{ $key->name }}</td>
                             <td>{{ $key->email ?: '-' }}</td>
                             <td><small>{{ $key->description ?: '-' }}</small></td>
-                            <td><small>{{ $key->redirect_url ?: route('admin.google-drive.callback') }}</small></td>
+                            <td><small>{{ $key->oauth_refresh_token ? 'OAuth' : 'Manual API Key' }}</small></td>
+                            <td><small>{{ $key->redirect_url ?: config('services.google.redirect_uri') ?: route('admin.google.callback') }}</small></td>
                             <td>
                                 <span class="badge text-bg-{{ $key->is_active ? 'success' : 'secondary' }}">
                                     {{ $key->is_active ? 'Active' : 'Inactive' }}
@@ -44,7 +49,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-muted text-center">No Google Drive keys found.</td></tr>
+                        <tr><td colspan="7" class="text-muted text-center">No Google Drive keys found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

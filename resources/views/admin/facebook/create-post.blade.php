@@ -18,6 +18,12 @@
             </div>
         @endif
 
+        @if(!$googleAccount)
+            <div class="alert alert-warning">
+                Google Business is not connected. <a href="{{ route('admin.google.settings') }}">Connect Google account</a> to enable Google Business posting.
+            </div>
+        @endif
+
         <form id="driveFilterForm" class="row g-3">
             @csrf
             <div class="col-md-3">
@@ -110,7 +116,22 @@
                         <input class="form-check-input" type="checkbox" name="platforms[]" value="instagram">
                         <label class="form-check-label">Instagram</label>
                     </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="platforms[]" value="google_business">
+                        <label class="form-check-label">Google Business Profile</label>
+                    </div>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Google Business Location</label>
+                    <select name="google_location_id" class="form-select">
+                        <option value="">Use default location</option>
+                        @foreach($googleLocations as $googleLocation)
+                            <option value="{{ $googleLocation->id }}" {{ (int) $defaultGoogleLocationId === $googleLocation->id ? 'selected' : '' }}>{{ $googleLocation->name }}</option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">Required when posting to Google Business Profile.</small>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label">Prompt for AI Caption</label>
                     <div class="input-group">
@@ -167,6 +188,10 @@
                     <div class="form-check form-check-inline">
                         <input class="form-check-input drive-platform" type="checkbox" value="instagram" id="drive_platform_instagram">
                         <label class="form-check-label" for="drive_platform_instagram">Instagram</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input drive-platform" type="checkbox" value="google_business" id="drive_platform_google">
+                        <label class="form-check-label" for="drive_platform_google">Google Business</label>
                     </div>
                 </div>
                 <div class="mb-3">
