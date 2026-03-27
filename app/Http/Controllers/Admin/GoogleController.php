@@ -29,7 +29,11 @@ class GoogleController extends Controller
 
     public function redirect(): RedirectResponse
     {
-        return redirect()->away($this->googleService->getOauthRedirectUrl());
+        try {
+            return redirect()->away($this->googleService->getOauthRedirectUrl());
+        } catch (\Throwable $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
     }
 
     public function callback(): RedirectResponse

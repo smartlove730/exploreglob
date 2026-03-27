@@ -20,10 +20,11 @@ class GoogleService
 
     public function getOauthRedirectUrl(): string
     {
+        $clientId = $this->resolveClientId();
         $redirectUri = $this->resolveRedirectUri();
 
         $query = http_build_query([
-            'client_id' => config('services.google.client_id'),
+            'client_id' => $clientId,
             'redirect_uri' => $redirectUri,
             'response_type' => 'code',
             'scope' => implode(' ', [
@@ -43,13 +44,15 @@ class GoogleService
 
     public function exchangeCodeForToken(string $code): array
     {
+        $clientId = $this->resolveClientId();
+        $clientSecret = $this->resolveClientSecret();
         $redirectUri = $this->resolveRedirectUri();
 
         $response = $this->client->post(self::TOKEN_URL, [
             'form_params' => [
                 'code' => $code,
-                'client_id' => config('services.google.client_id'),
-                'client_secret' => config('services.google.client_secret'),
+                'client_id' => $clientId,
+                'client_secret' => $clientSecret,
                 'redirect_uri' => $redirectUri,
                 'grant_type' => 'authorization_code',
             ],
@@ -72,12 +75,36 @@ class GoogleService
         throw new RuntimeException('Google redirect URI is not configured.');
     }
 
+
+    private function resolveClientId(): string
+    {
+        $clientId = (string) config('services.google.client_id', '');
+        if ($clientId !== '') {
+            return $clientId;
+        }
+
+        throw new RuntimeException('Google client ID is not configured. Set GOOGLE_CLIENT_ID or GOOGLE_DRIVE_CLIENT_ID.');
+    }
+
+    private function resolveClientSecret(): string
+    {
+        $clientSecret = (string) config('services.google.client_secret', '');
+        if ($clientSecret !== '') {
+            return $clientSecret;
+        }
+
+        throw new RuntimeException('Google client secret is not configured. Set GOOGLE_CLIENT_SECRET or GOOGLE_DRIVE_CLIENT_SECRET.');
+    }
+
     public function refreshAccessToken(string $refreshToken): array
     {
+        $clientId = $this->resolveClientId();
+        $clientSecret = $this->resolveClientSecret();
+
         $response = $this->client->post(self::TOKEN_URL, [
             'form_params' => [
-                'client_id' => config('services.google.client_id'),
-                'client_secret' => config('services.google.client_secret'),
+                'client_id' => $clientId,
+                'client_secret' => $clientSecret,
                 'refresh_token' => $refreshToken,
                 'grant_type' => 'refresh_token',
             ],
