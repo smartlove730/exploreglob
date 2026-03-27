@@ -121,6 +121,46 @@ class FacebookGraphService
         return $response->json();
     }
 
+    public function publishMultiImagePost(FacebookPage $page, string $message, array $imageUrls): array
+    {
+        if (empty($imageUrls)) {
+            throw new RuntimeException('At least one image is required for multi-image Facebook posting.');
+        }
+
+        $mediaIds = [];
+
+        foreach ($imageUrls as $imageUrl) {
+            $uploadResponse = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/photos", [
+                'access_token' => $page->page_access_token,
+                'url' => $imageUrl,
+                'published' => 'false',
+            ]);
+
+            if (!$uploadResponse->ok() || !isset($uploadResponse['id'])) {
+                throw new RuntimeException('Facebook multi-image upload failed: '.$uploadResponse->body());
+            }
+
+            $mediaIds[] = (string) $uploadResponse['id'];
+        }
+
+        $payload = [
+            'access_token' => $page->page_access_token,
+            'message' => $message,
+        ];
+
+        foreach ($mediaIds as $index => $mediaId) {
+            $payload["attached_media[{$index}]"] = json_encode(['media_fbid' => $mediaId], JSON_THROW_ON_ERROR);
+        }
+
+        $publishResponse = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/feed", $payload);
+
+        if (!$publishResponse->ok()) {
+            throw new RuntimeException('Facebook multi-image publish failed: '.$publishResponse->body());
+        }
+
+        return $publishResponse->json();
+    }
+
     public function upsertPages(FacebookAccount $account, array $pages): void
     {
         foreach ($pages as $page) {
