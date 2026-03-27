@@ -278,13 +278,16 @@ class PostController extends Controller
         $data = $request->validate([
             'app_id' => 'required|integer|exists:facebook_apps,id',
             'page_id' => 'required|integer|exists:facebook_pages,id',
+            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'folder_id' => 'nullable|string|max:255',
             'caption' => 'required|string|max:60000',
+            'post_mode' => 'nullable|string|in:separate,combined',
             'platforms' => 'required|array|min:1',
             'platforms.*' => 'required|string|in:facebook,instagram',
             'images' => 'required|array|min:1',
             'images.*.id' => 'required|string|max:255',
             'images.*.url' => 'required|url|max:2048',
+            'images.*.resource_key' => 'nullable|string|max:255',
         ]);
 
         $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
@@ -296,18 +299,135 @@ class PostController extends Controller
         }
 
         $platforms = collect($data['platforms'])->unique()->values()->all();
-        $results = [];
+        $postMode = (string) ($data['post_mode'] ?? 'separate');
+        $driveApiKey = DriveApiKey::query()
+            ->whereKey((int) $data['drive_api_key_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$driveApiKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selected Google Drive key is invalid or inactive.',
+            ], 422);
+        }
+
+        $preparedImages = [];
 
         foreach ($data['images'] as $imageData) {
-            $imageUrl = (string) $imageData['url'];
+            try {
+                $preparedImages[] = $this->storeDriveImageLocally(
+                    (string) $imageData['id'],
+                    (string) ($imageData['resource_key'] ?? ''),
+                    $driveApiKey
+                );
+            } catch (\Throwable $exception) {
+                Log::error('Drive image preparation failed', [
+                    'file_id' => $imageData['id'],
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        if (empty($preparedImages)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No valid images could be prepared for posting.',
+                'data' => ['results' => []],
+            ], 422);
+        }
+
+        $results = [];
+
+        if ($postMode === 'combined') {
+            try {
+                $publishResult = $this->metaPostService->publishCombined(
+                    $page,
+                    $data['caption'],
+                    collect($preparedImages)->pluck('public_url')->all(),
+                    $platforms
+                );
+
+                $post = FacebookPost::create([
+                    'page_id' => $page->id,
+                    'message' => $data['caption'],
+                    'image_url' => $preparedImages[0]['public_url'],
+                    'platforms' => $platforms,
+                    'status' => FacebookPost::STATUS_PUBLISHED,
+                    'posted_at' => now(),
+                    'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
+                    'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
+                    'response_json' => $publishResult['response_json'] ?? null,
+                ]);
+
+                foreach ($preparedImages as $imageMeta) {
+                    $post->images()->create(['image_path' => $imageMeta['storage_path']]);
+
+                    DriveImagePost::create([
+                        'page_id' => $page->id,
+                        'drive_file_id' => $imageMeta['file_id'],
+                        'drive_folder_id' => $data['folder_id'] ?? null,
+                        'image_url' => $imageMeta['public_url'],
+                        'caption' => $data['caption'],
+                        'platforms' => $platforms,
+                        'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
+                        'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
+                        'response_json' => $publishResult['response_json'] ?? null,
+                        'posted_at' => now(),
+                    ]);
+
+                    $results[] = [
+                        'file_id' => $imageMeta['file_id'],
+                        'success' => true,
+                    ];
+                }
+            } catch (\Throwable $exception) {
+                Log::error('Combined drive image publish failed', ['error' => $exception->getMessage()]);
+
+                foreach ($preparedImages as $imageMeta) {
+                    $results[] = [
+                        'file_id' => $imageMeta['file_id'],
+                        'success' => false,
+                        'message' => $exception->getMessage(),
+                    ];
+                }
+            }
+
+            $successCount = collect($results)->where('success', true)->count();
+
+            return response()->json([
+                'success' => $successCount > 0,
+                'message' => $successCount === count($results)
+                    ? 'All images posted successfully in one post.'
+                    : "Posted {$successCount} of ".count($results).' images.',
+                'data' => ['results' => $results],
+            ], $successCount > 0 ? 200 : 422);
+        }
+
+        foreach ($preparedImages as $imageMeta) {
+            $imageUrl = $imageMeta['public_url'];
             $this->assertPublicHttpsImageUrl($imageUrl);
 
             try {
                 $publishResult = $this->metaPostService->publish($page, $data['caption'], $imageUrl, $platforms);
 
+                $post = FacebookPost::create([
+                    'page_id' => $page->id,
+                    'message' => $data['caption'],
+                    'image_url' => $imageUrl,
+                    'platforms' => $platforms,
+                    'status' => FacebookPost::STATUS_PUBLISHED,
+                    'posted_at' => now(),
+                    'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
+                    'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
+                    'response_json' => $publishResult['response_json'] ?? null,
+                ]);
+
+                $post->images()->create(['image_path' => $imageMeta['storage_path']]);
+
                 DriveImagePost::create([
                     'page_id' => $page->id,
-                    'drive_file_id' => (string) $imageData['id'],
+                    'drive_file_id' => $imageMeta['file_id'],
                     'drive_folder_id' => $data['folder_id'] ?? null,
                     'image_url' => $imageUrl,
                     'caption' => $data['caption'],
@@ -319,18 +439,18 @@ class PostController extends Controller
                 ]);
 
                 $results[] = [
-                    'file_id' => $imageData['id'],
+                    'file_id' => $imageMeta['file_id'],
                     'success' => true,
                 ];
             } catch (\Throwable $exception) {
                 Log::error('Drive image publish failed', [
                     'page_id' => $page->id,
-                    'file_id' => $imageData['id'],
+                    'file_id' => $imageMeta['file_id'],
                     'error' => $exception->getMessage(),
                 ]);
 
                 $results[] = [
-                    'file_id' => $imageData['id'],
+                    'file_id' => $imageMeta['file_id'],
                     'success' => false,
                     'message' => $exception->getMessage(),
                 ];
@@ -459,5 +579,26 @@ class PostController extends Controller
                 'image_url' => 'Image URL must be publicly reachable.',
             ]);
         }
+    }
+
+    private function storeDriveImageLocally(string $fileId, string $resourceKey, DriveApiKey $driveApiKey): array
+    {
+        $binary = $this->googleDriveService->fetchImageBinary($fileId, $driveApiKey->api_key, $resourceKey);
+        $contentType = (string) ($binary['content_type'] ?? 'image/jpeg');
+        $extension = match ($contentType) {
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+            default => 'jpg',
+        };
+
+        $storagePath = 'drive-posts/'.$fileId.'-'.uniqid().'.'.$extension;
+        Storage::disk('public')->put($storagePath, $binary['content']);
+
+        return [
+            'file_id' => $fileId,
+            'storage_path' => $storagePath,
+            'public_url' => url(Storage::disk('public')->url($storagePath)),
+        ];
     }
 }

@@ -153,6 +153,21 @@
                         <label class="form-check-label" for="drive_platform_instagram">Instagram</label>
                     </div>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label d-block">Post Mode</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="drive_post_mode" id="drive_post_mode_separate" value="separate" checked>
+                        <label class="form-check-label" for="drive_post_mode_separate">
+                            Post each selected image separately
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="drive_post_mode" id="drive_post_mode_combined" value="combined">
+                        <label class="form-check-label" for="drive_post_mode_combined">
+                            Post all selected images in one post (Facebook album / Instagram carousel)
+                        </label>
+                    </div>
+                </div>
                 <div class="small" id="drive_modal_status"></div>
             </div>
             <div class="modal-footer">
@@ -357,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pageId = pageIdInput.value;
         const caption = modalCaption.value.trim();
         const platforms = [...document.querySelectorAll('.drive-platform:checked')].map((node) => node.value);
+        const postMode = document.querySelector('input[name="drive_post_mode"]:checked')?.value || 'separate';
 
         if (!caption) {
             setModalStatus('Caption is required.', 'danger');
@@ -378,8 +394,10 @@ document.addEventListener('DOMContentLoaded', () => {
             page_id: pageId,
             folder_id: state.folderId,
             caption,
+            drive_api_key_id: driveApiKeyInput.value,
+            post_mode: postMode,
             platforms,
-            images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url })),
+            images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url, resource_key: img.resource_key || '' })),
         };
 
         modalPostBtn.disabled = true;

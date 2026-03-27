@@ -42,6 +42,36 @@ class MetaPostService
         ];
     }
 
+    public function publishCombined(FacebookPage $page, string $message, array $imageUrls, array $platforms): array
+    {
+        if (empty($imageUrls)) {
+            throw new RuntimeException('At least one image is required.');
+        }
+
+        if (count($imageUrls) === 1) {
+            return $this->publish($page, $message, $imageUrls[0], $platforms);
+        }
+
+        $responses = [];
+
+        foreach ($platforms as $platform) {
+            if ($platform === 'facebook') {
+                $responses['facebook'] = $this->facebookGraphService->publishMultiImagePost($page, $message, $imageUrls);
+                continue;
+            }
+
+            if ($platform === 'instagram') {
+                $responses['instagram'] = $this->instagramService->publishCarouselWithCaption($page, $imageUrls, $message, 3);
+            }
+        }
+
+        return [
+            'facebook_post_id' => data_get($responses, 'facebook.post_id') ?: data_get($responses, 'facebook.id'),
+            'instagram_media_id' => data_get($responses, 'instagram.publish_response.id'),
+            'response_json' => $responses,
+        ];
+    }
+
     public function deleteFacebookPost(FacebookPage $page, ?string $facebookPostId): void
     {
         if (!$facebookPostId) {
