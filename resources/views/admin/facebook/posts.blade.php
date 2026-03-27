@@ -17,6 +17,7 @@
                         <th>App</th>
                         <th>Page</th>
                         <th>Message</th>
+                        <th>Media</th>
                         <th>Images</th>
                         <th>Status</th>
                         <th>Posted</th>
@@ -29,6 +30,11 @@
                             <td>{{ $post->page?->facebookAccount?->app?->name ?? '-' }}</td>
                             <td>{{ $post->page?->page_name }}</td>
                             <td>{{ \Illuminate\Support\Str::limit($post->message, 100) }}</td>
+                            <td>
+                                <span class="badge text-bg-{{ ($post->media_type ?? 'image') === 'video' ? 'warning' : 'info' }}">
+                                    {{ ucfirst($post->media_type ?? 'image') }}
+                                </span>
+                            </td>
                             <td>{{ $post->images->count() }}</td>
                             <td><span class="badge text-bg-{{ $post->status === 'published' ? 'success' : 'secondary' }}">{{ ucfirst($post->status) }}</span></td>
                             <td>{{ optional($post->posted_at)->format('M d, Y H:i') ?? '-' }}</td>
@@ -118,7 +124,7 @@
                             </div>
                         </div>
                     @empty
-                        <tr><td colspan="7" class="text-center text-muted">No posts yet.</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted">No posts yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

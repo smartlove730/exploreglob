@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessVideoPostJob;
 use App\Models\DriveApiKey;
 use App\Models\DriveFolder;
 use App\Models\DriveImagePost;
@@ -20,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PostController extends Controller
@@ -85,13 +87,36 @@ class PostController extends Controller
 
         $googleLocationId = $this->resolveGoogleLocationId($data);
 
+        $mediaType = $data['media_type'] ?? FacebookPost::MEDIA_TYPE_IMAGE;
+        if ($mediaType === FacebookPost::MEDIA_TYPE_VIDEO && in_array('google_business', $data['platforms'], true)) {
+            throw ValidationException::withMessages([
+                'platforms' => 'Google Business posting currently supports image posts only.',
+            ]);
+        }
+
         $post = FacebookPost::create([
             'page_id' => $page->id,
             'message' => $data['message'],
+            'media_type' => $mediaType,
             'image_url' => $data['image_url'] ?? null,
+            'video_path' => null,
+            'video_url' => null,
             'platforms' => $data['platforms'],
-            'status' => FacebookPost::STATUS_DRAFT,
+            'status' => FacebookPost::STATUS_PROCESSING,
         ]);
+
+        if ($mediaType === FacebookPost::MEDIA_TYPE_VIDEO) {
+            $videoMeta = $this->storeVideoAndResolveUrl($request);
+
+            $post->update([
+                'video_path' => $videoMeta['video_path'],
+                'video_url' => $videoMeta['video_url'],
+            ]);
+
+            ProcessVideoPostJob::dispatch($post->id);
+
+            return redirect()->route('admin.posts.index')->with('success', 'Video queued for background publishing.');
+        }
 
         $this->syncImages($post, $request, []);
         $publishImageUrl = $this->resolvePublishImageUrl($post);
@@ -117,7 +142,12 @@ class PostController extends Controller
         } catch (\Throwable $exception) {
             Log::error('Post publishing failed on create', ['post_id' => $post->id, 'error' => $exception->getMessage()]);
 
-            return redirect()->route('admin.posts.index')->with('error', 'Post saved as draft. Publishing failed: '.$exception->getMessage());
+            $post->update([
+                'status' => FacebookPost::STATUS_FAILED,
+                'response_json' => ['error' => $exception->getMessage()],
+            ]);
+
+            return redirect()->route('admin.posts.index')->with('error', 'Post saved but publishing failed: '.$exception->getMessage());
         }
     }
 
@@ -137,12 +167,15 @@ class PostController extends Controller
             'page_id' => $page->id,
             'message' => $data['message'],
             'platforms' => $data['platforms'],
+            'media_type' => $data['media_type'] ?? $post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE,
             'image_url' => $data['image_url'] ?? $post->image_url,
         ]);
 
         $this->syncImages($post, $request, $data['remove_images'] ?? []);
         $publishImageUrl = $this->resolvePublishImageUrl($post);
         $googleLocationId = $this->resolveGoogleLocationId($data);
+
+        $isImagePost = ($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_IMAGE;
 
         if ($post->status === FacebookPost::STATUS_PUBLISHED) {
             try {
@@ -157,7 +190,7 @@ class PostController extends Controller
                 Log::warning('Failed deleting old Instagram media before update', ['post_id' => $post->id, 'error' => $exception->getMessage()]);
             }
 
-            if (in_array('instagram', $data['platforms'], true) && !$publishImageUrl) {
+            if ($isImagePost && in_array('instagram', $data['platforms'], true) && !$publishImageUrl) {
                 throw ValidationException::withMessages(['images' => 'Instagram requires at least one image URL or upload.']);
             }
 
@@ -561,7 +594,9 @@ class PostController extends Controller
             'app_id' => 'required|integer|exists:facebook_apps,id',
             'page_id' => 'required|integer|exists:facebook_pages,id',
             'message' => 'required|string|max:60000',
+            'media_type' => 'nullable|string|in:image,video',
             'image_url' => 'nullable|url|max:2048',
+            'video' => 'nullable|file|mimes:mp4|max:51200',
             'platforms' => 'required|array|min:1',
             'platforms.*' => 'required|string|in:facebook,instagram,google_business',
             'google_location_id' => 'nullable|integer|exists:google_locations,id',
@@ -665,6 +700,32 @@ class PostController extends Controller
                 'image_url' => 'Image URL must be publicly reachable.',
             ]);
         }
+    }
+
+    private function storeVideoAndResolveUrl(Request $request): array
+    {
+        $video = $request->file('video');
+
+        if (!$video) {
+            throw ValidationException::withMessages([
+                'video' => 'Please upload an MP4 video file.',
+            ]);
+        }
+
+        $extension = strtolower((string) $video->getClientOriginalExtension());
+        if ($extension !== 'mp4') {
+            throw ValidationException::withMessages([
+                'video' => 'Only MP4 videos are allowed.',
+            ]);
+        }
+
+        $videoPath = $video->storeAs('posts/videos', Str::uuid()->toString().'.mp4', 'public');
+        $videoUrl = url(Storage::disk('public')->url($videoPath));
+
+        return [
+            'video_path' => $videoPath,
+            'video_url' => $videoUrl,
+        ];
     }
 
     private function storeDriveImageLocally(string $fileId, string $sourceUrl, string $resourceKey, DriveApiKey $driveApiKey): array

@@ -8,17 +8,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FacebookPost extends Model
 {
+    public const MEDIA_TYPE_IMAGE = 'image';
+    public const MEDIA_TYPE_VIDEO = 'video';
+
     public const STATUS_DRAFT = 'draft';
+    public const STATUS_PROCESSING = 'processing';
     public const STATUS_PUBLISHED = 'published';
     public const STATUS_PENDING = 'draft';
     public const STATUS_SCHEDULED = 'draft';
     public const STATUS_POSTED = 'published';
-    public const STATUS_FAILED = 'draft';
+    public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
         'page_id',
         'message',
+        'media_type',
         'image_url',
+        'video_path',
+        'video_url',
         'facebook_post_id',
         'instagram_media_id',
         'google_post_name',
