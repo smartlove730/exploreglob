@@ -26,7 +26,7 @@ class DriveApiKeyController extends Controller
         $data = $this->validateData($request);
         DriveApiKey::create($data);
 
-        return redirect()->route('admin.google-drive-keys.index')->with('success', 'Google Drive key added successfully.');
+        return redirect()->route('admin.facebook.google-drive-keys.index')->with('success', 'Google Drive key added successfully.');
     }
 
     public function edit(DriveApiKey $google_drive_key)
@@ -39,14 +39,14 @@ class DriveApiKeyController extends Controller
         $data = $this->validateData($request);
         $google_drive_key->update($data);
 
-        return redirect()->route('admin.google-drive-keys.index')->with('success', 'Google Drive key updated successfully.');
+        return redirect()->route('admin.facebook.google-drive-keys.index')->with('success', 'Google Drive key updated successfully.');
     }
 
     public function destroy(DriveApiKey $google_drive_key): RedirectResponse
     {
         $google_drive_key->delete();
 
-        return redirect()->route('admin.google-drive-keys.index')->with('success', 'Google Drive key deleted successfully.');
+        return redirect()->route('admin.facebook.google-drive-keys.index')->with('success', 'Google Drive key deleted successfully.');
     }
 
     public function callback(Request $request)
