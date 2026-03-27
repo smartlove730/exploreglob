@@ -42,7 +42,7 @@ class GoogleDriveService
                 ->get('https://www.googleapis.com/drive/v3/files', [
                     'key' => $apiKey,
                     'q' => "'{$folderId}' in parents and mimeType contains 'image/' and trashed = false",
-                    'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink)',
+                    'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey)',
                     'pageSize' => 200,
                     'pageToken' => $pageToken,
                     'supportsAllDrives' => 'true',
@@ -70,8 +70,8 @@ class GoogleDriveService
                     'name' => (string) ($file['name'] ?? 'Untitled'),
                     'mime_type' => (string) ($file['mimeType'] ?? ''),
                     'web_view_link' => (string) ($file['webViewLink'] ?? ''),
-                    'preview_url' => $this->buildPreviewUrl($id),
-                    'download_url' => $this->buildDownloadUrl($id),
+                    'preview_url' => $this->buildPreviewUrl($id, (string) ($file['resourceKey'] ?? '')),
+                    'download_url' => $this->buildDownloadUrl($id, (string) ($file['resourceKey'] ?? '')),
                 ];
             }
 
@@ -81,13 +81,28 @@ class GoogleDriveService
         return $images;
     }
 
-    public function buildPreviewUrl(string $fileId): string
+    public function buildPreviewUrl(string $fileId, string $resourceKey = ''): string
     {
-        return "https://drive.google.com/uc?export=view&id={$fileId}";
+        return $this->buildUserContentUrl($fileId, 'view', $resourceKey);
     }
 
-    public function buildDownloadUrl(string $fileId): string
+    public function buildDownloadUrl(string $fileId, string $resourceKey = ''): string
     {
-        return "https://drive.google.com/uc?export=download&id={$fileId}";
+        return $this->buildUserContentUrl($fileId, 'download', $resourceKey);
+    }
+
+    private function buildUserContentUrl(string $fileId, string $export, string $resourceKey = ''): string
+    {
+        $query = [
+            'id' => $fileId,
+            'export' => $export,
+            'authuser' => '0',
+        ];
+
+        if ($resourceKey !== '') {
+            $query['resourcekey'] = $resourceKey;
+        }
+
+        return 'https://drive.usercontent.google.com/download?'.http_build_query($query);
     }
 }
