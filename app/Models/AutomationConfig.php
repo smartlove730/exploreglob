@@ -13,6 +13,7 @@ class AutomationConfig extends Model
         'name',
         'prompt',
         'drive_link',
+        'drive_api_key_id',
         'app_id',
         'page_id',
         'platforms',
@@ -35,6 +36,11 @@ class AutomationConfig extends Model
     public function app(): BelongsTo
     {
         return $this->belongsTo(FacebookApp::class, 'app_id');
+    }
+
+    public function driveApiKey(): BelongsTo
+    {
+        return $this->belongsTo(DriveApiKey::class, 'drive_api_key_id');
     }
 
     public function page(): BelongsTo

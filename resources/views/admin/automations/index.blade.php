@@ -23,6 +23,7 @@
                     <tr>
                         <th>Name</th>
                         <th>App / Page</th>
+                        <th>Drive Key</th>
                         <th>Platforms</th>
                         <th>Runs/Day</th>
                         <th>Daily Limit</th>
@@ -36,6 +37,7 @@
                     <tr>
                         <td>{{ $config->name ?: 'Automation #'.$config->id }}</td>
                         <td><div>{{ $config->app?->name ?? '-' }}</div><small class="text-muted">{{ $config->page?->page_name ?? '-' }}</small></td>
+                        <td>{{ $config->driveApiKey?->name ?? '-' }}</td>
                         <td class="text-capitalize">{{ $config->platforms }}</td>
                         <td>{{ $config->runs_per_day }}</td>
                         <td>{{ $config->post_limit_per_day }}</td>
@@ -55,7 +57,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="text-center text-muted">No automation configs found.</td></tr>
+                    <tr><td colspan="9" class="text-center text-muted">No automation configs found.</td></tr>
                 @endforelse
                 </tbody>
             </table>

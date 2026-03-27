@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AutomationConfig;
 use App\Models\AutomationPostLog;
+use App\Models\DriveApiKey;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +19,7 @@ class AutomationConfigController extends Controller
     public function index()
     {
         $configs = AutomationConfig::query()
-            ->with(['app', 'page'])
+            ->with(['app', 'page', 'driveApiKey'])
             ->where('user_id', Auth::id())
             ->latest()
             ->paginate(20);
@@ -37,6 +38,7 @@ class AutomationConfigController extends Controller
         return view('admin.automations.create', [
             'apps' => FacebookApp::query()->where('is_active', true)->orderBy('name')->get(),
             'pages' => $this->pagesForUser(),
+            'driveApiKeys' => DriveApiKey::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -44,6 +46,7 @@ class AutomationConfigController extends Controller
     {
         $data = $this->validateData($request);
         $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $data['page_id']);
+        $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
         $data['user_id'] = Auth::id();
 
         AutomationConfig::create($data);
@@ -59,6 +62,7 @@ class AutomationConfigController extends Controller
             'automation' => $automation,
             'apps' => FacebookApp::query()->where('is_active', true)->orderBy('name')->get(),
             'pages' => $this->pagesForUser(),
+            'driveApiKeys' => DriveApiKey::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -68,6 +72,7 @@ class AutomationConfigController extends Controller
 
         $data = $this->validateData($request);
         $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $data['page_id']);
+        $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
         $automation->update($data);
 
         return redirect()->route('admin.automations.index')->with('success', 'Automation config updated successfully.');
@@ -97,6 +102,7 @@ class AutomationConfigController extends Controller
             'name' => 'nullable|string|max:255',
             'prompt' => 'required|string|max:5000',
             'drive_link' => 'required|url|max:4096',
+            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'app_id' => 'required|integer|exists:facebook_apps,id',
             'page_id' => 'required|integer|exists:facebook_pages,id',
             'platforms' => 'required|string|in:facebook,instagram,both',
@@ -126,5 +132,15 @@ class AutomationConfigController extends Controller
             ->exists();
 
         abort_unless($validPage, 422, 'Selected app/page is not authorized for this user.');
+    }
+
+    private function assertDriveKeyIsActive(int $driveApiKeyId): void
+    {
+        $active = DriveApiKey::query()
+            ->whereKey($driveApiKeyId)
+            ->where('is_active', true)
+            ->exists();
+
+        abort_unless($active, 422, 'Selected Google Drive API key is inactive.');
     }
 }

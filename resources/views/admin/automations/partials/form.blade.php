@@ -15,6 +15,18 @@
     <input type="url" name="drive_link" class="form-control" value="{{ old('drive_link', $isEdit ? $automation->drive_link : '') }}" required>
 </div>
 
+<div class="mb-3">
+    <label class="form-label">Google Drive Key</label>
+    <select name="drive_api_key_id" class="form-select" required>
+        <option value="">Select key</option>
+        @foreach($driveApiKeys as $driveApiKey)
+            <option value="{{ $driveApiKey->id }}" @selected((int) old('drive_api_key_id', $isEdit ? $automation->drive_api_key_id : 0) === $driveApiKey->id)>
+                {{ $driveApiKey->name }}
+            </option>
+        @endforeach
+    </select>
+</div>
+
 <div class="row g-3">
     <div class="col-md-6">
         <label class="form-label">App ID</label>

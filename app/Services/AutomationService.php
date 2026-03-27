@@ -25,7 +25,7 @@ class AutomationService
     {
         Cache::lock('automation:run-all', 300)->block(5, function () use ($automationConfigId) {
             $configs = AutomationConfig::query()
-                ->with('page.facebookAccount')
+                ->with(['page.facebookAccount', 'driveApiKey'])
                 ->where('is_active', true)
                 ->when($automationConfigId, fn ($query) => $query->whereKey($automationConfigId))
                 ->get();
@@ -46,7 +46,13 @@ class AutomationService
         }
 
         try {
-            $drivePayload = $this->driveService->fetchImagesFromDriveLink($config->drive_link);
+            if (!$config->driveApiKey || !$config->driveApiKey->is_active) {
+                $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), 'No active Google Drive key selected.');
+
+                return;
+            }
+
+            $drivePayload = $this->driveService->fetchImagesFromDriveLink($config->drive_link, $config->driveApiKey);
             $folderId = (string) ($drivePayload['folder_id'] ?? '');
             $images = collect($drivePayload['images'] ?? []);
 
