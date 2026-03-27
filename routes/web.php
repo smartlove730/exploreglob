@@ -84,6 +84,8 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::get('posts', [PostController::class, 'index'])->name('index');
         Route::get('posts/create', [PostController::class, 'create'])->name('create');
         Route::post('posts', [PostController::class, 'store'])->name('store');
+        Route::post('posts/drive/images', [PostController::class, 'fetchDriveImages'])->name('drive.images');
+        Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
     });
