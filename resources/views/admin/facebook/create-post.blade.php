@@ -519,6 +519,52 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    document.querySelectorAll('.generate-caption-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const promptInput = document.querySelector(button.dataset.targetPrompt);
+            const captionInput = document.querySelector(button.dataset.targetCaption);
+            const localStatus = document.querySelector(button.dataset.status);
+
+            if (!promptInput || !captionInput || !localStatus) return;
+
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                localStatus.textContent = 'Please enter a prompt first.';
+                localStatus.className = 'text-danger d-block mt-1';
+                return;
+            }
+
+            button.disabled = true;
+            localStatus.textContent = 'Generating caption...';
+            localStatus.className = 'text-muted d-block mt-1';
+
+            try {
+                const response = await fetch(button.dataset.generateUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ prompt }),
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message || 'Failed to generate caption.');
+
+                captionInput.value = result.data.caption || '';
+                localStatus.textContent = 'Caption generated successfully.';
+                localStatus.className = 'text-success d-block mt-1';
+            } catch (error) {
+                localStatus.textContent = error.message || 'Unexpected error while generating caption.';
+                localStatus.className = 'text-danger d-block mt-1';
+            } finally {
+                button.disabled = false;
+            }
+        });
+    });
 });
 </script>
 @endpush
