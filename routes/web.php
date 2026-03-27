@@ -58,6 +58,7 @@ use App\Http\Controllers\Admin\FacebookPostController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\FacebookAppController;
 use App\Http\Controllers\Admin\DriveApiKeyController;
+use App\Http\Controllers\Admin\DriveFolderController;
 
 Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
 
@@ -76,6 +77,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
 
         Route::resource('apps', FacebookAppController::class)->except(['show']);
         Route::resource('google-drive-keys', DriveApiKeyController::class)->except(['show']);
+        Route::resource('drive-folders', DriveFolderController::class)->except(['show']);
 
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
     });

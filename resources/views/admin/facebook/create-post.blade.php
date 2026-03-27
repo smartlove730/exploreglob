@@ -54,6 +54,22 @@
                     <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ $driveApiKeys->isEmpty() ? 'disabled' : '' }}>Fetch Images</button>
                 </div>
             </div>
+            <div class="col-12">
+                <label class="form-label">Or select saved folder</label>
+                <div class="input-group">
+                    <select class="form-select" id="saved_drive_folder_id">
+                        <option value="">Select saved folder</option>
+                        @foreach($driveFolders as $driveFolder)
+                            <option
+                                value="{{ $driveFolder->id }}"
+                                data-folder-url="{{ $driveFolder->folder_url }}"
+                                data-drive-key-id="{{ $driveFolder->drive_api_key_id }}"
+                            >{{ $driveFolder->name }}</option>
+                        @endforeach
+                    </select>
+                    <a href="{{ route('admin.facebook.drive-folders.create') }}" class="btn btn-outline-secondary">Manage Folders</a>
+                </div>
+            </div>
         </form>
 
         <div class="d-none mt-3" id="post_selected_container">
@@ -203,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageIdInput = document.getElementById('drive_page_id');
     const driveApiKeyInput = document.getElementById('drive_api_key_id');
     const folderUrlInput = document.getElementById('drive_folder_url');
+    const savedFolderInput = document.getElementById('saved_drive_folder_id');
 
     const modalTitle = document.getElementById('drivePostModalTitle');
     const modalPreview = document.getElementById('drive_modal_preview');
@@ -331,6 +348,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    savedFolderInput?.addEventListener('change', () => {
+        const selected = savedFolderInput.options[savedFolderInput.selectedIndex];
+        if (!selected || !selected.value) return;
+
+        if (selected.dataset.folderUrl) {
+            folderUrlInput.value = selected.dataset.folderUrl;
+        }
+
+        if (selected.dataset.driveKeyId) {
+            driveApiKeyInput.value = selected.dataset.driveKeyId;
+        }
+    });
+
     gridNode?.addEventListener('change', (event) => {
         const checkbox = event.target.closest('.drive-image-select');
         if (!checkbox) return;
@@ -442,6 +472,52 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             modalPostBtn.disabled = false;
         }
+    });
+
+    document.querySelectorAll('.generate-caption-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const promptInput = document.querySelector(button.dataset.targetPrompt);
+            const captionInput = document.querySelector(button.dataset.targetCaption);
+            const localStatus = document.querySelector(button.dataset.status);
+
+            if (!promptInput || !captionInput || !localStatus) return;
+
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                localStatus.textContent = 'Please enter a prompt first.';
+                localStatus.className = 'text-danger d-block mt-1';
+                return;
+            }
+
+            button.disabled = true;
+            localStatus.textContent = 'Generating caption...';
+            localStatus.className = 'text-muted d-block mt-1';
+
+            try {
+                const response = await fetch(button.dataset.generateUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ prompt }),
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message || 'Failed to generate caption.');
+
+                captionInput.value = result.data.caption || '';
+                localStatus.textContent = 'Caption generated successfully.';
+                localStatus.className = 'text-success d-block mt-1';
+            } catch (error) {
+                localStatus.textContent = error.message || 'Unexpected error while generating caption.';
+                localStatus.className = 'text-danger d-block mt-1';
+            } finally {
+                button.disabled = false;
+            }
+        });
     });
 
     document.querySelectorAll('.generate-caption-btn').forEach((button) => {
