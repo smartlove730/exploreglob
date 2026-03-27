@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DriveApiKey;
+use App\Models\DriveImagePost;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Models\FacebookPost;
+use App\Services\GoogleDriveService;
 use App\Services\MetaPostService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +20,10 @@ use Illuminate\Validation\ValidationException;
 
 class PostController extends Controller
 {
-    public function __construct(private readonly MetaPostService $metaPostService)
+    public function __construct(
+        private readonly MetaPostService $metaPostService,
+        private readonly GoogleDriveService $googleDriveService
+    )
     {
     }
 
@@ -53,6 +60,8 @@ class PostController extends Controller
             'selectedAppId' => $selectedAppId,
             'pages' => $pages,
             'selectedPageId' => (int) old('page_id', $request->integer('page_id')),
+            'driveApiKeys' => DriveApiKey::query()->where('is_active', true)->orderBy('name')->get(),
+            'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $request->integer('drive_api_key_id')),
         ]);
     }
 
@@ -195,6 +204,145 @@ class PostController extends Controller
         return redirect()->route('admin.posts.index')->with('success', 'Post deleted successfully.');
     }
 
+    public function fetchDriveImages(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'folder_url' => 'required|string|max:2048',
+            'app_id' => 'required|integer|exists:facebook_apps,id',
+            'page_id' => 'required|integer|exists:facebook_pages,id',
+            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
+        ]);
+
+        $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
+        if (!$page) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selected page is not valid for this app/user.',
+            ], 422);
+        }
+
+        $driveApiKey = DriveApiKey::query()
+            ->whereKey((int) $data['drive_api_key_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$driveApiKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selected Google Drive key is invalid or inactive.',
+            ], 422);
+        }
+
+        $folderId = $this->googleDriveService->extractFolderId($data['folder_url']);
+        $images = $this->googleDriveService->listPublicFolderImages($folderId, $driveApiKey->api_key);
+
+        $postedByImage = DriveImagePost::query()
+            ->where('page_id', $page->id)
+            ->whereIn('drive_file_id', collect($images)->pluck('id')->all())
+            ->get()
+            ->groupBy('drive_file_id');
+
+        $payload = collect($images)->map(function (array $image) use ($postedByImage) {
+            $records = $postedByImage->get($image['id'], collect());
+            $postedPlatforms = $records
+                ->flatMap(fn ($record) => $record->platforms ?? [])
+                ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
+                ->unique()
+                ->values()
+                ->all();
+
+            return array_merge($image, [
+                'is_posted' => !empty($postedPlatforms),
+                'posted_platforms' => $postedPlatforms,
+            ]);
+        })->values()->all();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'folder_id' => $folderId,
+                'images' => $payload,
+            ],
+        ]);
+    }
+
+    public function postDriveImages(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'app_id' => 'required|integer|exists:facebook_apps,id',
+            'page_id' => 'required|integer|exists:facebook_pages,id',
+            'folder_id' => 'nullable|string|max:255',
+            'caption' => 'required|string|max:60000',
+            'platforms' => 'required|array|min:1',
+            'platforms.*' => 'required|string|in:facebook,instagram',
+            'images' => 'required|array|min:1',
+            'images.*.id' => 'required|string|max:255',
+            'images.*.url' => 'required|url|max:2048',
+        ]);
+
+        $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
+        if (!$page) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selected page is not valid for this app/user.',
+            ], 422);
+        }
+
+        $platforms = collect($data['platforms'])->unique()->values()->all();
+        $results = [];
+
+        foreach ($data['images'] as $imageData) {
+            $imageUrl = (string) $imageData['url'];
+            $this->assertPublicHttpsImageUrl($imageUrl);
+
+            try {
+                $publishResult = $this->metaPostService->publish($page, $data['caption'], $imageUrl, $platforms);
+
+                DriveImagePost::create([
+                    'page_id' => $page->id,
+                    'drive_file_id' => (string) $imageData['id'],
+                    'drive_folder_id' => $data['folder_id'] ?? null,
+                    'image_url' => $imageUrl,
+                    'caption' => $data['caption'],
+                    'platforms' => $platforms,
+                    'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
+                    'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
+                    'response_json' => $publishResult['response_json'] ?? null,
+                    'posted_at' => now(),
+                ]);
+
+                $results[] = [
+                    'file_id' => $imageData['id'],
+                    'success' => true,
+                ];
+            } catch (\Throwable $exception) {
+                Log::error('Drive image publish failed', [
+                    'page_id' => $page->id,
+                    'file_id' => $imageData['id'],
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $results[] = [
+                    'file_id' => $imageData['id'],
+                    'success' => false,
+                    'message' => $exception->getMessage(),
+                ];
+            }
+        }
+
+        $successCount = collect($results)->where('success', true)->count();
+
+        return response()->json([
+            'success' => $successCount > 0,
+            'message' => $successCount === count($results)
+                ? 'All images posted successfully.'
+                : "Posted {$successCount} of ".count($results).' images.',
+            'data' => [
+                'results' => $results,
+            ],
+        ], $successCount > 0 ? 200 : 422);
+    }
+
     private function validatePostRequest(Request $request, bool $isUpdate = false): array
     {
         return $request->validate([
@@ -255,5 +403,29 @@ class PostController extends Controller
         }
 
         return Storage::disk('public')->url($firstImage->image_path);
+    }
+
+    private function assertPublicHttpsImageUrl(string $imageUrl): void
+    {
+        $host = parse_url($imageUrl, PHP_URL_HOST);
+        $scheme = parse_url($imageUrl, PHP_URL_SCHEME);
+
+        if ($scheme !== 'https' || !$host) {
+            throw ValidationException::withMessages([
+                'image_url' => 'Image URL must be publicly accessible and use HTTPS.',
+            ]);
+        }
+
+        if (in_array($host, ['localhost', '127.0.0.1'], true)) {
+            throw ValidationException::withMessages([
+                'image_url' => 'Image URL must not point to localhost.',
+            ]);
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) && !filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            throw ValidationException::withMessages([
+                'image_url' => 'Image URL must be publicly reachable.',
+            ]);
+        }
     }
 }
