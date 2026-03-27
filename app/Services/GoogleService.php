@@ -20,9 +20,11 @@ class GoogleService
 
     public function getOauthRedirectUrl(): string
     {
+        $redirectUri = $this->resolveRedirectUri();
+
         $query = http_build_query([
             'client_id' => config('services.google.client_id'),
-            'redirect_uri' => config('services.google.redirect_uri'),
+            'redirect_uri' => $redirectUri,
             'response_type' => 'code',
             'scope' => implode(' ', [
                 'https://www.googleapis.com/auth/business.manage',
@@ -41,17 +43,33 @@ class GoogleService
 
     public function exchangeCodeForToken(string $code): array
     {
+        $redirectUri = $this->resolveRedirectUri();
+
         $response = $this->client->post(self::TOKEN_URL, [
             'form_params' => [
                 'code' => $code,
                 'client_id' => config('services.google.client_id'),
                 'client_secret' => config('services.google.client_secret'),
-                'redirect_uri' => config('services.google.redirect_uri'),
+                'redirect_uri' => $redirectUri,
                 'grant_type' => 'authorization_code',
             ],
         ]);
 
         return json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private function resolveRedirectUri(): string
+    {
+        $configuredRedirectUri = (string) config('services.google.redirect_uri', '');
+        if ($configuredRedirectUri !== '') {
+            return $configuredRedirectUri;
+        }
+
+        if (function_exists('route')) {
+            return route('admin.google.callback');
+        }
+
+        throw new RuntimeException('Google redirect URI is not configured.');
     }
 
     public function refreshAccessToken(string $refreshToken): array
