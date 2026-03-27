@@ -55,6 +55,7 @@ use App\Http\Controllers\Admin\BlogController as AdminBlogController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\FacebookSettingsController;
 use App\Http\Controllers\Admin\FacebookPostController;
+use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\FacebookAppController;
 
 Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
@@ -73,11 +74,18 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
 
         Route::resource('apps', FacebookAppController::class)->except(['show']);
 
-        Route::get('posts', [FacebookPostController::class, 'index'])->name('posts');
-        Route::get('posts/create', [FacebookPostController::class, 'create'])->name('posts.create');
-        Route::post('posts', [FacebookPostController::class, 'store'])->name('posts.store');
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
-        Route::post('posts/{post}/retry', [FacebookPostController::class, 'retry'])->name('posts.retry');
+    });
+
+Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
+    ->prefix('admin')
+    ->name('admin.posts.')
+    ->group(function () {
+        Route::get('posts', [PostController::class, 'index'])->name('index');
+        Route::get('posts/create', [PostController::class, 'create'])->name('create');
+        Route::post('posts', [PostController::class, 'store'])->name('store');
+        Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
+        Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
     });
 
 // Admin auth
