@@ -10,7 +10,8 @@
 
 <div class="mb-3">
     <label class="form-label">Drive API Key</label>
-    <input type="text" name="api_key" class="form-control" value="{{ old('api_key', $isEdit ? $driveKey->api_key : '') }}" required>
+    <input type="text" name="api_key" class="form-control" value="{{ old('api_key', $isEdit ? $driveKey->api_key : '') }}">
+    <small class="text-muted">Optional when using OAuth connect flow.</small>
 </div>
 
 <div class="mb-3">
