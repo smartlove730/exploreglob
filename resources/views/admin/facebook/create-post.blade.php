@@ -145,12 +145,27 @@
                     <textarea name="message" id="message" rows="6" class="form-control" required>{{ old('message') }}</textarea>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label d-block">Media Type</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input js-media-type" type="radio" name="media_type" value="image" id="media_type_image" {{ old('media_type', 'image') === 'image' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="media_type_image">Image</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input js-media-type" type="radio" name="media_type" value="video" id="media_type_video" {{ old('media_type') === 'video' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="media_type_video">Video</label>
+                    </div>
+                </div>
+                <div class="mb-3">
                     <label class="form-label">Image URL (optional)</label>
                     <input type="url" name="image_url" class="form-control" value="{{ old('image_url') }}">
                 </div>
-                <div class="mb-3">
+                <div class="mb-3" id="image_upload_group">
                     <label class="form-label">Upload Images</label>
                     <input type="file" name="images[]" class="form-control" accept="image/*" multiple>
+                </div>
+                <div class="mb-3 d-none" id="video_upload_group">
+                    <label class="form-label">Upload Video (MP4, max 50MB)</label>
+                    <input type="file" name="video" class="form-control" accept="video/mp4">
                 </div>
                 <button class="btn btn-primary">Publish Post</button>
             </form>
@@ -223,6 +238,21 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const mediaTypeInputs = Array.from(document.querySelectorAll('.js-media-type'));
+    const imageUploadGroup = document.getElementById('image_upload_group');
+    const videoUploadGroup = document.getElementById('video_upload_group');
+
+    const toggleMediaInputs = () => {
+        const mediaType = mediaTypeInputs.find((input) => input.checked)?.value || 'image';
+        const isVideo = mediaType === 'video';
+
+        imageUploadGroup?.classList.toggle('d-none', isVideo);
+        videoUploadGroup?.classList.toggle('d-none', !isVideo);
+    };
+
+    mediaTypeInputs.forEach((input) => input.addEventListener('change', toggleMediaInputs));
+    toggleMediaInputs();
+
     const state = {
         folderId: null,
         images: [],
