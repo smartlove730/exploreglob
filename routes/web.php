@@ -57,10 +57,12 @@ use App\Http\Controllers\Admin\FacebookSettingsController;
 use App\Http\Controllers\Admin\FacebookPostController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\FacebookAppController;
+use App\Http\Controllers\Admin\DriveApiKeyController;
 
 Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
 
 Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('admin.facebook.callback');
+Route::get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
 
 
 Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
@@ -73,6 +75,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::post('pages/{page}/activate', [FacebookSettingsController::class, 'activatePage'])->name('pages.activate');
 
         Route::resource('apps', FacebookAppController::class)->except(['show']);
+        Route::resource('google-drive-keys', DriveApiKeyController::class)->except(['show']);
 
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
     });

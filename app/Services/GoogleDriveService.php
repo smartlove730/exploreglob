@@ -24,9 +24,9 @@ class GoogleDriveService
         ]);
     }
 
-    public function listPublicFolderImages(string $folderId): array
+    public function listPublicFolderImages(string $folderId, ?string $apiKey = null): array
     {
-        $apiKey = config('services.google_drive.api_key');
+        $apiKey = $apiKey ?: config('services.google_drive.api_key');
 
         if (!$apiKey) {
             throw ValidationException::withMessages([

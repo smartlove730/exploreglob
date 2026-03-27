@@ -12,10 +12,15 @@
     <div class="card-body">
         <h2 class="h5">Google Drive Folder Images</h2>
         <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images, then post one or many with generated captions.</p>
+        @if($driveApiKeys->isEmpty())
+            <div class="alert alert-warning">
+                No active Google Drive key found. <a href="{{ route('admin.facebook.google-drive-keys.create') }}">Add a Drive key</a> first.
+            </div>
+        @endif
 
         <form id="driveFilterForm" class="row g-3">
             @csrf
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">Facebook App</label>
                 <select name="app_id" id="drive_app_id" class="form-select" required>
                     <option value="">Select an app</option>
@@ -24,7 +29,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">Facebook Page (Active)</label>
                 <select name="page_id" id="drive_page_id" class="form-select" required>
                     <option value="">Select a page</option>
@@ -33,11 +38,20 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
+                <label class="form-label">Google Drive Key</label>
+                <select name="drive_api_key_id" id="drive_api_key_id" class="form-select" required>
+                    <option value="">Select Drive key</option>
+                    @foreach($driveApiKeys as $driveApiKey)
+                        <option value="{{ $driveApiKey->id }}" {{ $selectedDriveApiKeyId === $driveApiKey->id ? 'selected' : '' }}>{{ $driveApiKey->name }}{{ $driveApiKey->email ? ' ('.$driveApiKey->email.')' : '' }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-3">
                 <label class="form-label">Google Drive Folder URL</label>
                 <div class="input-group">
                     <input type="url" name="folder_url" id="drive_folder_url" class="form-control" placeholder="https://drive.google.com/drive/folders/..." required>
-                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}">Fetch Images</button>
+                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ $driveApiKeys->isEmpty() ? 'disabled' : '' }}>Fetch Images</button>
                 </div>
             </div>
         </form>
@@ -172,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const appIdInput = document.getElementById('drive_app_id');
     const pageIdInput = document.getElementById('drive_page_id');
+    const driveApiKeyInput = document.getElementById('drive_api_key_id');
     const folderUrlInput = document.getElementById('drive_folder_url');
 
     const modalTitle = document.getElementById('drivePostModalTitle');
@@ -258,10 +273,11 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchBtn?.addEventListener('click', async () => {
         const appId = appIdInput.value;
         const pageId = pageIdInput.value;
+        const driveApiKeyId = driveApiKeyInput.value;
         const folderUrl = folderUrlInput.value.trim();
 
-        if (!appId || !pageId || !folderUrl) {
-            setStatus('App, page, and folder URL are required.', 'danger');
+        if (!appId || !pageId || !driveApiKeyId || !folderUrl) {
+            setStatus('App, page, Drive key, and folder URL are required.', 'danger');
             return;
         }
 
@@ -276,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ app_id: appId, page_id: pageId, folder_url: folderUrl }),
+                body: JSON.stringify({ app_id: appId, page_id: pageId, drive_api_key_id: driveApiKeyId, folder_url: folderUrl }),
             });
 
             const result = await response.json();

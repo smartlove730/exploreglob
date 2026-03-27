@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DriveApiKey;
 use App\Models\DriveImagePost;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
@@ -59,6 +60,8 @@ class PostController extends Controller
             'selectedAppId' => $selectedAppId,
             'pages' => $pages,
             'selectedPageId' => (int) old('page_id', $request->integer('page_id')),
+            'driveApiKeys' => DriveApiKey::query()->where('is_active', true)->orderBy('name')->get(),
+            'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $request->integer('drive_api_key_id')),
         ]);
     }
 
@@ -207,6 +210,7 @@ class PostController extends Controller
             'folder_url' => 'required|string|max:2048',
             'app_id' => 'required|integer|exists:facebook_apps,id',
             'page_id' => 'required|integer|exists:facebook_pages,id',
+            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
         ]);
 
         $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
@@ -217,8 +221,20 @@ class PostController extends Controller
             ], 422);
         }
 
+        $driveApiKey = DriveApiKey::query()
+            ->whereKey((int) $data['drive_api_key_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$driveApiKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selected Google Drive key is invalid or inactive.',
+            ], 422);
+        }
+
         $folderId = $this->googleDriveService->extractFolderId($data['folder_url']);
-        $images = $this->googleDriveService->listPublicFolderImages($folderId);
+        $images = $this->googleDriveService->listPublicFolderImages($folderId, $driveApiKey->api_key);
 
         $postedByImage = DriveImagePost::query()
             ->where('page_id', $page->id)
