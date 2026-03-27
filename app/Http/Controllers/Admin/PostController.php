@@ -242,9 +242,7 @@ class PostController extends Controller
             ->get()
             ->groupBy('drive_file_id');
 
-        $driveApiKeyId = (int) $data['drive_api_key_id'];
-
-        $payload = collect($images)->map(function (array $image) use ($postedByImage, $driveApiKeyId) {
+        $payload = collect($images)->map(function (array $image) use ($postedByImage) {
             $records = $postedByImage->get($image['id'], collect());
             $postedPlatforms = $records
                 ->flatMap(fn ($record) => $record->platforms ?? [])
@@ -254,11 +252,6 @@ class PostController extends Controller
                 ->all();
 
             return array_merge($image, [
-                'preview_url' => route('admin.posts.drive.image-proxy', [
-                    'file_id' => $image['id'],
-                    'drive_api_key_id' => $driveApiKeyId,
-                    'resource_key' => $image['resource_key'] ?? null,
-                ]),
                 'is_posted' => !empty($postedPlatforms),
                 'posted_platforms' => $postedPlatforms,
             ]);
