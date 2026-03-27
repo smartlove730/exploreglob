@@ -41,4 +41,8 @@ return [
         'redirect_uri' => env('FACEBOOK_REDIRECT_URI'),
     ],
 
+    'google_drive' => [
+        'api_key' => env('GOOGLE_DRIVE_API_KEY'),
+    ],
+
 ];
