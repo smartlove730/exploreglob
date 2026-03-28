@@ -16,6 +16,15 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/home/categories/load', [HomeController::class, 'loadCategories'])->name('home.categories.load');
 Route::get('/search', [HomeController::class, 'search'])->name('home.search');
 
+Route::middleware(['auth', 'verified'])->get('/dashboard', function () {
+    return view('dashboard');
+})->name('dashboard');
+
+Route::middleware(['auth', 'verified', 'role:customer,admin'])->get('/app', function () {
+    return view('dashboard');
+})->name('tenant.dashboard');
+
+
 // Country Selector
 Route::get('/country/{code}', [CountryController::class, 'setCountry'])->name('country.set');
 
@@ -145,3 +154,5 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     });
 });
+
+require __DIR__.'/auth.php';
