@@ -397,69 +397,57 @@ class PostController extends Controller
         $results = [];
 
         if ($postMode === 'combined') {
-            try {
-                $publishResult = $this->metaPostService->publishCombined(
-                    $page,
-                    $data['caption'],
-                    collect($preparedImages)->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms))->all(),
-                    $platforms
-                );
-
-                $post = FacebookPost::create([
-                    'user_id' => $page->user_id,
-                    'page_id' => $page->id,
-                    'message' => $data['caption'],
-                    'image_url' => $preparedImages[0]['public_url'],
-                    'platforms' => $platforms,
-                    'status' => FacebookPost::STATUS_PUBLISHED,
-                    'posted_at' => now(),
-                    'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
-                    'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
-                    'google_post_name' => $publishResult['google_post_name'] ?? null,
-                'response_json' => $publishResult['response_json'] ?? null,
-                ]);
-
-                foreach ($preparedImages as $imageMeta) {
-                    $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
-
-                    DriveImagePost::create([
-                        'user_id' => $page->user_id,
-                        'page_id' => $page->id,
-                        'drive_file_id' => $imageMeta['file_id'],
-                        'drive_folder_id' => $data['folder_id'] ?? null,
-                        'image_url' => $imageMeta['public_url'],
-                        'caption' => $data['caption'],
-                        'platforms' => $platforms,
-                        'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
-                        'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
-                        'response_json' => $publishResult['response_json'] ?? null,
-                        'posted_at' => now(),
-                    ]);
-
-                    $results[] = [
-                        'file_id' => $imageMeta['file_id'],
-                        'success' => true,
-                    ];
-                }
-            } catch (\Throwable $exception) {
-                Log::error('Combined drive image publish failed', ['error' => $exception->getMessage()]);
-
-                foreach ($preparedImages as $imageMeta) {
-                    $results[] = [
-                        'file_id' => $imageMeta['file_id'],
-                        'success' => false,
-                        'message' => $exception->getMessage(),
-                    ];
+            $queueImageUrls = collect($preparedImages)
+                ->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms))
+                ->all();
+            foreach ($queueImageUrls as $queueImageUrl) {
+                if ($queueImageUrl) {
+                    $this->assertPublicHttpsImageUrl($queueImageUrl);
                 }
             }
 
-            $successCount = collect($results)->where('success', true)->count();
+            $googleLocationId = $this->resolveGoogleLocationId($data);
+            $post = FacebookPost::create([
+                'user_id' => $page->user_id,
+                'page_id' => $page->id,
+                'message' => $data['caption'],
+                'image_url' => $queueImageUrls[0] ?? null,
+                'platforms' => $platforms,
+                'google_location_id' => $googleLocationId,
+                'status' => FacebookPost::STATUS_PENDING,
+                'last_error' => null,
+            ]);
+
+            foreach ($preparedImages as $imageMeta) {
+                $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
+
+                DriveImagePost::create([
+                    'user_id' => $page->user_id,
+                    'page_id' => $page->id,
+                    'drive_file_id' => $imageMeta['file_id'],
+                    'drive_folder_id' => $data['folder_id'] ?? null,
+                    'image_url' => $imageMeta['public_url'],
+                    'caption' => $data['caption'],
+                    'platforms' => $platforms,
+                    'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
+                ]);
+
+                $results[] = [
+                    'file_id' => $imageMeta['file_id'],
+                    'success' => true,
+                    'message' => 'Queued for publishing.',
+                ];
+            }
+
+            PublishPostJob::dispatch($post->id);
+
+            $successCount = count($results);
 
             return response()->json([
                 'success' => $successCount > 0,
                 'message' => $successCount === count($results)
-                    ? 'All images posted successfully in one post.'
-                    : "Posted {$successCount} of ".count($results).' images.',
+                    ? 'Combined post queued for background publishing.'
+                    : "Queued {$successCount} of ".count($results).' images.',
                 'data' => ['results' => $results],
             ], $successCount > 0 ? 200 : 422);
         }
@@ -471,20 +459,15 @@ class PostController extends Controller
 
             try {
                 $googleLocationId = $this->resolveGoogleLocationId($data);
-                $publishResult = $this->metaPostService->publish($page, $data['caption'], $imageUrl, $platforms, $googleLocationId);
-
                 $post = FacebookPost::create([
                     'user_id' => $page->user_id,
                     'page_id' => $page->id,
                     'message' => $data['caption'],
                     'image_url' => $imageUrl,
                     'platforms' => $platforms,
-                    'status' => FacebookPost::STATUS_PUBLISHED,
-                    'posted_at' => now(),
-                    'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
-                    'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
-                    'google_post_name' => $publishResult['google_post_name'] ?? null,
-                'response_json' => $publishResult['response_json'] ?? null,
+                    'google_location_id' => $googleLocationId,
+                    'status' => FacebookPost::STATUS_PENDING,
+                    'last_error' => null,
                 ]);
 
                 $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
@@ -497,18 +480,18 @@ class PostController extends Controller
                     'image_url' => $imageUrl,
                     'caption' => $data['caption'],
                     'platforms' => $platforms,
-                    'facebook_post_id' => $publishResult['facebook_post_id'] ?? null,
-                    'instagram_media_id' => $publishResult['instagram_media_id'] ?? null,
-                    'response_json' => $publishResult['response_json'] ?? null,
-                    'posted_at' => now(),
+                    'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
                 ]);
+
+                PublishPostJob::dispatch($post->id);
 
                 $results[] = [
                     'file_id' => $imageMeta['file_id'],
                     'success' => true,
+                    'message' => 'Queued for publishing.',
                 ];
             } catch (\Throwable $exception) {
-                Log::error('Drive image publish failed', [
+                Log::error('Drive image queue failed', [
                     'page_id' => $page->id,
                     'file_id' => $imageMeta['file_id'],
                     'error' => $exception->getMessage(),
@@ -527,8 +510,8 @@ class PostController extends Controller
         return response()->json([
             'success' => $successCount > 0,
             'message' => $successCount === count($results)
-                ? 'All images posted successfully.'
-                : "Posted {$successCount} of ".count($results).' images.',
+                ? 'All images queued for background publishing.'
+                : "Queued {$successCount} of ".count($results).' images.',
             'data' => [
                 'results' => $results,
             ],
