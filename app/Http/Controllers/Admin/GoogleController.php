@@ -65,8 +65,9 @@ class GoogleController extends Controller
             );
 
             DriveApiKey::updateOrCreate(
-                ['name' => 'OAuth ('.Auth::user()->email.')'],
+                ['user_id' => Auth::id(), 'name' => 'OAuth ('.Auth::user()->email.')'],
                 [
+                    'user_id' => Auth::id(),
                     'email' => Auth::user()->email,
                     'description' => 'Connected via Google OAuth',
                     'is_active' => true,
