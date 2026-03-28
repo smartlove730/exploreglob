@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\ProcessVideoPostJob;
+use App\Jobs\PublishPostJob;
 use App\Models\DriveApiKey;
 use App\Models\DriveFolder;
 use App\Models\DriveImagePost;
@@ -102,7 +102,9 @@ class PostController extends Controller
             'video_path' => null,
             'video_url' => null,
             'platforms' => $data['platforms'],
-            'status' => FacebookPost::STATUS_PROCESSING,
+            'google_location_id' => $googleLocationId,
+            'status' => FacebookPost::STATUS_PENDING,
+            'last_error' => null,
         ]);
 
         if ($mediaType === FacebookPost::MEDIA_TYPE_VIDEO) {
@@ -113,7 +115,7 @@ class PostController extends Controller
                 'video_url' => $videoMeta['video_url'],
             ]);
 
-            ProcessVideoPostJob::dispatch($post->id);
+            PublishPostJob::dispatch($post->id);
 
             return redirect()->route('admin.posts.index')->with('success', 'Video queued for background publishing.');
         }
@@ -126,30 +128,16 @@ class PostController extends Controller
             throw ValidationException::withMessages(['images' => 'Instagram requires at least one image URL or upload.']);
         }
 
-        try {
-            $publishResult = $this->metaPostService->publish($page, $post->message, $publishImageUrl, $data['platforms'], $googleLocationId);
+        $post->update([
+            'image_url' => $publishImageUrl,
+            'google_location_id' => $googleLocationId,
+            'status' => FacebookPost::STATUS_PENDING,
+            'last_error' => null,
+        ]);
 
-            $post->update([
-                'status' => FacebookPost::STATUS_PUBLISHED,
-                'posted_at' => now(),
-                'facebook_post_id' => $publishResult['facebook_post_id'],
-                'instagram_media_id' => $publishResult['instagram_media_id'],
-                'google_post_name' => $publishResult['google_post_name'] ?? null,
-                'response_json' => $publishResult['response_json'],
-                'image_url' => $publishImageUrl,
-            ]);
+        PublishPostJob::dispatch($post->id);
 
-            return redirect()->route('admin.posts.index')->with('success', 'Post created and published successfully.');
-        } catch (\Throwable $exception) {
-            Log::error('Post publishing failed on create', ['post_id' => $post->id, 'error' => $exception->getMessage()]);
-
-            $post->update([
-                'status' => FacebookPost::STATUS_FAILED,
-                'response_json' => ['error' => $exception->getMessage()],
-            ]);
-
-            return redirect()->route('admin.posts.index')->with('error', 'Post saved but publishing failed: '.$exception->getMessage());
-        }
+        return redirect()->route('admin.posts.index')->with('success', 'Post queued for background publishing.');
     }
 
     public function update(Request $request, int $id): RedirectResponse
@@ -194,32 +182,23 @@ class PostController extends Controller
             if ($isImagePost && in_array('instagram', $data['platforms'], true) && !$publishImageUrl) {
                 throw ValidationException::withMessages(['images' => 'Instagram requires at least one image URL or upload.']);
             }
-
-            try {
-                $publishResult = $this->metaPostService->publish($page, $post->message, $publishImageUrl, $data['platforms'], $googleLocationId);
-                $post->update([
-                    'status' => FacebookPost::STATUS_PUBLISHED,
-                    'posted_at' => now(),
-                    'facebook_post_id' => $publishResult['facebook_post_id'],
-                    'instagram_media_id' => $publishResult['instagram_media_id'],
-                    'google_post_name' => $publishResult['google_post_name'] ?? null,
-                    'response_json' => $publishResult['response_json'],
-                    'image_url' => $publishImageUrl,
-                ]);
-            } catch (\Throwable $exception) {
-                Log::error('Re-publishing failed on update', ['post_id' => $post->id, 'error' => $exception->getMessage()]);
-                $post->update(['status' => FacebookPost::STATUS_DRAFT]);
-
-                return back()->with('error', 'Post updated locally, but re-publishing failed.');
-            }
-        } else {
-            $post->update([
-                'status' => FacebookPost::STATUS_DRAFT,
-                'image_url' => $publishImageUrl,
-            ]);
         }
 
-        return redirect()->route('admin.posts.index')->with('success', 'Post updated successfully.');
+        $post->update([
+            'status' => FacebookPost::STATUS_PENDING,
+            'image_url' => $publishImageUrl,
+            'google_location_id' => $googleLocationId,
+            'facebook_post_id' => null,
+            'instagram_media_id' => null,
+            'google_post_name' => null,
+            'posted_at' => null,
+            'response_json' => null,
+            'last_error' => null,
+        ]);
+
+        PublishPostJob::dispatch($post->id);
+
+        return redirect()->route('admin.posts.index')->with('success', 'Post updated and queued for publishing.');
     }
 
     public function destroy(int $id): RedirectResponse

@@ -14,11 +14,11 @@ class FacebookPost extends Model
     public const MEDIA_TYPE_IMAGE = 'image';
     public const MEDIA_TYPE_VIDEO = 'video';
 
-    public const STATUS_DRAFT = 'draft';
+    public const STATUS_DRAFT = 'pending';
+    public const STATUS_PENDING = 'pending';
     public const STATUS_PROCESSING = 'processing';
     public const STATUS_PUBLISHED = 'published';
-    public const STATUS_PENDING = 'draft';
-    public const STATUS_SCHEDULED = 'draft';
+    public const STATUS_SCHEDULED = 'pending';
     public const STATUS_POSTED = 'published';
     public const STATUS_FAILED = 'failed';
 
@@ -34,9 +34,11 @@ class FacebookPost extends Model
         'instagram_media_id',
         'google_post_name',
         'platforms',
+        'google_location_id',
         'status',
         'scheduled_at',
         'posted_at',
+        'last_error',
         'response_json',
         'attempts',
     ];

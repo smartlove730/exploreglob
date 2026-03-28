@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\PublishFacebookPostJob;
+use App\Jobs\PublishPostJob;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Models\FacebookPost;
@@ -104,7 +104,7 @@ class FacebookPostController extends Controller
             'status' => FacebookPost::STATUS_PENDING,
         ]);
 
-        PublishFacebookPostJob::dispatch($post->id);
+        PublishPostJob::dispatch($post->id);
 
         return redirect()->route('admin.facebook.posts')->with('success', 'Post queued for publishing.');
     }
@@ -117,10 +117,11 @@ class FacebookPostController extends Controller
 
         $post->update([
             'status' => FacebookPost::STATUS_PENDING,
+            'last_error' => null,
             'response_json' => null,
         ]);
 
-        PublishFacebookPostJob::dispatch($post->id);
+        PublishPostJob::dispatch($post->id);
 
         return back()->with('success', 'Post retry queued.');
     }
