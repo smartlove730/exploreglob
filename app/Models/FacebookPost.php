@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToUserScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FacebookPost extends Model
 {
+    use BelongsToUserScope;
+
     public const MEDIA_TYPE_IMAGE = 'image';
     public const MEDIA_TYPE_VIDEO = 'video';
 
@@ -20,6 +23,7 @@ class FacebookPost extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
+        'user_id',
         'page_id',
         'message',
         'media_type',
@@ -43,6 +47,11 @@ class FacebookPost extends Model
         'posted_at' => 'datetime',
         'response_json' => 'array',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function page(): BelongsTo
     {

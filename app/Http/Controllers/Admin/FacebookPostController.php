@@ -20,8 +20,8 @@ class FacebookPostController extends Controller
 {
     public function index()
     {
-        $posts = FacebookPost::with(['page.facebookAccount.app'])
-            ->whereHas('page.facebookAccount', fn ($query) => $query->where('user_id', Auth::id()))
+        $posts = FacebookPost::query()->ownedBy(Auth::user())
+            ->with(['page.facebookAccount.app'])
             ->latest()
             ->paginate(20);
 
@@ -95,6 +95,7 @@ class FacebookPostController extends Controller
         }
 
         $post = FacebookPost::create([
+            'user_id' => $page->user_id,
             'page_id' => $page->id,
             'message' => $data['message'],
             'image_url' => $data['image_url'] ?? null,
@@ -110,7 +111,9 @@ class FacebookPostController extends Controller
 
     public function retry(FacebookPost $post): RedirectResponse
     {
-        abort_unless($post->page->facebookAccount->user_id === Auth::id(), 403);
+        if (!Auth::user()?->isAdmin() && $post->user_id !== Auth::id()) {
+            abort(403);
+        }
 
         $post->update([
             'status' => FacebookPost::STATUS_PENDING,
