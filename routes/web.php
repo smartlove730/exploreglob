@@ -82,7 +82,7 @@ use App\Http\Controllers\Admin\AutomationConfigController;
 use App\Http\Controllers\AutomationController;
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
-Route::middleware(['auth', 'admin'])->get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
+Route::middleware(['auth', 'admin', 'subscription.active'])->get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
 
 Route::middleware(['auth', 'admin'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('admin.facebook.callback');
 Route::middleware(['auth', 'admin'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('admin.google.callback');
@@ -115,7 +115,7 @@ Route::middleware(['auth', 'admin'])
         Route::post('locations/{location}/default', [GoogleController::class, 'setDefaultLocation'])->name('locations.default');
     });
 
-Route::middleware(['auth', 'admin'])
+Route::middleware(['auth', 'admin', 'subscription.active'])
     ->prefix('admin')
     ->name('admin.posts.')
     ->group(function () {
@@ -129,7 +129,7 @@ Route::middleware(['auth', 'admin'])
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
     });
 
-Route::middleware(['auth', 'admin'])
+Route::middleware(['auth', 'admin', 'subscription.active'])
     ->prefix('admin')
     ->name('admin.automations.')
     ->group(function () {
