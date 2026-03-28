@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\App\BillingController;
+
 use App\Http\Controllers\{
     HomeController,
     CategoryController,
@@ -27,6 +29,9 @@ Route::prefix('app')
         Route::get('/', function () {
             return view('app.dashboard');
         })->name('dashboard');
+
+        Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
+        Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->name('billing.subscribe');
     });
 
 // Country Selector
