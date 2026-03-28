@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToUserScope;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DriveApiKey extends Model
 {
+    use BelongsToUserScope;
+
     protected $fillable = [
+        'user_id',
         'name',
         'api_key',
         'description',
@@ -22,4 +27,9 @@ class DriveApiKey extends Model
         'is_active' => 'boolean',
         'oauth_expires_at' => 'datetime',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }
