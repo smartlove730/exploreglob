@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\App\BillingController;
+
 use App\Http\Controllers\{
     HomeController,
     CategoryController,
@@ -15,6 +17,22 @@ use App\Http\Controllers\{
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/home/categories/load', [HomeController::class, 'loadCategories'])->name('home.categories.load');
 Route::get('/search', [HomeController::class, 'search'])->name('home.search');
+
+Route::middleware(['auth', 'verified'])->get('/dashboard', function () {
+    return redirect()->route('app.dashboard');
+})->name('dashboard');
+
+Route::prefix('app')
+    ->name('app.')
+    ->middleware(['auth', 'verified', 'role:customer,admin'])
+    ->group(function () {
+        Route::get('/', function () {
+            return view('app.dashboard');
+        })->name('dashboard');
+
+        Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
+        Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->name('billing.subscribe');
+    });
 
 // Country Selector
 Route::get('/country/{code}', [CountryController::class, 'setCountry'])->name('country.set');
@@ -61,17 +79,18 @@ use App\Http\Controllers\Admin\DriveApiKeyController;
 use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\GoogleController;
 use App\Http\Controllers\Admin\AutomationConfigController;
+use App\Http\Controllers\Admin\ScheduledPostController;
 use App\Http\Controllers\AutomationController;
 
-Route::post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
-Route::get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
+Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
+Route::middleware(['auth', 'admin', 'subscription.active'])->get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
 
-Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('admin.facebook.callback');
-Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('admin.google.callback');
-Route::get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
+Route::middleware(['auth', 'admin'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('admin.facebook.callback');
+Route::middleware(['auth', 'admin'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('admin.google.callback');
+Route::middleware(['auth', 'admin'])->get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
 
 
-Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin/facebook')
     ->name('admin.facebook.')
     ->group(function () {
@@ -87,7 +106,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
     });
 
-Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin/google')
     ->name('admin.google.')
     ->group(function () {
@@ -97,7 +116,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::post('locations/{location}/default', [GoogleController::class, 'setDefaultLocation'])->name('locations.default');
     });
 
-Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
+Route::middleware(['auth', 'admin', 'subscription.active'])
     ->prefix('admin')
     ->name('admin.posts.')
     ->group(function () {
@@ -111,7 +130,17 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
     });
 
-Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])
+Route::middleware(['auth', 'admin', 'subscription.active'])
+    ->prefix('admin')
+    ->name('admin.scheduled-posts.')
+    ->group(function () {
+        Route::get('scheduled-posts', [ScheduledPostController::class, 'index'])->name('index');
+        Route::post('scheduled-posts', [ScheduledPostController::class, 'store'])->name('store');
+        Route::put('scheduled-posts/{id}', [ScheduledPostController::class, 'update'])->name('update');
+        Route::delete('scheduled-posts/{id}', [ScheduledPostController::class, 'destroy'])->name('destroy');
+    });
+
+Route::middleware(['auth', 'admin', 'subscription.active'])
     ->prefix('admin')
     ->name('admin.automations.')
     ->group(function () {
@@ -130,7 +159,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('login', [AdminAuthController::class, 'login'])->name('login.post');
     Route::post('logout', [AdminAuthController::class, 'logout'])->name('logout');
 
-    Route::middleware(['auth', \App\Http\Middleware\EnsureAdmin::class])->group(function () {
+    Route::middleware(['auth', 'admin'])->group(function () {
         Route::get('/', function () { return view('admin.dashboard'); })->name('dashboard');
             // Modal endpoints for dynamic forms
             Route::get('blogs/create-modal', [AdminBlogController::class, 'createModal'])->name('blogs.createModal');
@@ -145,3 +174,5 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     });
 });
+
+require __DIR__.'/auth.php';

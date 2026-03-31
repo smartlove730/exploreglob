@@ -8,6 +8,7 @@ use App\Models\DriveFolder;
 use App\Services\GoogleDriveService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class DriveFolderController extends Controller
 {
@@ -17,14 +18,14 @@ class DriveFolderController extends Controller
 
     public function index()
     {
-        $folders = DriveFolder::with('driveApiKey')->latest()->paginate(20);
+        $folders = $this->scopedFolders()->with('driveApiKey')->latest()->paginate(20);
 
         return view('admin.drive-folders.index', compact('folders'));
     }
 
     public function create()
     {
-        $driveApiKeys = DriveApiKey::where('is_active', true)->orderBy('name')->get();
+        $driveApiKeys = DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
 
         return view('admin.drive-folders.create', compact('driveApiKeys'));
     }
@@ -32,7 +33,9 @@ class DriveFolderController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validateData($request);
+        $this->assertAuthorizedDriveKey($data['drive_api_key_id'] ?? null);
         $data['folder_id'] = $this->googleDriveService->extractFolderId($data['folder_url']);
+        $data['user_id'] = Auth::id();
 
         DriveFolder::create($data);
 
@@ -41,14 +44,19 @@ class DriveFolderController extends Controller
 
     public function edit(DriveFolder $drive_folder)
     {
-        $driveApiKeys = DriveApiKey::where('is_active', true)->orderBy('name')->get();
+        $this->authorizeFolder($drive_folder);
+
+        $driveApiKeys = DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
 
         return view('admin.drive-folders.edit', ['driveFolder' => $drive_folder, 'driveApiKeys' => $driveApiKeys]);
     }
 
     public function update(Request $request, DriveFolder $drive_folder): RedirectResponse
     {
+        $this->authorizeFolder($drive_folder);
+
         $data = $this->validateData($request);
+        $this->assertAuthorizedDriveKey($data['drive_api_key_id'] ?? null);
         $data['folder_id'] = $this->googleDriveService->extractFolderId($data['folder_url']);
         $drive_folder->update($data);
 
@@ -57,9 +65,37 @@ class DriveFolderController extends Controller
 
     public function destroy(DriveFolder $drive_folder): RedirectResponse
     {
+        $this->authorizeFolder($drive_folder);
+
         $drive_folder->delete();
 
         return redirect()->route('admin.facebook.drive-folders.index')->with('success', 'Drive folder deleted successfully.');
+    }
+
+    private function scopedFolders()
+    {
+        return DriveFolder::query()->ownedBy(Auth::user());
+    }
+
+    private function authorizeFolder(DriveFolder $driveFolder): void
+    {
+        if (!Auth::user()?->isAdmin() && $driveFolder->user_id !== Auth::id()) {
+            abort(403);
+        }
+    }
+
+    private function assertAuthorizedDriveKey(?int $driveApiKeyId): void
+    {
+        if (!$driveApiKeyId) {
+            return;
+        }
+
+        $exists = DriveApiKey::query()
+            ->ownedBy(Auth::user())
+            ->whereKey($driveApiKeyId)
+            ->exists();
+
+        abort_unless($exists, 422, 'Selected Drive API key is not accessible.');
     }
 
     private function validateData(Request $request): array
