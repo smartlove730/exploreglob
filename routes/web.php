@@ -79,6 +79,7 @@ use App\Http\Controllers\Admin\DriveApiKeyController;
 use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\GoogleController;
 use App\Http\Controllers\Admin\AutomationConfigController;
+use App\Http\Controllers\Admin\ScheduledPostController;
 use App\Http\Controllers\AutomationController;
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
@@ -127,6 +128,16 @@ Route::middleware(['auth', 'admin', 'subscription.active'])
         Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
+    });
+
+Route::middleware(['auth', 'admin', 'subscription.active'])
+    ->prefix('admin')
+    ->name('admin.scheduled-posts.')
+    ->group(function () {
+        Route::get('scheduled-posts', [ScheduledPostController::class, 'index'])->name('index');
+        Route::post('scheduled-posts', [ScheduledPostController::class, 'store'])->name('store');
+        Route::put('scheduled-posts/{id}', [ScheduledPostController::class, 'update'])->name('update');
+        Route::delete('scheduled-posts/{id}', [ScheduledPostController::class, 'destroy'])->name('destroy');
     });
 
 Route::middleware(['auth', 'admin', 'subscription.active'])
