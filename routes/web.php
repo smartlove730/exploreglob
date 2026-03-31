@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\App\BillingController;
+use App\Http\Controllers\App\ContentCalendarController;
 
 use App\Http\Controllers\{
     HomeController,
@@ -32,6 +33,12 @@ Route::prefix('app')
 
         Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
         Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->name('billing.subscribe');
+
+        Route::get('/calendar', [ContentCalendarController::class, 'index'])->name('calendar.index');
+        Route::get('/calendar/events', [ContentCalendarController::class, 'events'])->name('calendar.events');
+        Route::post('/calendar', [ContentCalendarController::class, 'store'])->name('calendar.store');
+        Route::put('/calendar/{id}', [ContentCalendarController::class, 'update'])->name('calendar.update');
+        Route::delete('/calendar/{id}', [ContentCalendarController::class, 'destroy'])->name('calendar.destroy');
     });
 
 // Country Selector

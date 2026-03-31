@@ -12,6 +12,7 @@
     @if (auth()->user()->isAdmin())
         <p><a href="{{ route('admin.dashboard') }}">Go to Admin Dashboard</a></p>
     @endif
+    <p><a href="{{ route('app.calendar.index') }}">Open Content Calendar</a></p>
 
     <form method="POST" action="{{ route('logout') }}">
         @csrf
