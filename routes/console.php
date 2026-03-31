@@ -4,6 +4,7 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use App\Jobs\RunAutomationJob;
+use App\Jobs\DispatchDueScheduledPostsJob;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -39,4 +40,9 @@ Schedule::command('facebook:refresh-tokens')
 // Automation runner. Per-config frequency is enforced in AutomationService (runs_per_day).
 Schedule::job(new RunAutomationJob())
     ->everyThirtyMinutes()
+    ->withoutOverlapping();
+
+// Dispatch due scheduled social posts every minute.
+Schedule::job(new DispatchDueScheduledPostsJob())
+    ->everyMinute()
     ->withoutOverlapping();
