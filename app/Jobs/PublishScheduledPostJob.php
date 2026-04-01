@@ -125,6 +125,9 @@ class PublishScheduledPostJob implements ShouldQueue
         } catch (Throwable $exception) {
             Log::error('Scheduled post publish failed', [
                 'scheduled_post_id' => $scheduledPost->id,
+                'user_id' => $scheduledPost->user_id,
+                'page_id' => $scheduledPost->page_id,
+                'attempts' => (int) $scheduledPost->attempts + 1,
                 'error' => $exception->getMessage(),
             ]);
 

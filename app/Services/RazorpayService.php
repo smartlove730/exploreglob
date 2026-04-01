@@ -70,7 +70,16 @@ class RazorpayService
             ],
         ];
 
-        $remoteSubscription = $this->api->subscription->create($payload);
+        try {
+            $remoteSubscription = $this->api->subscription->create($payload);
+        } catch (\Throwable $exception) {
+            Log::error('Failed to create Razorpay subscription', [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'error' => $exception->getMessage(),
+            ]);
+            throw $exception;
+        }
 
         return Subscription::updateOrCreate(
             ['razorpay_subscription_id' => (string) $remoteSubscription['id']],
@@ -127,6 +136,11 @@ class RazorpayService
                 'status' => (string) Arr::get($subscriptionPayload, 'status', $subscription->status),
                 'current_period_start' => $this->timestampToDateTime(Arr::get($subscriptionPayload, 'current_start')),
                 'current_period_end' => $this->timestampToDateTime(Arr::get($subscriptionPayload, 'current_end')),
+            ]);
+            Log::info('Razorpay subscription webhook applied', [
+                'subscription_id' => $subscription->id,
+                'user_id' => $subscription->user_id,
+                'status' => $subscription->status,
             ]);
 
             return $subscription->fresh();

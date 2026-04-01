@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\ScheduledPost;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -68,6 +69,10 @@ class SaasManagementController extends Controller
         ]);
 
         $plan->update(['is_active' => (bool) $request->boolean('is_active')]);
+        app(ActivityLogService::class)->log('admin.plan.toggled', $request->user(), [
+            'plan_id' => $plan->id,
+            'is_active' => $plan->is_active,
+        ]);
 
         return back()->with('success', "Plan {$plan->name} updated.");
     }

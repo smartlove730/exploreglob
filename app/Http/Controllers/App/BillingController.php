@@ -5,6 +5,7 @@ namespace App\Http\Controllers\App;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Services\ActivityLogService;
 use App\Services\RazorpayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,10 @@ class BillingController extends Controller
             ->firstOrFail();
 
         $subscription = $this->razorpayService->createSubscriptionForUser($request->user(), $plan);
+        app(ActivityLogService::class)->log('billing.checkout.started', $request->user(), [
+            'plan_id' => $plan->id,
+            'subscription_id' => $subscription->id,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -66,19 +71,33 @@ class BillingController extends Controller
     {
         $signature = (string) $request->header('X-Razorpay-Signature', '');
         $rawPayload = (string) $request->getContent();
+        if ($signature === '') {
+            logger()->warning('Razorpay webhook missing signature header.');
+            return response()->json(['status' => 'error', 'message' => 'Invalid webhook request.'], 422);
+        }
 
         try {
             $this->razorpayService->verifyWebhookSignature($rawPayload, $signature);
             $event = $request->json()->all();
+            if (!is_array($event) || empty($event['event'])) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid webhook payload.'], 422);
+            }
             $this->razorpayService->handleWebhook($event);
+            app(ActivityLogService::class)->log('billing.webhook.processed', null, [
+                'event' => (string) ($event['event'] ?? 'unknown'),
+                'contains_subscription' => !empty(data_get($event, 'payload.subscription.entity.id')),
+            ]);
 
             return response()->json(['status' => 'ok']);
         } catch (Throwable $exception) {
             report($exception);
+            logger()->error('Razorpay webhook handling failed', [
+                'error' => $exception->getMessage(),
+            ]);
 
             return response()->json([
                 'status' => 'error',
-                'message' => $exception->getMessage(),
+                'message' => 'Webhook processing failed.',
             ], 422);
         }
     }

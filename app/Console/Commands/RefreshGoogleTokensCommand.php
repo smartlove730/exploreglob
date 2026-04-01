@@ -37,6 +37,8 @@ class RefreshGoogleTokensCommand extends Command
             } catch (Throwable $exception) {
                 Log::error('Google account token refresh failed', [
                     'google_account_id' => $account->id,
+                    'user_id' => $account->user_id,
+                    'expires_at' => optional($account->expires_at)?->toDateTimeString(),
                     'error' => $exception->getMessage(),
                 ]);
             }
@@ -65,6 +67,8 @@ class RefreshGoogleTokensCommand extends Command
             } catch (Throwable $exception) {
                 Log::error('Google Drive token refresh failed', [
                     'drive_api_key_id' => $driveKey->id,
+                    'user_id' => $driveKey->user_id,
+                    'expires_at' => optional($driveKey->oauth_expires_at)?->toDateTimeString(),
                     'error' => $exception->getMessage(),
                 ]);
             }

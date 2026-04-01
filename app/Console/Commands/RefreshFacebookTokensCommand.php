@@ -48,6 +48,8 @@ class RefreshFacebookTokensCommand extends Command
             } catch (Throwable $exception) {
                 Log::error('Facebook token refresh failed', [
                     'facebook_account_id' => $account->id,
+                    'user_id' => $account->user_id,
+                    'expires_at' => optional($account->token_expires_at)?->toDateTimeString(),
                     'error' => $exception->getMessage(),
                 ]);
             }

@@ -95,7 +95,10 @@ class PublishPostJob implements ShouldQueue
         } catch (Throwable $exception) {
             Log::error('Queued post publish failed', [
                 'facebook_post_id' => $post->id,
+                'user_id' => $post->user_id,
+                'page_id' => $post->page_id,
                 'platforms' => $pendingPlatforms,
+                'attempts' => (int) $post->attempts + 1,
                 'error' => $exception->getMessage(),
             ]);
 

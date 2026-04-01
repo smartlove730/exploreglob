@@ -8,6 +8,7 @@ use App\Models\ScheduledPost;
 use App\Models\ScheduledPostImport;
 use App\Models\UserMedia;
 use App\Jobs\ProcessScheduledPostCsvImportJob;
+use App\Services\ActivityLogService;
 use App\Services\PlanEnforcementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -114,6 +115,10 @@ class ContentCalendarController extends Controller
             'status' => ScheduledPost::STATUS_PENDING,
             'last_error' => null,
         ]);
+        app(ActivityLogService::class)->log('calendar.post.created', Auth::user(), [
+            'page_id' => $page->id,
+            'platforms' => $platforms,
+        ]);
 
         return back()->with('success', 'Scheduled post created.');
     }
@@ -149,6 +154,11 @@ class ContentCalendarController extends Controller
             'response_json' => null,
             'last_error' => null,
         ]);
+        app(ActivityLogService::class)->log('calendar.post.updated', Auth::user(), [
+            'scheduled_post_id' => $post->id,
+            'page_id' => $page->id,
+            'platforms' => $platforms,
+        ]);
 
         return back()->with('success', 'Scheduled post updated.');
     }
@@ -162,6 +172,9 @@ class ContentCalendarController extends Controller
         }
 
         $post->update(['status' => ScheduledPost::STATUS_CANCELLED]);
+        app(ActivityLogService::class)->log('calendar.post.cancelled', Auth::user(), [
+            'scheduled_post_id' => $post->id,
+        ]);
 
         return back()->with('success', 'Scheduled post cancelled.');
     }
@@ -180,6 +193,9 @@ class ContentCalendarController extends Controller
         ]);
 
         ProcessScheduledPostCsvImportJob::dispatch($import->id);
+        app(ActivityLogService::class)->log('calendar.csv.import.queued', Auth::user(), [
+            'import_id' => $import->id,
+        ]);
 
         return back()->with('success', 'CSV import queued. Refresh to see progress.');
     }

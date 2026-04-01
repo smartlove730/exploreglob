@@ -26,4 +26,6 @@ Route::prefix('v1')->group(function () {
     Route::get('/categories/{id}', [ApiCategoryController::class, 'show']);
 });
 
-Route::post('/razorpay/webhook', [BillingController::class, 'webhook'])->name('razorpay.webhook');
+Route::post('/razorpay/webhook', [BillingController::class, 'webhook'])
+    ->middleware('throttle:billing-webhook')
+    ->name('razorpay.webhook');

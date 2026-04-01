@@ -22,7 +22,7 @@ Route::get('/features', [MarketingController::class, 'features'])->name('marketi
 Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
 Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
 Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
-Route::post('/contact', [MarketingController::class, 'sendContact'])->name('marketing.contact.send');
+Route::post('/contact', [MarketingController::class, 'sendContact'])->middleware('throttle:contact-form')->name('marketing.contact.send');
 Route::get('/privacy-policy', [MarketingController::class, 'privacy'])->name('marketing.privacy');
 Route::get('/terms-and-conditions', [MarketingController::class, 'terms'])->name('marketing.terms');
 
@@ -41,7 +41,7 @@ Route::prefix('app')
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
-        Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->name('billing.subscribe');
+        Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->middleware('throttle:billing-checkout')->name('billing.subscribe');
 
         Route::get('/calendar', [ContentCalendarController::class, 'index'])->name('calendar.index');
         Route::get('/calendar/events', [ContentCalendarController::class, 'events'])->name('calendar.events');

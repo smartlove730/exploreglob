@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\ContactFormSubmissionMail;
 use App\Models\Plan;
+use App\Services\ActivityLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -54,6 +55,10 @@ class MarketingController extends Controller
         if ($recipient) {
             Mail::to($recipient)->send(new ContactFormSubmissionMail($data));
         }
+        app(ActivityLogService::class)->log('public.contact.submitted', null, [
+            'email' => $data['email'],
+            'subject' => $data['subject'],
+        ]);
 
         return back()->with('success', 'Thanks for reaching out. We received your message.');
     }
