@@ -88,6 +88,7 @@ class AutomationService
 
             DB::transaction(function () use ($config, $unusedImage, $platforms, $result, $caption, $imageUrl, $folderId) {
                 $facebookPost = FacebookPost::create([
+                    'user_id' => $config->user_id,
                     'page_id' => $config->page_id,
                     'message' => $caption,
                     'image_url' => $imageUrl,
@@ -100,11 +101,13 @@ class AutomationService
                 ]);
 
                 PostImage::create([
+                    'user_id' => $config->user_id,
                     'post_id' => $facebookPost->id,
                     'image_path' => $this->resolveImagePathForHistory($imageUrl),
                 ]);
 
                 DriveImagePost::create([
+                    'user_id' => $config->user_id,
                     'page_id' => $config->page_id,
                     'drive_file_id' => (string) ($unusedImage['id'] ?? ''),
                     'drive_folder_id' => $folderId,
@@ -118,6 +121,7 @@ class AutomationService
                 ]);
 
                 AutomationPostLog::create([
+                    'user_id' => $config->user_id,
                     'automation_config_id' => $config->id,
                     'page_id' => $config->page_id,
                     'drive_file_id' => (string) ($unusedImage['id'] ?? ''),
@@ -217,6 +221,7 @@ class AutomationService
     private function logSkipped(AutomationConfig $config, string $message): void
     {
         AutomationPostLog::create([
+            'user_id' => $config->user_id,
             'automation_config_id' => $config->id,
             'page_id' => $config->page_id,
             'status' => 'skipped',
@@ -228,6 +233,7 @@ class AutomationService
     private function logFailed(AutomationConfig $config, ?array $image, array $platforms, string $message): void
     {
         AutomationPostLog::create([
+            'user_id' => $config->user_id,
             'automation_config_id' => $config->id,
             'page_id' => $config->page_id,
             'drive_file_id' => (string) ($image['id'] ?? ''),

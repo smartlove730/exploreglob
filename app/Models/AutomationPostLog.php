@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToUserScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AutomationPostLog extends Model
 {
+    use BelongsToUserScope;
+
     protected $table = 'automation_posts_logs';
 
     protected $fillable = [
+        'user_id',
         'automation_config_id',
         'page_id',
         'drive_file_id',
@@ -30,6 +34,11 @@ class AutomationPostLog extends Model
         'response_json' => 'array',
         'posted_at' => 'datetime',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function automationConfig(): BelongsTo
     {

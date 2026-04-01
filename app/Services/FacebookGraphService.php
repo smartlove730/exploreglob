@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\ReauthorizationRequiredException;
 use App\Models\FacebookAccount;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
@@ -78,7 +79,16 @@ class FacebookGraphService
         ]);
 
         if (!$response->ok() || !isset($response['access_token'])) {
-            throw new RuntimeException('Unable to refresh long-lived Facebook token.');
+            try {
+                $this->throwRefreshException($response->json());
+            } catch (ReauthorizationRequiredException $exception) {
+                $account->update([
+                    'reauthorization_required' => true,
+                    'reauthorization_reason' => $exception->getMessage(),
+                ]);
+
+                throw $exception;
+            }
         }
 
         return [
@@ -94,7 +104,7 @@ class FacebookGraphService
         ]);
 
         if (!$response->ok()) {
-            throw new RuntimeException('Unable to fetch Facebook pages.');
+            $this->throwRefreshException($response->json(), 'Unable to fetch Facebook pages.');
         }
 
         return (array) $response->json('data', []);
@@ -115,7 +125,7 @@ class FacebookGraphService
         $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/{$endpoint}", $payload);
 
         if (!$response->ok()) {
-            throw new RuntimeException('Facebook posting API call failed: '.$response->body());
+            $this->throwRefreshException($response->json(), 'Facebook posting API call failed.');
         }
 
         return $response->json();
@@ -137,7 +147,7 @@ class FacebookGraphService
             ]);
 
             if (!$uploadResponse->ok() || !isset($uploadResponse['id'])) {
-                throw new RuntimeException('Facebook multi-image upload failed: '.$uploadResponse->body());
+                $this->throwRefreshException($uploadResponse->json(), 'Facebook multi-image upload failed.');
             }
 
             $mediaIds[] = (string) $uploadResponse['id'];
@@ -155,7 +165,7 @@ class FacebookGraphService
         $publishResponse = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/feed", $payload);
 
         if (!$publishResponse->ok()) {
-            throw new RuntimeException('Facebook multi-image publish failed: '.$publishResponse->body());
+            $this->throwRefreshException($publishResponse->json(), 'Facebook multi-image publish failed.');
         }
 
         return $publishResponse->json();
@@ -186,6 +196,7 @@ class FacebookGraphService
             $account->pages()->updateOrCreate(
                 ['page_id' => $page['id']],
                 [
+                    'user_id' => $account->user_id,
                     'facebook_app_id' => $account->facebook_app_id,
                     'page_name' => $page['name'],
                     'page_access_token' => $page['access_token'],
@@ -194,5 +205,18 @@ class FacebookGraphService
                 ]
             );
         }
+    }
+
+    private function throwRefreshException(?array $payload = null, string $fallback = 'Facebook API request failed.'): void
+    {
+        $errorCode = (int) data_get($payload, 'error.code', 0);
+        $subCode = (int) data_get($payload, 'error.error_subcode', 0);
+        $message = (string) data_get($payload, 'error.message', $fallback);
+
+        if ($errorCode === 190 || in_array($subCode, [458, 459, 460, 463, 464, 467], true)) {
+            throw new ReauthorizationRequiredException('Facebook connection expired or was revoked. Please reconnect your Facebook account.');
+        }
+
+        throw new RuntimeException($fallback.' '.$message);
     }
 }

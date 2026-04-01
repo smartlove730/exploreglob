@@ -11,7 +11,13 @@
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
         @if($account)
-            <p class="mb-1"><span class="badge text-bg-success">Connected</span></p>
+            @if($account->reauthorization_required)
+                <p class="mb-1"><span class="badge text-bg-warning">Reconnect Required</span></p>
+                <p class="mb-2 text-muted">{{ $account->reauthorization_reason ?: 'Google token refresh failed. Reconnect your account to continue posting/syncing.' }}</p>
+                <a href="{{ route('admin.google.connect') }}" class="btn btn-sm btn-primary mb-2">Reconnect Google</a>
+            @else
+                <p class="mb-1"><span class="badge text-bg-success">Connected</span></p>
+            @endif
             <p class="mb-2 text-muted">Account: {{ $account->google_account_id }}</p>
             <p class="mb-3 text-muted">Token expires: {{ optional($account->expires_at)->format('M d, Y H:i') }}</p>
             <form method="POST" action="{{ route('admin.google.sync-locations') }}">
