@@ -64,6 +64,10 @@ class PublishPostJob implements ShouldQueue
 
         try {
             if (($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO) {
+                if (in_array('google_business', $pendingPlatforms, true)) {
+                    throw new \RuntimeException('Google Business does not support video posting.');
+                }
+
                 $videoResult = $this->publishVideo($post, $metaVideoService, $pendingPlatforms);
                 $responses = array_merge($responses, $videoResult);
             } else {

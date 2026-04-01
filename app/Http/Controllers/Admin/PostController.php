@@ -113,6 +113,7 @@ class PostController extends Controller
             $post->update([
                 'video_path' => $videoMeta['video_path'],
                 'video_url' => $videoMeta['video_url'],
+                'image_url' => null,
             ]);
 
             PublishPostJob::dispatch($post->id);
@@ -157,7 +158,25 @@ class PostController extends Controller
             'platforms' => $data['platforms'],
             'media_type' => $data['media_type'] ?? $post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE,
             'image_url' => $data['image_url'] ?? $post->image_url,
+            'video_url' => $data['video_url'] ?? $post->video_url,
         ]);
+
+        if (($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO
+            && in_array('google_business', $data['platforms'], true)) {
+            throw ValidationException::withMessages([
+                'platforms' => 'Google Business posting currently supports image posts only.',
+            ]);
+        }
+
+        if (($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO && $request->hasFile('video')) {
+            $videoMeta = $this->storeVideoAndResolveUrl($request);
+
+            $post->update([
+                'video_path' => $videoMeta['video_path'],
+                'video_url' => $videoMeta['video_url'],
+                'image_url' => null,
+            ]);
+        }
 
         $this->syncImages($post, $request, $data['remove_images'] ?? []);
         $publishImageUrl = $this->resolvePublishImageUrl($post);
@@ -165,6 +184,11 @@ class PostController extends Controller
         $googleLocationId = $this->resolveGoogleLocationId($data);
 
         $isImagePost = ($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_IMAGE;
+        $isVideoPost = ($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO;
+
+        if ($isVideoPost && !$post->video_url) {
+            throw ValidationException::withMessages(['video' => 'Please upload an MP4 video file or provide a valid video URL.']);
+        }
 
         if ($post->status === FacebookPost::STATUS_PUBLISHED) {
             try {
@@ -186,7 +210,7 @@ class PostController extends Controller
 
         $post->update([
             'status' => FacebookPost::STATUS_PENDING,
-            'image_url' => $publishImageUrl,
+            'image_url' => $isImagePost ? $publishImageUrl : null,
             'google_location_id' => $googleLocationId,
             'facebook_post_id' => null,
             'instagram_media_id' => null,
@@ -564,6 +588,7 @@ class PostController extends Controller
             'media_type' => 'nullable|string|in:image,video',
             'image_url' => 'nullable|url|max:2048',
             'video' => 'nullable|file|mimes:mp4|max:51200',
+            'video_url' => 'nullable|url|max:2048',
             'platforms' => 'required|array|min:1',
             'platforms.*' => 'required|string|in:facebook,instagram,google_business',
             'google_location_id' => 'nullable|integer|exists:google_locations,id',
