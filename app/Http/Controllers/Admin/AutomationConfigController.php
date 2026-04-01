@@ -19,15 +19,15 @@ class AutomationConfigController extends Controller
     public function index()
     {
         $configs = AutomationConfig::query()
+            ->ownedBy(Auth::user())
             ->with(['app', 'page', 'driveApiKey'])
-            ->where('user_id', Auth::id())
             ->latest()
             ->paginate(20);
 
         $queueStats = [
             'pending_jobs' => DB::table('jobs')->count(),
             'failed_jobs' => Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0,
-            'last_activity' => AutomationPostLog::query()->latest('created_at')->value('created_at'),
+            'last_activity' => AutomationPostLog::query()->ownedBy(Auth::user())->latest('created_at')->value('created_at'),
         ];
 
         return view('admin.automations.index', compact('configs', 'queueStats'));
@@ -38,7 +38,7 @@ class AutomationConfigController extends Controller
         return view('admin.automations.create', [
             'apps' => FacebookApp::query()->where('is_active', true)->orderBy('name')->get(),
             'pages' => $this->pagesForUser(),
-            'driveApiKeys' => DriveApiKey::query()->where('is_active', true)->orderBy('name')->get(),
+            'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -56,19 +56,19 @@ class AutomationConfigController extends Controller
 
     public function edit(AutomationConfig $automation)
     {
-        abort_unless($automation->user_id === Auth::id(), 403);
+        $this->authorizeAutomation($automation);
 
         return view('admin.automations.edit', [
             'automation' => $automation,
             'apps' => FacebookApp::query()->where('is_active', true)->orderBy('name')->get(),
             'pages' => $this->pagesForUser(),
-            'driveApiKeys' => DriveApiKey::query()->where('is_active', true)->orderBy('name')->get(),
+            'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
     public function update(Request $request, AutomationConfig $automation): RedirectResponse
     {
-        abort_unless($automation->user_id === Auth::id(), 403);
+        $this->authorizeAutomation($automation);
 
         $data = $this->validateData($request);
         $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $data['page_id']);
@@ -80,7 +80,7 @@ class AutomationConfigController extends Controller
 
     public function destroy(AutomationConfig $automation): RedirectResponse
     {
-        abort_unless($automation->user_id === Auth::id(), 403);
+        $this->authorizeAutomation($automation);
 
         $automation->delete();
 
@@ -89,11 +89,18 @@ class AutomationConfigController extends Controller
 
     public function toggle(AutomationConfig $automation): RedirectResponse
     {
-        abort_unless($automation->user_id === Auth::id(), 403);
+        $this->authorizeAutomation($automation);
 
         $automation->update(['is_active' => !$automation->is_active]);
 
         return back()->with('success', 'Automation status updated.');
+    }
+
+    private function authorizeAutomation(AutomationConfig $automation): void
+    {
+        if (!Auth::user()?->isAdmin() && $automation->user_id !== Auth::id()) {
+            abort(403);
+        }
     }
 
     private function validateData(Request $request): array
@@ -117,8 +124,8 @@ class AutomationConfigController extends Controller
     private function pagesForUser()
     {
         return FacebookPage::query()
+            ->ownedBy(Auth::user())
             ->where('is_active', true)
-            ->whereHas('facebookAccount', fn ($query) => $query->where('user_id', Auth::id()))
             ->orderBy('page_name')
             ->get();
     }
@@ -126,9 +133,9 @@ class AutomationConfigController extends Controller
     private function assertAuthorizedAppAndPage(int $appId, int $pageId): void
     {
         $validPage = FacebookPage::query()
+            ->ownedBy(Auth::user())
             ->whereKey($pageId)
             ->where('facebook_app_id', $appId)
-            ->whereHas('facebookAccount', fn ($query) => $query->where('user_id', Auth::id()))
             ->exists();
 
         abort_unless($validPage, 422, 'Selected app/page is not authorized for this user.');
@@ -137,6 +144,7 @@ class AutomationConfigController extends Controller
     private function assertDriveKeyIsActive(int $driveApiKeyId): void
     {
         $active = DriveApiKey::query()
+            ->ownedBy(Auth::user())
             ->whereKey($driveApiKeyId)
             ->where('is_active', true)
             ->exists();

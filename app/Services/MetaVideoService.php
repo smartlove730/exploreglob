@@ -16,6 +16,8 @@ class MetaVideoService
 
     public function postToFacebookVideo(FacebookPage $page, string $videoUrl, string $caption): array
     {
+        $this->assertPublicHttpsVideoUrl($videoUrl);
+
         $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/videos", [
             'file_url' => $videoUrl,
             'description' => $caption,
@@ -31,6 +33,8 @@ class MetaVideoService
 
     public function postToInstagramVideo(FacebookPage $page, string $videoUrl, string $caption, int $maxPollAttempts = 20, int $pollDelaySeconds = 4): array
     {
+        $this->assertPublicHttpsVideoUrl($videoUrl);
+
         $igUserId = $this->instagramService->ensureInstagramBusinessAccountId($page);
 
         $createResponse = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$igUserId}/media", [
@@ -93,5 +97,28 @@ class MetaVideoService
         }
 
         return $response->json();
+    }
+
+    private function assertPublicHttpsVideoUrl(string $videoUrl): void
+    {
+        $host = parse_url($videoUrl, PHP_URL_HOST);
+        $scheme = parse_url($videoUrl, PHP_URL_SCHEME);
+        $path = strtolower((string) parse_url($videoUrl, PHP_URL_PATH));
+
+        if ($scheme !== 'https' || !$host) {
+            throw new RuntimeException('Video URL must be publicly accessible and use HTTPS.');
+        }
+
+        if (in_array($host, ['localhost', '127.0.0.1'], true)) {
+            throw new RuntimeException('Video URL must not point to localhost.');
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) && !filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            throw new RuntimeException('Video URL must be publicly reachable.');
+        }
+
+        if ($path !== '' && !str_ends_with($path, '.mp4')) {
+            throw new RuntimeException('Video URL must point to an MP4 file.');
+        }
     }
 }
