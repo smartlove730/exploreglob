@@ -40,7 +40,13 @@
             <div class="card-body">
                 <h2 class="h6 text-uppercase text-muted">Connection Status</h2>
                 @if($account)
-                    <p class="mb-1"><span class="badge text-bg-success">Connected</span></p>
+                    @if($account->reauthorization_required)
+                        <p class="mb-1"><span class="badge text-bg-warning">Reconnect Required</span></p>
+                        <p class="mb-1 text-muted">{{ $account->reauthorization_reason ?: 'Your Facebook token could not be refreshed. Reconnect to continue posting.' }}</p>
+                        <a href="{{ route('admin.facebook.connect', ['app_id' => $selectedAppId]) }}" class="btn btn-sm btn-primary">Reconnect Facebook</a>
+                    @else
+                        <p class="mb-1"><span class="badge text-bg-success">Connected</span></p>
+                    @endif
                     <p class="mb-0 text-muted">Token expires: {{ optional($account->token_expires_at)->format('M d, Y H:i') ?? 'Unknown' }}</p>
                 @else
                     <p class="mb-0"><span class="badge text-bg-danger">Not Connected</span></p>

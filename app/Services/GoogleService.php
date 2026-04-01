@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Exceptions\ReauthorizationRequiredException;
 use App\Models\DriveApiKey;
 use App\Models\GoogleAccount;
 use App\Models\GoogleLocation;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Arr;
 use RuntimeException;
 
@@ -13,6 +15,7 @@ class GoogleService
 {
     private const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
     private const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+    private const REFRESH_SKEW_SECONDS = 300;
 
     public function __construct(private readonly Client $client = new Client())
     {
@@ -115,7 +118,7 @@ class GoogleService
 
     public function ensureValidGoogleAccountToken(GoogleAccount $account): GoogleAccount
     {
-        if ($account->expires_at && $account->expires_at->isFuture()) {
+        if ($account->expires_at && $account->expires_at->gt(now()->addSeconds(self::REFRESH_SKEW_SECONDS))) {
             return $account;
         }
 
@@ -123,12 +126,27 @@ class GoogleService
             throw new RuntimeException('Google token expired and no refresh token is available. Reconnect your Google account.');
         }
 
-        $tokenData = $this->refreshAccessToken($account->refresh_token);
+        try {
+            $tokenData = $this->refreshAccessToken($account->refresh_token);
+        } catch (GuzzleException $exception) {
+            if ($this->isInvalidGrant($exception)) {
+                $account->update([
+                    'reauthorization_required' => true,
+                    'reauthorization_reason' => 'Google connection expired or was revoked. Please reconnect your Google account.',
+                ]);
+                throw new ReauthorizationRequiredException('Google connection expired or was revoked. Please reconnect your Google account.');
+            }
+
+            throw $exception;
+        }
 
         $account->update([
             'access_token' => Arr::get($tokenData, 'access_token', $account->access_token),
             'expires_at' => now()->addSeconds((int) Arr::get($tokenData, 'expires_in', 3600)),
             'refresh_token' => Arr::get($tokenData, 'refresh_token', $account->refresh_token),
+            'token_last_refreshed_at' => now(),
+            'reauthorization_required' => false,
+            'reauthorization_reason' => null,
         ]);
 
         return $account->fresh();
@@ -136,7 +154,7 @@ class GoogleService
 
     public function ensureValidDriveToken(DriveApiKey $driveApiKey): DriveApiKey
     {
-        if ($driveApiKey->oauth_access_token && $driveApiKey->oauth_expires_at?->isFuture()) {
+        if ($driveApiKey->oauth_access_token && $driveApiKey->oauth_expires_at?->gt(now()->addSeconds(self::REFRESH_SKEW_SECONDS))) {
             return $driveApiKey;
         }
 
@@ -144,11 +162,27 @@ class GoogleService
             throw new RuntimeException('Google Drive OAuth token is missing. Connect a Google account from Drive Keys.');
         }
 
-        $tokenData = $this->refreshAccessToken($driveApiKey->oauth_refresh_token);
+        try {
+            $tokenData = $this->refreshAccessToken($driveApiKey->oauth_refresh_token);
+        } catch (GuzzleException $exception) {
+            if ($this->isInvalidGrant($exception)) {
+                $driveApiKey->update([
+                    'oauth_reauthorization_required' => true,
+                    'oauth_reauthorization_reason' => 'Google Drive authorization expired. Reconnect Google from Drive Keys.',
+                ]);
+                throw new ReauthorizationRequiredException('Google Drive authorization expired. Reconnect Google from Drive Keys.');
+            }
+
+            throw $exception;
+        }
+
         $driveApiKey->update([
             'oauth_access_token' => Arr::get($tokenData, 'access_token', $driveApiKey->oauth_access_token),
             'oauth_refresh_token' => Arr::get($tokenData, 'refresh_token', $driveApiKey->oauth_refresh_token),
             'oauth_expires_at' => now()->addSeconds((int) Arr::get($tokenData, 'expires_in', 3600)),
+            'oauth_token_last_refreshed_at' => now(),
+            'oauth_reauthorization_required' => false,
+            'oauth_reauthorization_reason' => null,
         ]);
 
         return $driveApiKey->fresh();
@@ -247,5 +281,12 @@ class GoogleService
         ]);
 
         return json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private function isInvalidGrant(GuzzleException $exception): bool
+    {
+        $message = $exception->getMessage();
+
+        return str_contains(strtolower($message), 'invalid_grant');
     }
 }
