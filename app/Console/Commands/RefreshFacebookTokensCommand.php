@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\ReauthorizationRequiredException;
 use App\Models\FacebookAccount;
 use App\Services\FacebookGraphService;
 use Illuminate\Console\Command;
@@ -17,9 +18,12 @@ class RefreshFacebookTokensCommand extends Command
     public function handle(FacebookGraphService $facebookGraphService): int
     {
         $accounts = FacebookAccount::query()
-            ->whereNotNull('token_expires_at')
-            ->where('token_expires_at', '<=', now()->addDays(7))
-                        ->with('app')
+            ->where(function ($query) {
+                $query->whereNull('token_expires_at')
+                    ->orWhere('token_expires_at', '<=', now()->addDays(7));
+            })
+            ->where('reauthorization_required', false)
+            ->with('app')
             ->get();
 
         foreach ($accounts as $account) {
@@ -29,10 +33,18 @@ class RefreshFacebookTokensCommand extends Command
                 $account->update([
                     'long_lived_user_token' => $tokenData['access_token'],
                     'token_expires_at' => now()->addSeconds($tokenData['expires_in']),
+                    'token_last_refreshed_at' => now(),
+                    'reauthorization_required' => false,
+                    'reauthorization_reason' => null,
                 ]);
 
                 $pages = $facebookGraphService->fetchManagedPages($tokenData['access_token']);
                 $facebookGraphService->upsertPages($account, $pages);
+            } catch (ReauthorizationRequiredException $exception) {
+                $account->update([
+                    'reauthorization_required' => true,
+                    'reauthorization_reason' => $exception->getMessage(),
+                ]);
             } catch (Throwable $exception) {
                 Log::error('Facebook token refresh failed', [
                     'facebook_account_id' => $account->id,

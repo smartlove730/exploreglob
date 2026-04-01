@@ -37,6 +37,12 @@ Schedule::command('facebook:refresh-tokens')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Refresh Google/Drive OAuth tokens daily.
+Schedule::command('google:refresh-tokens')
+    ->dailyAt('03:15')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Automation runner. Per-config frequency is enforced in AutomationService (runs_per_day).
 Schedule::job(new RunAutomationJob())
     ->everyThirtyMinutes()

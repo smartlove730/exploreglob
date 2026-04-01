@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\ReauthorizationRequiredException;
 use App\Http\Controllers\Controller;
 use App\Models\FacebookAccount;
 use App\Models\FacebookApp;
@@ -73,6 +74,9 @@ class FacebookSettingsController extends Controller
                 [
                     'long_lived_user_token' => $tokenData['access_token'],
                     'token_expires_at' => now()->addSeconds($tokenData['expires_in']),
+                    'token_last_refreshed_at' => now(),
+                    'reauthorization_required' => false,
+                    'reauthorization_reason' => null,
                 ]
             );
 
@@ -103,10 +107,33 @@ class FacebookSettingsController extends Controller
         }
 
         try {
+            if ($account->reauthorization_required) {
+                return back()->with('error', 'Facebook needs to be reconnected before syncing pages.');
+            }
+
+            if (!$account->token_expires_at || $account->token_expires_at->lte(now()->addDay())) {
+                $tokenData = $this->facebookGraphService->refreshLongLivedToken($account);
+                $account->update([
+                    'long_lived_user_token' => $tokenData['access_token'],
+                    'token_expires_at' => now()->addSeconds($tokenData['expires_in']),
+                    'token_last_refreshed_at' => now(),
+                    'reauthorization_required' => false,
+                    'reauthorization_reason' => null,
+                ]);
+                $account = $account->fresh();
+            }
+
             $pages = $this->facebookGraphService->fetchManagedPages($account->long_lived_user_token);
             $this->facebookGraphService->upsertPages($account, $pages);
 
             return back()->with('success', 'Facebook pages synced.');
+        } catch (ReauthorizationRequiredException $exception) {
+            $account->update([
+                'reauthorization_required' => true,
+                'reauthorization_reason' => $exception->getMessage(),
+            ]);
+
+            return back()->with('error', $exception->getMessage());
         } catch (Throwable $exception) {
             Log::error('Facebook pages sync failed', ['error' => $exception->getMessage()]);
 

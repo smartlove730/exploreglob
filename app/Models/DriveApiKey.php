@@ -21,11 +21,16 @@ class DriveApiKey extends Model
         'oauth_access_token',
         'oauth_refresh_token',
         'oauth_expires_at',
+        'oauth_token_last_refreshed_at',
+        'oauth_reauthorization_required',
+        'oauth_reauthorization_reason',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'oauth_expires_at' => 'datetime',
+        'oauth_token_last_refreshed_at' => 'datetime',
+        'oauth_reauthorization_required' => 'boolean',
     ];
 
     public function user(): BelongsTo

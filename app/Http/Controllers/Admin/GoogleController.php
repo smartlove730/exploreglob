@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\ReauthorizationRequiredException;
 use App\Http\Controllers\Controller;
 use App\Models\DriveApiKey;
 use App\Models\GoogleAccount;
@@ -59,8 +60,14 @@ class GoogleController extends Controller
                 ['user_id' => Auth::id(), 'google_account_id' => $primaryAccount],
                 [
                     'access_token' => $accessToken,
-                    'refresh_token' => $refreshToken,
+                    'refresh_token' => $refreshToken ?: GoogleAccount::query()
+                        ->where('user_id', Auth::id())
+                        ->where('google_account_id', $primaryAccount)
+                        ->value('refresh_token'),
                     'expires_at' => now()->addSeconds((int) ($tokenData['expires_in'] ?? 3600)),
+                    'token_last_refreshed_at' => now(),
+                    'reauthorization_required' => false,
+                    'reauthorization_reason' => null,
                 ]
             );
 
@@ -72,8 +79,14 @@ class GoogleController extends Controller
                     'description' => 'Connected via Google OAuth',
                     'is_active' => true,
                     'oauth_access_token' => $accessToken,
-                    'oauth_refresh_token' => $refreshToken,
+                    'oauth_refresh_token' => $refreshToken ?: DriveApiKey::query()
+                        ->where('user_id', Auth::id())
+                        ->where('name', 'OAuth ('.Auth::user()->email.')')
+                        ->value('oauth_refresh_token'),
                     'oauth_expires_at' => now()->addSeconds((int) ($tokenData['expires_in'] ?? 3600)),
+                    'oauth_token_last_refreshed_at' => now(),
+                    'oauth_reauthorization_required' => false,
+                    'oauth_reauthorization_reason' => null,
                 ]
             );
 
@@ -95,9 +108,20 @@ class GoogleController extends Controller
         }
 
         try {
+            if ($account->reauthorization_required) {
+                return back()->with('error', 'Google needs to be reconnected before syncing locations.');
+            }
+
             $count = $this->googleService->syncLocations($account);
 
             return back()->with('success', "Synced {$count} location(s).");
+        } catch (ReauthorizationRequiredException $exception) {
+            $account->update([
+                'reauthorization_required' => true,
+                'reauthorization_reason' => $exception->getMessage(),
+            ]);
+
+            return back()->with('error', $exception->getMessage());
         } catch (\Throwable $exception) {
             return back()->with('error', 'Unable to sync Google locations: '.$exception->getMessage());
         }
