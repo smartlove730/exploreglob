@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\App\BillingController;
 use App\Http\Controllers\App\ContentCalendarController;
+use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\MediaLibraryController;
 
 use App\Http\Controllers\{
@@ -28,9 +29,7 @@ Route::prefix('app')
     ->name('app.')
     ->middleware(['auth', 'verified', 'role:customer,admin'])
     ->group(function () {
-        Route::get('/', function () {
-            return view('app.dashboard');
-        })->name('dashboard');
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
         Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->name('billing.subscribe');
