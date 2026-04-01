@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToUserScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DriveImagePost extends Model
 {
+    use BelongsToUserScope;
+
     protected $fillable = [
+        'user_id',
         'page_id',
         'drive_file_id',
         'drive_folder_id',
@@ -25,6 +29,11 @@ class DriveImagePost extends Model
         'response_json' => 'array',
         'posted_at' => 'datetime',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function page(): BelongsTo
     {
