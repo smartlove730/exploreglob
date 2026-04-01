@@ -5,7 +5,10 @@ namespace App\Providers;
 use App\Models\Blog;
 use App\Models\Category;
 use App\Models\Country;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
@@ -26,6 +29,18 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Paginator::useBootstrapFive();
+        RateLimiter::for('contact-form', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
+        RateLimiter::for('billing-checkout', function (Request $request) {
+            $userKey = $request->user()?->id ?: $request->ip();
+            return Limit::perMinute(10)->by($userKey);
+        });
+
+        RateLimiter::for('billing-webhook', function (Request $request) {
+            return Limit::perMinute(120)->by($request->ip());
+        });
 
         View::composer('layouts.app', function ($view) {
             $country = session('country') ?? 183;

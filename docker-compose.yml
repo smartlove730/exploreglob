@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  app:
+    image: webdevops/php-nginx:8.2
+    container_name: exploreglob-app
+    working_dir: /app
+    environment:
+      WEB_DOCUMENT_ROOT: /app/public
+      PHP_MEMORY_LIMIT: 512M
+      PHP_DISPLAY_ERRORS: 0
+      APP_ENV: production
+      APP_DEBUG: 0
+    volumes:
+      - ./:/app
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  queue:
+    image: webdevops/php:8.2
+    container_name: exploreglob-queue
+    working_dir: /app
+    command: sh -c "php artisan queue:work --queue=default --sleep=3 --tries=3 --timeout=120"
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  scheduler:
+    image: webdevops/php:8.2
+    container_name: exploreglob-scheduler
+    working_dir: /app
+    command: sh -c "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: exploreglob-db
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: exploreglob
+      MYSQL_USER: exploreglob
+      MYSQL_PASSWORD: exploreglob
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: exploreglob-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  redis_data:
