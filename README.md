@@ -59,6 +59,7 @@ A modern, scalable blogging platform built with Laravel that automatically gener
 
 - **[Setup Guide](SETUP.md)** - Complete installation and configuration instructions
 - **[API Documentation](API_DOCUMENTATION.md)** - API endpoints for cron jobs and automation
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment checklist (Redis, queue workers, scheduler, webhooks)
 
 
 ## 📣 Facebook + Instagram Publishing
@@ -178,6 +179,7 @@ php artisan queue:work
 ```
 
 For production, use Supervisor (see [SETUP.md](SETUP.md)).
+For SaaS production deployment (billing, scheduler, token refresh workers), see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## 📁 Project Structure
 
