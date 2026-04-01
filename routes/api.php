@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\BlogGenerationController;
 use App\Http\Controllers\Api\CategoryController as ApiCategoryController;
+use App\Http\Controllers\App\BillingController;
 
 Route::prefix('v1')->group(function () {
     // API endpoints for cron jobs (require API key authentication)
@@ -24,3 +25,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/categories', [ApiCategoryController::class, 'index']);
     Route::get('/categories/{id}', [ApiCategoryController::class, 'show']);
 });
+
+Route::post('/razorpay/webhook', [BillingController::class, 'webhook'])
+    ->middleware('throttle:billing-webhook')
+    ->name('razorpay.webhook');
