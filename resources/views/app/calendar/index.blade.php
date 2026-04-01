@@ -21,6 +21,7 @@
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('app.dashboard') }}" class="btn btn-outline-secondary">Back to App</a>
+            <a href="{{ route('app.media.index') }}" class="btn btn-outline-secondary">Media Library</a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">Schedule Post</button>
         </div>
     </div>
@@ -91,6 +92,7 @@ const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), 
         document.querySelector('#editForm [name="media_type"]').value = props.media_type || 'image';
         document.querySelector('#editForm [name="image_url"]').value = props.image_url || '';
         document.querySelector('#editForm [name="video_url"]').value = props.video_url || '';
+        document.querySelector('#editForm [name="media_id"]').value = '';
         document.querySelector('#editForm [name="scheduled_for"]').value = e.startStr ? e.startStr.slice(0,16) : '';
 
         const selected = props.platforms || [];
@@ -110,6 +112,29 @@ const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), 
     }
 });
 calendar.render();
+
+function wireMediaAutoFill(formSelector) {
+    const form = document.querySelector(formSelector);
+    if (!form) return;
+    const picker = form.querySelector('[name=\"media_id\"]');
+    if (!picker) return;
+    picker.addEventListener('change', function () {
+        const selected = picker.options[picker.selectedIndex];
+        const mediaType = selected?.dataset?.type || '';
+        const mediaUrl = selected?.dataset?.url || '';
+        if (!mediaUrl) return;
+        if (mediaType === 'video') {
+            form.querySelector('[name=\"media_type\"]').value = 'video';
+            form.querySelector('[name=\"video_url\"]').value = mediaUrl;
+        } else {
+            form.querySelector('[name=\"media_type\"]').value = 'image';
+            form.querySelector('[name=\"image_url\"]').value = mediaUrl;
+        }
+    });
+}
+
+wireMediaAutoFill('#createModal form');
+wireMediaAutoFill('#editForm');
 
 document.getElementById('deleteBtn').addEventListener('click', function() {
     if (confirm('Cancel this scheduled post?')) {

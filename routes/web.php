@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\App\BillingController;
 use App\Http\Controllers\App\ContentCalendarController;
+use App\Http\Controllers\App\MediaLibraryController;
 
 use App\Http\Controllers\{
     HomeController,
@@ -39,6 +40,11 @@ Route::prefix('app')
         Route::post('/calendar', [ContentCalendarController::class, 'store'])->name('calendar.store');
         Route::put('/calendar/{id}', [ContentCalendarController::class, 'update'])->name('calendar.update');
         Route::delete('/calendar/{id}', [ContentCalendarController::class, 'destroy'])->name('calendar.destroy');
+
+        Route::get('/media', [MediaLibraryController::class, 'index'])->name('media.index');
+        Route::get('/media/list', [MediaLibraryController::class, 'list'])->name('media.list');
+        Route::post('/media', [MediaLibraryController::class, 'store'])->name('media.store');
+        Route::delete('/media/{id}', [MediaLibraryController::class, 'destroy'])->name('media.destroy');
     });
 
 // Country Selector

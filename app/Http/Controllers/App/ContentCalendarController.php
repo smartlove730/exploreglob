@@ -5,6 +5,7 @@ namespace App\Http\Controllers\App;
 use App\Http\Controllers\Controller;
 use App\Models\FacebookPage;
 use App\Models\ScheduledPost;
+use App\Models\UserMedia;
 use App\Services\PlanEnforcementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -25,9 +26,14 @@ class ContentCalendarController extends Controller
             ->where('is_active', true)
             ->orderBy('page_name')
             ->get(['id', 'facebook_app_id', 'page_name']);
+        $mediaItems = UserMedia::query()
+            ->ownedBy(Auth::user())
+            ->latest()
+            ->get(['id', 'type', 'original_name', 'path']);
 
         return view('app.calendar.index', [
             'pages' => $pages,
+            'mediaItems' => $mediaItems,
         ]);
     }
 
@@ -84,15 +90,16 @@ class ContentCalendarController extends Controller
 
         $platforms = collect($data['platforms'])->unique()->values()->all();
         $this->planEnforcementService->assertCanPost(Auth::user(), $platforms);
+        $resolved = $this->resolveMediaSelection($data);
 
         ScheduledPost::create([
             'user_id' => Auth::id(),
             'page_id' => $page->id,
             'message' => $data['message'],
             'media_type' => $data['media_type'] ?? 'image',
-            'image_url' => $data['image_url'] ?? null,
+            'image_url' => $resolved['image_url'],
             'video_path' => null,
-            'video_url' => $data['video_url'] ?? null,
+            'video_url' => $resolved['video_url'],
             'platforms' => $platforms,
             'scheduled_for' => $data['scheduled_for'],
             'status' => ScheduledPost::STATUS_PENDING,
@@ -119,13 +126,14 @@ class ContentCalendarController extends Controller
 
         $platforms = collect($data['platforms'])->unique()->values()->all();
         $this->planEnforcementService->assertCanPost(Auth::user(), $platforms);
+        $resolved = $this->resolveMediaSelection($data);
 
         $post->update([
             'page_id' => $page->id,
             'message' => $data['message'],
             'media_type' => $data['media_type'] ?? 'image',
-            'image_url' => $data['image_url'] ?? null,
-            'video_url' => $data['video_url'] ?? null,
+            'image_url' => $resolved['image_url'],
+            'video_url' => $resolved['video_url'],
             'platforms' => $platforms,
             'scheduled_for' => $data['scheduled_for'],
             'status' => ScheduledPost::STATUS_PENDING,
@@ -157,6 +165,7 @@ class ContentCalendarController extends Controller
             'media_type' => 'nullable|string|in:image,video',
             'image_url' => 'nullable|url|max:2048',
             'video_url' => 'nullable|url|max:2048',
+            'media_id' => 'nullable|integer|exists:user_media,id',
             'platforms' => 'required|array|min:1',
             'platforms.*' => 'required|string|in:facebook,instagram,google_business',
             'scheduled_for' => 'required|date|after:now',
@@ -180,5 +189,28 @@ class ContentCalendarController extends Controller
             ->whereKey($pageId)
             ->where('is_active', true)
             ->first();
+    }
+
+    private function resolveMediaSelection(array $data): array
+    {
+        $imageUrl = $data['image_url'] ?? null;
+        $videoUrl = $data['video_url'] ?? null;
+        $mediaId = (int) ($data['media_id'] ?? 0);
+
+        if ($mediaId > 0) {
+            $selected = UserMedia::query()->ownedBy(Auth::user())->whereKey($mediaId)->first();
+            if ($selected) {
+                if ($selected->type === UserMedia::TYPE_VIDEO) {
+                    $videoUrl = $selected->public_url;
+                } else {
+                    $imageUrl = $selected->public_url;
+                }
+            }
+        }
+
+        return [
+            'image_url' => $imageUrl,
+            'video_url' => $videoUrl,
+        ];
     }
 }

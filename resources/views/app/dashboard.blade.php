@@ -13,6 +13,7 @@
         <p><a href="{{ route('admin.dashboard') }}">Go to Admin Dashboard</a></p>
     @endif
     <p><a href="{{ route('app.calendar.index') }}">Open Content Calendar</a></p>
+    <p><a href="{{ route('app.media.index') }}">Open Media Library</a></p>
 
     <form method="POST" action="{{ route('logout') }}">
         @csrf
