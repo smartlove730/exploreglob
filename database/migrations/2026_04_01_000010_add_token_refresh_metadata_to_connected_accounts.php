@@ -33,13 +33,22 @@ return new class extends Migration {
 
         Schema::table('drive_api_keys', function (Blueprint $table) {
             if (!Schema::hasColumn('drive_api_keys', 'oauth_token_last_refreshed_at')) {
-                $table->timestamp('oauth_token_last_refreshed_at')->nullable()->after('oauth_expires_at');
+                $column = $table->timestamp('oauth_token_last_refreshed_at')->nullable();
+                if (Schema::hasColumn('drive_api_keys', 'oauth_expires_at')) {
+                    $column->after('oauth_expires_at');
+                }
             }
             if (!Schema::hasColumn('drive_api_keys', 'oauth_reauthorization_required')) {
-                $table->boolean('oauth_reauthorization_required')->default(false)->after('oauth_token_last_refreshed_at');
+                $column = $table->boolean('oauth_reauthorization_required')->default(false);
+                if (Schema::hasColumn('drive_api_keys', 'oauth_token_last_refreshed_at')) {
+                    $column->after('oauth_token_last_refreshed_at');
+                }
             }
             if (!Schema::hasColumn('drive_api_keys', 'oauth_reauthorization_reason')) {
-                $table->string('oauth_reauthorization_reason')->nullable()->after('oauth_reauthorization_required');
+                $column = $table->string('oauth_reauthorization_reason')->nullable();
+                if (Schema::hasColumn('drive_api_keys', 'oauth_reauthorization_required')) {
+                    $column->after('oauth_reauthorization_required');
+                }
             }
         });
     }
