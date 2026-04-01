@@ -49,6 +49,7 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.google.*') ? 'active' : '' }}" href="{{ $googleSettingsUrl }}">Google Business</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.automations.*') ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.saas.*') ? 'active' : '' }}" href="{{ route('admin.saas.overview') }}">SaaS Management</a></li>
             </ul>
 
             <form method="POST" action="{{ route('admin.logout') }}" class="mt-auto pt-3 border-top border-secondary">

@@ -98,6 +98,7 @@ use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\GoogleController;
 use App\Http\Controllers\Admin\AutomationConfigController;
 use App\Http\Controllers\Admin\ScheduledPostController;
+use App\Http\Controllers\Admin\SaasManagementController;
 use App\Http\Controllers\AutomationController;
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
@@ -169,6 +170,17 @@ Route::middleware(['auth', 'admin', 'subscription.active'])
         Route::put('automations/{automation}', [AutomationConfigController::class, 'update'])->name('update');
         Route::delete('automations/{automation}', [AutomationConfigController::class, 'destroy'])->name('destroy');
         Route::post('automations/{automation}/toggle', [AutomationConfigController::class, 'toggle'])->name('toggle');
+    });
+
+Route::middleware(['auth', 'admin'])
+    ->prefix('admin/saas')
+    ->name('admin.saas.')
+    ->group(function () {
+        Route::get('/overview', [SaasManagementController::class, 'overview'])->name('overview');
+        Route::get('/users', [SaasManagementController::class, 'users'])->name('users');
+        Route::get('/plans', [SaasManagementController::class, 'plans'])->name('plans');
+        Route::post('/plans/{plan}/toggle', [SaasManagementController::class, 'togglePlan'])->name('plans.toggle');
+        Route::get('/subscriptions', [SaasManagementController::class, 'subscriptions'])->name('subscriptions');
     });
 
 // Admin auth
