@@ -6,18 +6,27 @@ use App\Http\Controllers\App\BillingController;
 use App\Http\Controllers\App\ContentCalendarController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\MediaLibraryController;
+use App\Http\Controllers\MarketingController;
 
 use App\Http\Controllers\{
     HomeController,
     CategoryController,
     BlogController,
-    PageController,
     CountryController,
     NewsletterSubscriptionController,
     ImageConversionController
 };
 
-Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/', [MarketingController::class, 'home'])->name('marketing.home');
+Route::get('/features', [MarketingController::class, 'features'])->name('marketing.features');
+Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
+Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
+Route::post('/contact', [MarketingController::class, 'sendContact'])->name('marketing.contact.send');
+Route::get('/privacy-policy', [MarketingController::class, 'privacy'])->name('marketing.privacy');
+Route::get('/terms-and-conditions', [MarketingController::class, 'terms'])->name('marketing.terms');
+
+Route::get('/explore', [HomeController::class, 'index'])->name('home');
 Route::get('/home/categories/load', [HomeController::class, 'loadCategories'])->name('home.categories.load');
 Route::get('/search', [HomeController::class, 'search'])->name('home.search');
 
@@ -69,15 +78,10 @@ Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, '
 
 Route::get('/tools/convert-category-images', [ImageConversionController::class, 'convertCategoryImages'])->name('tools.convert-category-images');
 
-// Static Pages
-Route::get('/contact', [PageController::class, 'contact'])->name('contact');
-Route::post('/contact/submit', [PageController::class, 'submitContact'])->name('contact.submit');
-Route::get('/policy', [PageController::class, 'policy'])->name('policy');
-Route::get('/privacy-policy', [PageController::class, 'policy'])->name('policy.alternate');
-Route::get('/terms', [PageController::class, 'terms'])->name('terms');
-Route::get('/terms-and-conditions', [PageController::class, 'terms'])->name('terms.alternate');
-Route::get('/about', [PageController::class, 'about'])->name('about');
-Route::get('/about-us', [PageController::class, 'about'])->name('about.alternate');
+// Legacy aliases for existing public pages
+Route::redirect('/policy', '/privacy-policy', 301)->name('policy');
+Route::redirect('/terms', '/terms-and-conditions', 301)->name('terms');
+Route::redirect('/about-us', '/about', 301)->name('about.alternate');
 Route::post('/addblog', [BlogController::class, 'store'])->name('store');
 Route::post('/genimage', [BlogController::class, 'genImage'])->name('genImage');
 
