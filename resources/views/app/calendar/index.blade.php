@@ -36,6 +36,58 @@
         </div>
     @endif
 
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title mb-2">Bulk schedule via CSV</h5>
+            <form method="POST" action="{{ route('app.calendar.import') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-md-8">
+                    <label class="form-label">CSV file</label>
+                    <input type="file" class="form-control" name="csv_file" accept=".csv,text/csv" required>
+                </div>
+                <div class="col-md-4 d-grid">
+                    <button class="btn btn-outline-primary">Upload & Queue Import</button>
+                </div>
+            </form>
+            <div class="small text-muted mt-2">
+                Example columns: <code>message,scheduled_for,platforms,page_id,image_url,media_id,media_type,video_url</code><br>
+                Example row: <code>"New launch post","2026-04-20 10:30:00","facebook,instagram",12,"https://cdn.example.com/photo.jpg",,image,</code>
+            </div>
+        </div>
+    </div>
+
+    @if(!empty($imports) && $imports->count())
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="mb-2">Recent CSV imports</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>ID</th><th>Status</th><th>Rows</th><th>Success</th><th>Failed</th><th>Errors</th><th>Updated</th></tr></thead>
+                        <tbody>
+                        @foreach($imports as $import)
+                            <tr>
+                                <td>#{{ $import->id }}</td>
+                                <td>{{ $import->status }}</td>
+                                <td>{{ $import->total_rows }}</td>
+                                <td>{{ $import->success_rows }}</td>
+                                <td>{{ $import->failed_rows }}</td>
+                                <td>
+                                    @if($import->error_report_path)
+                                        <a href="{{ route('app.calendar.import.errors', $import->id) }}" class="btn btn-sm btn-outline-secondary">Download</a>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td>{{ optional($import->updated_at)->diffForHumans() }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="calendar-wrap">
         <div id="calendar"></div>
     </div>

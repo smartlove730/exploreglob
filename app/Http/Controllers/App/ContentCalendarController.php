@@ -5,12 +5,15 @@ namespace App\Http\Controllers\App;
 use App\Http\Controllers\Controller;
 use App\Models\FacebookPage;
 use App\Models\ScheduledPost;
+use App\Models\ScheduledPostImport;
 use App\Models\UserMedia;
+use App\Jobs\ProcessScheduledPostCsvImportJob;
 use App\Services\PlanEnforcementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class ContentCalendarController extends Controller
@@ -30,10 +33,16 @@ class ContentCalendarController extends Controller
             ->ownedBy(Auth::user())
             ->latest()
             ->get(['id', 'type', 'original_name', 'path']);
+        $imports = ScheduledPostImport::query()
+            ->ownedBy(Auth::user())
+            ->latest()
+            ->limit(10)
+            ->get();
 
         return view('app.calendar.index', [
             'pages' => $pages,
             'mediaItems' => $mediaItems,
+            'imports' => $imports,
         ]);
     }
 
@@ -155,6 +164,34 @@ class ContentCalendarController extends Controller
         $post->update(['status' => ScheduledPost::STATUS_CANCELLED]);
 
         return back()->with('success', 'Scheduled post cancelled.');
+    }
+
+    public function importCsv(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:10240',
+        ]);
+
+        $path = $data['csv_file']->store('imports/scheduled-posts', 'local');
+        $import = ScheduledPostImport::create([
+            'user_id' => Auth::id(),
+            'status' => ScheduledPostImport::STATUS_QUEUED,
+            'source_file_path' => $path,
+        ]);
+
+        ProcessScheduledPostCsvImportJob::dispatch($import->id);
+
+        return back()->with('success', 'CSV import queued. Refresh to see progress.');
+    }
+
+    public function downloadImportErrors(int $id)
+    {
+        $import = ScheduledPostImport::query()->ownedBy(Auth::user())->findOrFail($id);
+        if (!$import->error_report_path || !Storage::disk('local')->exists($import->error_report_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('local')->download($import->error_report_path, 'scheduled-post-import-errors-'.$import->id.'.csv');
     }
 
     private function validatePayload(Request $request): array

@@ -40,6 +40,8 @@ Route::prefix('app')
         Route::post('/calendar', [ContentCalendarController::class, 'store'])->name('calendar.store');
         Route::put('/calendar/{id}', [ContentCalendarController::class, 'update'])->name('calendar.update');
         Route::delete('/calendar/{id}', [ContentCalendarController::class, 'destroy'])->name('calendar.destroy');
+        Route::post('/calendar/import-csv', [ContentCalendarController::class, 'importCsv'])->name('calendar.import');
+        Route::get('/calendar/imports/{id}/errors', [ContentCalendarController::class, 'downloadImportErrors'])->name('calendar.import.errors');
 
         Route::get('/media', [MediaLibraryController::class, 'index'])->name('media.index');
         Route::get('/media/list', [MediaLibraryController::class, 'list'])->name('media.list');
