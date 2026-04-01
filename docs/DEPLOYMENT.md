@@ -47,6 +47,7 @@ php artisan db:seed --force
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+php artisan storage:link
 ```
 
 ## 4) Queue workers and scheduler

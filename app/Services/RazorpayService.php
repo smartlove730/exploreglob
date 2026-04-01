@@ -58,6 +58,17 @@ class RazorpayService
 
     public function createSubscriptionForUser(User $user, Plan $plan): Subscription
     {
+        $existing = Subscription::query()
+            ->where('user_id', $user->id)
+            ->where('plan_id', $plan->id)
+            ->whereIn('status', [Subscription::STATUS_PENDING, Subscription::STATUS_ACTIVE])
+            ->latest('id')
+            ->first();
+
+        if ($existing && !empty($existing->razorpay_subscription_id)) {
+            return $existing;
+        }
+
         $remotePlanId = $this->createOrMapRemotePlan($plan);
 
         $payload = [

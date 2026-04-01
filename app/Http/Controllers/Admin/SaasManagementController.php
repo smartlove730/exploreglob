@@ -16,7 +16,13 @@ class SaasManagementController extends Controller
     public function overview()
     {
         $stats = [
-            'customers' => User::query()->where('role', User::ROLE_CUSTOMER)->count(),
+            'customers' => User::query()
+                ->where('is_admin', false)
+                ->where(function ($query) {
+                    $query->where('role', User::ROLE_CUSTOMER)
+                        ->orWhereNull('role');
+                })
+                ->count(),
             'admins' => User::query()->where('role', User::ROLE_ADMIN)->orWhere('is_admin', true)->count(),
             'plans' => Plan::query()->count(),
             'active_plans' => Plan::query()->where('is_active', true)->count(),
@@ -38,7 +44,11 @@ class SaasManagementController extends Controller
     public function users()
     {
         $users = User::query()
-            ->where('role', User::ROLE_CUSTOMER)
+            ->where('is_admin', false)
+            ->where(function ($query) {
+                $query->where('role', User::ROLE_CUSTOMER)
+                    ->orWhereNull('role');
+            })
             ->withCount([
                 'subscriptions',
                 'googleAccounts',
