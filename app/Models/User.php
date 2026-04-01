@@ -2,16 +2,20 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
+
+    public const ROLE_ADMIN = 'admin';
+    public const ROLE_CUSTOMER = 'customer';
 
     /**
      * The attributes that are mass assignable.
@@ -22,6 +26,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'is_admin',
     ];
 
     /**
@@ -44,8 +50,28 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
         ];
     }
+
+    public function isAdmin(): bool
+    {
+        return $this->is_admin || $this->role === self::ROLE_ADMIN;
+    }
+
+    public function hasRole(string ...$roles): bool
+    {
+        if (empty($roles)) {
+            return true;
+        }
+
+        if (in_array(self::ROLE_ADMIN, $roles, true) && $this->isAdmin()) {
+            return true;
+        }
+
+        return $this->role !== null && in_array($this->role, $roles, true);
+    }
+
     public function facebookAccounts(): HasMany
     {
         return $this->hasMany(FacebookAccount::class);
@@ -56,4 +82,15 @@ class User extends Authenticatable
         return $this->hasMany(GoogleAccount::class);
     }
 
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function activeSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class)
+            ->where('status', Subscription::STATUS_ACTIVE)
+            ->latestOfMany();
+    }
 }
