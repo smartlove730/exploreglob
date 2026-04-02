@@ -99,6 +99,7 @@ class GoogleDriveService
             Log::info('google_drive.list_public_folder_images.folder_scan_result', [
                 'folder_id' => $currentFolderId,
                 'entries_count' => count($files),
+                'mime_summary' => $this->summarizeMimeTypes($files),
             ]);
 
             foreach ($files as $file) {
@@ -127,7 +128,8 @@ class GoogleDriveService
                         continue;
                     }
 
-                    if (!str_starts_with($targetMimeType, 'image/')) {
+                    $targetName = (string) ($file['name'] ?? '');
+                    if (!$this->isImageLike($targetMimeType, $targetName)) {
                         continue;
                     }
 
@@ -136,7 +138,9 @@ class GoogleDriveService
                     $mimeType = $targetMimeType;
                 }
 
-                if ($fileId === '' || !str_starts_with($mimeType, 'image/')) {
+                $fileName = (string) ($file['name'] ?? '');
+                $fileExtension = (string) ($file['fileExtension'] ?? '');
+                if ($fileId === '' || !$this->isImageLike($mimeType, $fileName, $fileExtension)) {
                     continue;
                 }
 
@@ -179,8 +183,8 @@ class GoogleDriveService
             }
 
             $query = [
-                'q' => "'{$folderId}' in parents and (mimeType contains 'image/' or mimeType = 'application/vnd.google-apps.folder' or mimeType = 'application/vnd.google-apps.shortcut') and trashed = false",
-                'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey,shortcutDetails(targetId,targetMimeType,targetResourceKey))',
+                'q' => "'{$folderId}' in parents and trashed = false",
+                'fields' => 'nextPageToken,files(id,name,mimeType,fileExtension,webViewLink,resourceKey,shortcutDetails(targetId,targetMimeType,targetResourceKey))',
                 'pageSize' => 200,
                 'pageToken' => $pageToken,
                 'supportsAllDrives' => 'true',
@@ -281,6 +285,33 @@ class GoogleDriveService
         }
 
         return trim($message);
+    }
+
+    private function isImageLike(string $mimeType, string $name = '', string $fileExtension = ''): bool
+    {
+        if (str_starts_with($mimeType, 'image/')) {
+            return true;
+        }
+
+        $ext = strtolower(trim($fileExtension));
+        if ($ext === '') {
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        }
+
+        return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'heic', 'heif', 'avif'], true);
+    }
+
+    private function summarizeMimeTypes(array $files): array
+    {
+        $summary = [];
+        foreach ($files as $file) {
+            $mime = (string) ($file['mimeType'] ?? 'unknown');
+            $summary[$mime] = ($summary[$mime] ?? 0) + 1;
+        }
+
+        arsort($summary);
+
+        return array_slice($summary, 0, 10, true);
     }
 
     public function buildPreviewUrl(string $fileId, string $resourceKey = ''): string
