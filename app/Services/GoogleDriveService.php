@@ -7,24 +7,42 @@ use Illuminate\Validation\ValidationException;
 
 class GoogleDriveService
 {
-    public function extractFolderId(string $folderUrl): string
+    public function extractFolderReference(string $folderUrl): array
     {
         $folderUrl = trim($folderUrl);
+        $folderId = null;
 
         if (preg_match('~/folders/([a-zA-Z0-9_-]+)~', $folderUrl, $matches) === 1) {
-            return $matches[1];
+            $folderId = $matches[1];
+        } elseif (preg_match('/[?&]id=([a-zA-Z0-9_-]+)/', $folderUrl, $matches) === 1) {
+            $folderId = $matches[1];
         }
 
-        if (preg_match('/[?&]id=([a-zA-Z0-9_-]+)/', $folderUrl, $matches) === 1) {
-            return $matches[1];
+        if (!$folderId) {
+            throw ValidationException::withMessages([
+                'folder_url' => 'Unable to parse Google Drive folder ID from the provided link.',
+            ]);
         }
 
-        throw ValidationException::withMessages([
-            'folder_url' => 'Unable to parse Google Drive folder ID from the provided link.',
-        ]);
+        $resourceKey = '';
+        $query = parse_url($folderUrl, PHP_URL_QUERY);
+        if (is_string($query)) {
+            parse_str($query, $queryParams);
+            $resourceKey = (string) ($queryParams['resourcekey'] ?? $queryParams['resourceKey'] ?? '');
+        }
+
+        return [
+            'id' => $folderId,
+            'resource_key' => trim($resourceKey),
+        ];
     }
 
-    public function listPublicFolderImages(string $folderId, ?string $apiKey = null, ?string $accessToken = null): array
+    public function extractFolderId(string $folderUrl): string
+    {
+        return $this->extractFolderReference($folderUrl)['id'];
+    }
+
+    public function listPublicFolderImages(string $folderId, ?string $apiKey = null, ?string $accessToken = null, string $folderResourceKey = ''): array
     {
         $apiKey = $apiKey ?: config('services.google_drive.api_key');
 
@@ -52,6 +70,10 @@ class GoogleDriveService
                     'supportsAllDrives' => 'true',
                     'includeItemsFromAllDrives' => 'true',
                 ];
+
+            if ($folderResourceKey !== '') {
+                $query['resourceKeys'] = $folderId.'/'.$folderResourceKey;
+            }
 
             if (!$accessToken) {
                 $query['key'] = $apiKey;
