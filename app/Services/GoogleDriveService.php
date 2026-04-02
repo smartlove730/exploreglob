@@ -75,6 +75,7 @@ class GoogleDriveService
 
         $images = [];
         $seenImageIds = [];
+        $resolvedShortcutTargets = [];
         $visitedFolders = [];
         $pendingFolders = [[
             'id' => $folderId,
@@ -119,6 +120,7 @@ class GoogleDriveService
                     $targetId = (string) data_get($file, 'shortcutDetails.targetId', '');
                     $targetMimeType = (string) data_get($file, 'shortcutDetails.targetMimeType', '');
                     $targetResourceKey = (string) data_get($file, 'shortcutDetails.targetResourceKey', '');
+                    $targetExtension = '';
 
                     if ($targetMimeType === 'application/vnd.google-apps.folder' && $targetId !== '') {
                         $pendingFolders[] = [
@@ -129,7 +131,29 @@ class GoogleDriveService
                     }
 
                     $targetName = (string) ($file['name'] ?? '');
+                    if ($targetId !== '' && $targetMimeType === '') {
+                        if (!array_key_exists($targetId, $resolvedShortcutTargets)) {
+                            $resolvedShortcutTargets[$targetId] = $this->fetchFileMetadata(
+                                $targetId,
+                                $apiKey,
+                                $accessToken,
+                                $targetResourceKey
+                            );
+                        }
+
+                        $targetMeta = (array) ($resolvedShortcutTargets[$targetId] ?? []);
+                        $targetMimeType = (string) ($targetMeta['mimeType'] ?? '');
+                        $targetName = (string) ($targetMeta['name'] ?? $targetName);
+                        $targetExtension = (string) ($targetMeta['fileExtension'] ?? '');
+                    }
+
                     if (!$this->isImageLike($targetMimeType, $targetName)) {
+                        if (!$this->isImageLike($targetMimeType, $targetName, $targetExtension)) {
+                            continue;
+                        }
+                    }
+
+                    if ($targetMimeType === '') {
                         continue;
                     }
 
@@ -244,6 +268,36 @@ class GoogleDriveService
         } while ($pageToken);
 
         return $files;
+    }
+
+    private function fetchFileMetadata(string $fileId, ?string $apiKey, ?string $accessToken, string $resourceKey = ''): array
+    {
+        $query = [
+            'fields' => 'id,name,mimeType,fileExtension,resourceKey',
+            'supportsAllDrives' => 'true',
+        ];
+
+        if ($resourceKey !== '') {
+            $query['resourceKey'] = $resourceKey;
+        }
+
+        if (!$accessToken && $apiKey) {
+            $query['key'] = $apiKey;
+        }
+
+        $request = Http::timeout(30);
+        if ($accessToken) {
+            $request = $request->withToken($accessToken);
+        }
+
+        $response = $request->get("https://www.googleapis.com/drive/v3/files/{$fileId}", $query);
+        Log::debug('google_drive.fetch_file_metadata.response', [
+            'file_id' => $fileId,
+            'status' => $response->status(),
+            'successful' => $response->successful(),
+        ]);
+
+        return $response->successful() ? (array) $response->json() : [];
     }
 
     private function fetchFolderDriveMetadata(string $folderId, ?string $apiKey, ?string $accessToken, string $folderResourceKey = ''): array
