@@ -1,20 +1,34 @@
 @extends('marketing.layout')
 @section('title', 'Features | ExploreGlob')
+
 @section('content')
-<section class="mx-auto w-full max-w-7xl px-4 pb-14 pt-16 sm:px-6 lg:px-8">
-  <p class="text-sm font-semibold uppercase tracking-[0.2em] text-violet-700">Features</p>
-  <h1 class="mt-3 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">Everything you need to run social media on autopilot</h1>
+<section style="padding:3rem 0 1.5rem;">
+  <p class="eyebrow">Features</p>
+  <h1 class="page-title">Run social media operations from one streamlined workspace</h1>
+  <p class="lead">From planning to publishing, every feature is designed to remove busywork and improve team consistency.</p>
 </section>
-<section class="mx-auto grid w-full max-w-7xl gap-6 px-4 pb-20 sm:px-6 lg:grid-cols-2 lg:px-8">
+
+<section class="cards-2" style="padding-bottom:2rem;">
 @foreach([
-['Auto publishing engine',['Schedule once','Publish everywhere','Never miss posting again']],
-['Visual content calendar',['Drag and drop planner','Monthly overview','Campaign scheduling']],
-['Multi-account manager',['Manage multiple brands','Switch accounts instantly','Agency friendly']],
-['Team collaboration',['Invite teammates','Assign roles','Approve content before publishing']],
-['Analytics dashboard',['Track engagement','Measure growth','Optimize posting strategy']],
+['Auto publishing engine',['Schedule once and publish everywhere','Handle recurring campaigns automatically','Reduce manual posting errors']],
+['Visual content calendar',['Plan weeks ahead in one view','Drag and adjust dates quickly','Track campaign progress']],
+['Multi-brand workspace',['Separate content by brand/client','Switch profiles instantly','Agency-ready layout']],
+['Approvals and collaboration',['Invite team members securely','Assign draft/review states','Keep comments and edits in one place']],
+['Performance dashboard',['See top posts by channel','Measure growth trends','Turn data into next-week actions']],
+['Asset library',['Store captions and visuals together','Reuse winning assets','Save team production time']],
 ] as [$title,$items])
-<article class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm"><h2 class="text-2xl font-bold text-slate-900">{{ $title }}</h2><ul class="mt-4 space-y-2 text-sm text-slate-600">@foreach($items as $item)<li>• {{ $item }}</li>@endforeach</ul></article>
+<article class="card">
+    <h2>{{ $title }}</h2>
+    <ul style="margin-top:.8rem;padding-left:1rem;display:grid;gap:.35rem;">
+        @foreach($items as $item)<li>{{ $item }}</li>@endforeach
+    </ul>
+</article>
 @endforeach
 </section>
-<section class="bg-gradient-to-r from-indigo-600 to-violet-600"><div class="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 lg:px-8"><p class="inline-flex rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">Coming soon</p><h3 class="mt-4 text-3xl font-bold text-white">Google Business Profile posting</h3><p class="mt-2 text-indigo-100">Expand local visibility with automated Google Business Profile updates.</p></div></section>
+
+<section class="highlight" style="margin-bottom:2rem;">
+    <p class="eyebrow" style="color:#e0e7ff;">Coming soon</p>
+    <h3 style="font-size:1.7rem;font-weight:800;">Google Business Profile automation</h3>
+    <p>Publish location-focused updates and promotions from the same ExploreGlob dashboard.</p>
+</section>
 @endsection
