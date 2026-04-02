@@ -45,13 +45,18 @@ class AutomationConfigController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validateData($request);
-        $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $data['page_id']);
+        $pageIds = collect($data['page_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+        $this->assertAuthorizedAppAndPages((int) $data['app_id'], $pageIds);
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
         $data['user_id'] = Auth::id();
 
-        AutomationConfig::create($data);
+        $created = 0;
+        foreach ($pageIds as $pageId) {
+            AutomationConfig::create($data + ['page_id' => $pageId]);
+            $created++;
+        }
 
-        return redirect()->route('admin.automations.index')->with('success', 'Automation config created successfully.');
+        return redirect()->route('admin.automations.index')->with('success', $created.' automation config(s) created successfully.');
     }
 
     public function edit(AutomationConfig $automation)
@@ -71,11 +76,35 @@ class AutomationConfigController extends Controller
         $this->authorizeAutomation($automation);
 
         $data = $this->validateData($request);
-        $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $data['page_id']);
+        $pageIds = collect($data['page_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+        $this->assertAuthorizedAppAndPages((int) $data['app_id'], $pageIds);
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
-        $automation->update($data);
 
-        return redirect()->route('admin.automations.index')->with('success', 'Automation config updated successfully.');
+        $baseData = collect($data)->except(['page_ids', 'page_id'])->all();
+
+        $primaryPageId = array_shift($pageIds);
+        $automation->update($baseData + ['page_id' => $primaryPageId]);
+
+        $created = 0;
+        foreach ($pageIds as $pageId) {
+            $exists = AutomationConfig::query()
+                ->ownedBy(Auth::user())
+                ->where('app_id', (int) $data['app_id'])
+                ->where('page_id', $pageId)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            AutomationConfig::create($baseData + [
+                'user_id' => Auth::id(),
+                'page_id' => $pageId,
+            ]);
+            $created++;
+        }
+
+        return redirect()->route('admin.automations.index')->with('success', 'Automation config updated successfully.'.($created > 0 ? " {$created} additional config(s) created for other selected pages." : ''));
     }
 
     public function destroy(AutomationConfig $automation): RedirectResponse
@@ -111,7 +140,9 @@ class AutomationConfigController extends Controller
             'drive_link' => 'required|url|max:4096',
             'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'app_id' => 'required|integer|exists:facebook_apps,id',
-            'page_id' => 'required|integer|exists:facebook_pages,id',
+            'page_id' => 'nullable|integer|exists:facebook_pages,id',
+            'page_ids' => 'required_without:page_id|array|min:1',
+            'page_ids.*' => 'required|integer|exists:facebook_pages,id',
             'platforms' => 'required|string|in:facebook,instagram,both',
             'runs_per_day' => 'required|integer|min:1|max:24',
             'post_limit_per_day' => 'required|integer|min:1|max:100',
@@ -130,15 +161,15 @@ class AutomationConfigController extends Controller
             ->get();
     }
 
-    private function assertAuthorizedAppAndPage(int $appId, int $pageId): void
+    private function assertAuthorizedAppAndPages(int $appId, array $pageIds): void
     {
-        $validPage = FacebookPage::query()
+        $validPagesCount = FacebookPage::query()
             ->ownedBy(Auth::user())
-            ->whereKey($pageId)
+            ->whereIn('id', $pageIds)
             ->where('facebook_app_id', $appId)
-            ->exists();
+            ->count();
 
-        abort_unless($validPage, 422, 'Selected app/page is not authorized for this user.');
+        abort_unless($validPagesCount === count($pageIds), 422, 'Selected app/pages are not authorized for this user.');
     }
 
     private function assertDriveKeyIsActive(int $driveApiKeyId): void

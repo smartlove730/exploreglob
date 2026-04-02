@@ -1,4 +1,5 @@
 @php($isEdit = isset($automation))
+@php($selectedPageIds = collect(old('page_ids', $isEdit ? [$automation->page_id] : []))->map(fn ($id) => (int) $id)->all())
 
 <div class="mb-3">
     <label class="form-label">Config Name (optional)</label>
@@ -38,13 +39,13 @@
         </select>
     </div>
     <div class="col-md-6">
-        <label class="form-label">Page ID</label>
-        <select name="page_id" class="form-select" required>
-            <option value="">Select page</option>
+        <label class="form-label">Page IDs</label>
+        <select name="page_ids[]" class="form-select" multiple required>
             @foreach($pages as $page)
-                <option value="{{ $page->id }}" @selected((int) old('page_id', $isEdit ? $automation->page_id : 0) === $page->id)>{{ $page->page_name }} ({{ $page->page_id }})</option>
+                <option value="{{ $page->id }}" @selected(in_array($page->id, $selectedPageIds, true))>{{ $page->page_name }} ({{ $page->page_id }})</option>
             @endforeach
         </select>
+        <small class="text-muted">Use Ctrl/Cmd to select multiple pages.</small>
     </div>
 </div>
 

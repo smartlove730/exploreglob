@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class PostController extends Controller
@@ -65,7 +66,11 @@ class PostController extends Controller
             'apps' => $apps,
             'selectedAppId' => $selectedAppId,
             'pages' => $pages,
-            'selectedPageId' => (int) old('page_id', $request->integer('page_id')),
+            'selectedPageIds' => collect(old('page_ids', array_filter([(int) old('page_id', $request->integer('page_id'))])))
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->values()
+                ->all(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
             'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $request->integer('drive_api_key_id')),
             'driveFolders' => DriveFolder::query()->ownedBy(Auth::user())->with('driveApiKey')->where('is_active', true)->orderBy('name')->get(),
@@ -78,10 +83,9 @@ class PostController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validatePostRequest($request);
-        $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
-
-        if (!$page) {
-            return back()->withInput()->with('error', 'Selected page is not valid for this app/user.');
+        $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? []);
+        if ($pages->isEmpty()) {
+            return back()->withInput()->with('error', 'Select at least one valid page for this app/user.');
         }
 
         $googleLocationId = $this->resolveGoogleLocationId($data);
@@ -93,52 +97,58 @@ class PostController extends Controller
             ]);
         }
 
-        $post = FacebookPost::create([
-            'user_id' => $page->user_id,
-            'page_id' => $page->id,
-            'message' => $data['message'],
-            'media_type' => $mediaType,
-            'image_url' => $data['image_url'] ?? null,
-            'video_path' => null,
-            'video_url' => null,
-            'platforms' => $data['platforms'],
-            'google_location_id' => $googleLocationId,
-            'status' => FacebookPost::STATUS_PENDING,
-            'last_error' => null,
-        ]);
-
         if ($mediaType === FacebookPost::MEDIA_TYPE_VIDEO) {
             $videoMeta = $this->storeVideoAndResolveUrl($request);
+        }
+
+        $createdCount = 0;
+        foreach ($pages as $page) {
+            $post = FacebookPost::create([
+                'user_id' => $page->user_id,
+                'page_id' => $page->id,
+                'message' => $data['message'],
+                'media_type' => $mediaType,
+                'image_url' => $data['image_url'] ?? null,
+                'video_path' => null,
+                'video_url' => null,
+                'platforms' => $data['platforms'],
+                'google_location_id' => $googleLocationId,
+                'status' => FacebookPost::STATUS_PENDING,
+                'last_error' => null,
+            ]);
+
+            if ($mediaType === FacebookPost::MEDIA_TYPE_VIDEO) {
+                $post->update([
+                    'video_path' => $videoMeta['video_path'],
+                    'video_url' => $videoMeta['video_url'],
+                    'image_url' => null,
+                ]);
+
+                PublishPostJob::dispatch($post->id);
+                $createdCount++;
+                continue;
+            }
+
+            $this->syncImages($post, $request, []);
+            $publishImageUrl = $this->resolvePublishImageUrl($post);
+            $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
+
+            if (in_array('instagram', $data['platforms'], true) && !$publishImageUrl) {
+                throw ValidationException::withMessages(['images' => 'Instagram requires at least one image URL or upload.']);
+            }
 
             $post->update([
-                'video_path' => $videoMeta['video_path'],
-                'video_url' => $videoMeta['video_url'],
-                'image_url' => null,
+                'image_url' => $publishImageUrl,
+                'google_location_id' => $googleLocationId,
+                'status' => FacebookPost::STATUS_PENDING,
+                'last_error' => null,
             ]);
 
             PublishPostJob::dispatch($post->id);
-
-            return redirect()->route('admin.posts.index')->with('success', 'Video queued for background publishing.');
+            $createdCount++;
         }
 
-        $this->syncImages($post, $request, []);
-        $publishImageUrl = $this->resolvePublishImageUrl($post);
-        $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
-
-        if (in_array('instagram', $data['platforms'], true) && !$publishImageUrl) {
-            throw ValidationException::withMessages(['images' => 'Instagram requires at least one image URL or upload.']);
-        }
-
-        $post->update([
-            'image_url' => $publishImageUrl,
-            'google_location_id' => $googleLocationId,
-            'status' => FacebookPost::STATUS_PENDING,
-            'last_error' => null,
-        ]);
-
-        PublishPostJob::dispatch($post->id);
-
-        return redirect()->route('admin.posts.index')->with('success', 'Post queued for background publishing.');
+        return redirect()->route('admin.posts.index')->with('success', $createdCount.' post(s) queued for background publishing.');
     }
 
     public function update(Request $request, int $id): RedirectResponse
@@ -260,7 +270,9 @@ class PostController extends Controller
             'folder_url' => 'nullable|string|max:2048',
             'folder_id' => 'nullable|integer|exists:drive_folders,id',
             'app_id' => 'required|integer|exists:facebook_apps,id',
-            'page_id' => 'required|integer|exists:facebook_pages,id',
+            'page_id' => 'nullable|integer|exists:facebook_pages,id',
+            'page_ids' => 'required_without:page_id|array|min:1',
+            'page_ids.*' => 'required|integer|exists:facebook_pages,id',
             'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
         ]);
 
@@ -271,11 +283,11 @@ class PostController extends Controller
             ], 422);
         }
 
-        $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
-        if (!$page) {
+        $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? [$data['page_id'] ?? null]);
+        if ($pages->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected page is not valid for this app/user.',
+                'message' => 'Selected pages are not valid for this app/user.',
             ], 422);
         }
 
@@ -315,7 +327,7 @@ class PostController extends Controller
         $images = $this->googleDriveService->listPublicFolderImages($folderId, $driveApiKey->api_key, $driveToken);
 
         $postedByImage = DriveImagePost::query()->ownedBy(Auth::user())
-            ->where('page_id', $page->id)
+            ->whereIn('page_id', $pages->pluck('id')->all())
             ->whereIn('drive_file_id', collect($images)->pluck('id')->all())
             ->get()
             ->groupBy('drive_file_id');
@@ -356,7 +368,9 @@ class PostController extends Controller
     {
         $data = $request->validate([
             'app_id' => 'required|integer|exists:facebook_apps,id',
-            'page_id' => 'required|integer|exists:facebook_pages,id',
+            'page_id' => 'nullable|integer|exists:facebook_pages,id',
+            'page_ids' => 'required_without:page_id|array|min:1',
+            'page_ids.*' => 'required|integer|exists:facebook_pages,id',
             'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'folder_id' => 'nullable|string|max:255',
             'caption' => 'required|string|max:60000',
@@ -370,11 +384,11 @@ class PostController extends Controller
             'images.*.resource_key' => 'nullable|string|max:255',
         ]);
 
-        $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
-        if (!$page) {
+        $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? [$data['page_id'] ?? null]);
+        if ($pages->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected page is not valid for this app/user.',
+                'message' => 'Selected pages are not valid for this app/user.',
             ], 422);
         }
 
@@ -431,39 +445,42 @@ class PostController extends Controller
             }
 
             $googleLocationId = $this->resolveGoogleLocationId($data);
-            $post = FacebookPost::create([
-                'user_id' => $page->user_id,
-                'page_id' => $page->id,
-                'message' => $data['caption'],
-                'image_url' => $queueImageUrls[0] ?? null,
-                'platforms' => $platforms,
-                'google_location_id' => $googleLocationId,
-                'status' => FacebookPost::STATUS_PENDING,
-                'last_error' => null,
-            ]);
-
-            foreach ($preparedImages as $imageMeta) {
-                $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
-
-                DriveImagePost::create([
+            foreach ($pages as $page) {
+                $post = FacebookPost::create([
                     'user_id' => $page->user_id,
                     'page_id' => $page->id,
-                    'drive_file_id' => $imageMeta['file_id'],
-                    'drive_folder_id' => $data['folder_id'] ?? null,
-                    'image_url' => $imageMeta['public_url'],
-                    'caption' => $data['caption'],
+                    'message' => $data['caption'],
+                    'image_url' => $queueImageUrls[0] ?? null,
                     'platforms' => $platforms,
-                    'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
+                    'google_location_id' => $googleLocationId,
+                    'status' => FacebookPost::STATUS_PENDING,
+                    'last_error' => null,
                 ]);
 
-                $results[] = [
-                    'file_id' => $imageMeta['file_id'],
-                    'success' => true,
-                    'message' => 'Queued for publishing.',
-                ];
-            }
+                foreach ($preparedImages as $imageMeta) {
+                    $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
 
-            PublishPostJob::dispatch($post->id);
+                    DriveImagePost::create([
+                        'user_id' => $page->user_id,
+                        'page_id' => $page->id,
+                        'drive_file_id' => $imageMeta['file_id'],
+                        'drive_folder_id' => $data['folder_id'] ?? null,
+                        'image_url' => $imageMeta['public_url'],
+                        'caption' => $data['caption'],
+                        'platforms' => $platforms,
+                        'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
+                    ]);
+
+                    $results[] = [
+                        'page_id' => $page->id,
+                        'file_id' => $imageMeta['file_id'],
+                        'success' => true,
+                        'message' => 'Queued for publishing.',
+                    ];
+                }
+
+                PublishPostJob::dispatch($post->id);
+            }
 
             $successCount = count($results);
 
@@ -476,56 +493,60 @@ class PostController extends Controller
             ], $successCount > 0 ? 200 : 422);
         }
 
-        foreach ($preparedImages as $imageMeta) {
-            $imageUrl = $imageMeta['public_url'];
-            $imageUrl = $this->ensureInstagramEligibleImage($imageUrl, $platforms);
-            $this->assertPublicHttpsImageUrl($imageUrl);
+        foreach ($pages as $page) {
+            foreach ($preparedImages as $imageMeta) {
+                $imageUrl = $imageMeta['public_url'];
+                $imageUrl = $this->ensureInstagramEligibleImage($imageUrl, $platforms);
+                $this->assertPublicHttpsImageUrl($imageUrl);
 
-            try {
-                $googleLocationId = $this->resolveGoogleLocationId($data);
-                $post = FacebookPost::create([
-                    'user_id' => $page->user_id,
-                    'page_id' => $page->id,
-                    'message' => $data['caption'],
-                    'image_url' => $imageUrl,
-                    'platforms' => $platforms,
-                    'google_location_id' => $googleLocationId,
-                    'status' => FacebookPost::STATUS_PENDING,
-                    'last_error' => null,
-                ]);
+                try {
+                    $googleLocationId = $this->resolveGoogleLocationId($data);
+                    $post = FacebookPost::create([
+                        'user_id' => $page->user_id,
+                        'page_id' => $page->id,
+                        'message' => $data['caption'],
+                        'image_url' => $imageUrl,
+                        'platforms' => $platforms,
+                        'google_location_id' => $googleLocationId,
+                        'status' => FacebookPost::STATUS_PENDING,
+                        'last_error' => null,
+                    ]);
 
-                $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
+                    $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
 
-                DriveImagePost::create([
-                    'user_id' => $page->user_id,
-                    'page_id' => $page->id,
-                    'drive_file_id' => $imageMeta['file_id'],
-                    'drive_folder_id' => $data['folder_id'] ?? null,
-                    'image_url' => $imageUrl,
-                    'caption' => $data['caption'],
-                    'platforms' => $platforms,
-                    'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
-                ]);
+                    DriveImagePost::create([
+                        'user_id' => $page->user_id,
+                        'page_id' => $page->id,
+                        'drive_file_id' => $imageMeta['file_id'],
+                        'drive_folder_id' => $data['folder_id'] ?? null,
+                        'image_url' => $imageUrl,
+                        'caption' => $data['caption'],
+                        'platforms' => $platforms,
+                        'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
+                    ]);
 
-                PublishPostJob::dispatch($post->id);
+                    PublishPostJob::dispatch($post->id);
 
-                $results[] = [
-                    'file_id' => $imageMeta['file_id'],
-                    'success' => true,
-                    'message' => 'Queued for publishing.',
-                ];
-            } catch (\Throwable $exception) {
-                Log::error('Drive image queue failed', [
-                    'page_id' => $page->id,
-                    'file_id' => $imageMeta['file_id'],
-                    'error' => $exception->getMessage(),
-                ]);
+                    $results[] = [
+                        'page_id' => $page->id,
+                        'file_id' => $imageMeta['file_id'],
+                        'success' => true,
+                        'message' => 'Queued for publishing.',
+                    ];
+                } catch (\Throwable $exception) {
+                    Log::error('Drive image queue failed', [
+                        'page_id' => $page->id,
+                        'file_id' => $imageMeta['file_id'],
+                        'error' => $exception->getMessage(),
+                    ]);
 
-                $results[] = [
-                    'file_id' => $imageMeta['file_id'],
-                    'success' => false,
-                    'message' => $exception->getMessage(),
-                ];
+                    $results[] = [
+                        'page_id' => $page->id,
+                        'file_id' => $imageMeta['file_id'],
+                        'success' => false,
+                        'message' => $exception->getMessage(),
+                    ];
+                }
             }
         }
 
@@ -583,7 +604,9 @@ class PostController extends Controller
     {
         return $request->validate([
             'app_id' => 'required|integer|exists:facebook_apps,id',
-            'page_id' => 'required|integer|exists:facebook_pages,id',
+            'page_id' => $isUpdate ? 'required|integer|exists:facebook_pages,id' : 'nullable|integer|exists:facebook_pages,id',
+            'page_ids' => $isUpdate ? 'nullable|array|min:1' : 'required_without:page_id|array|min:1',
+            'page_ids.*' => 'required|integer|exists:facebook_pages,id',
             'message' => 'required|string|max:60000',
             'media_type' => 'nullable|string|in:image,video',
             'image_url' => 'nullable|url|max:2048',
@@ -631,6 +654,22 @@ class PostController extends Controller
             ->where('facebook_app_id', $appId)
             ->where('is_active', true)
             ->first();
+    }
+
+    private function resolveAuthorizedPages(int $appId, array $pageIds): Collection
+    {
+        $pageIds = collect($pageIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        if ($pageIds->isEmpty()) {
+            return collect();
+        }
+
+        $pages = FacebookPage::query()->ownedBy(Auth::user())
+            ->whereIn('id', $pageIds->all())
+            ->where('facebook_app_id', $appId)
+            ->where('is_active', true)
+            ->get();
+
+        return $pages->count() === $pageIds->count() ? $pages : collect();
     }
 
     private function syncImages(FacebookPost $post, Request $request, array $removeIds = []): void
