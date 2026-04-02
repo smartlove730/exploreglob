@@ -148,6 +148,14 @@ class RazorpayService
                 'current_period_start' => $this->timestampToDateTime(Arr::get($subscriptionPayload, 'current_start')),
                 'current_period_end' => $this->timestampToDateTime(Arr::get($subscriptionPayload, 'current_end')),
             ]);
+
+            if ($subscription->status === Subscription::STATUS_ACTIVE) {
+                Subscription::query()
+                    ->where('user_id', $subscription->user_id)
+                    ->where('id', '!=', $subscription->id)
+                    ->whereIn('status', [Subscription::STATUS_ACTIVE, Subscription::STATUS_PENDING])
+                    ->update(['status' => Subscription::STATUS_CANCELLED]);
+            }
             Log::info('Razorpay subscription webhook applied', [
                 'subscription_id' => $subscription->id,
                 'user_id' => $subscription->user_id,

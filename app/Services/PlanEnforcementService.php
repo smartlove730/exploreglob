@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\AutomationConfig;
+use App\Models\FacebookAccount;
+use App\Models\FacebookPage;
+use App\Models\ScheduledPost;
 use App\Models\Subscription;
 use App\Models\User;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -72,6 +75,43 @@ class PlanEnforcementService
                 'post_limit' => 'Post limit exceeded for your current subscription period.',
             ]);
         }
+
+        $this->assertPostWindowLimit($user, 'posts_per_day_limit', now()->startOfDay(), 'daily');
+        $this->assertPostWindowLimit($user, 'posts_per_week_limit', now()->startOfWeek(), 'weekly');
+        $this->assertPostWindowLimit($user, 'posts_per_month_limit', now()->startOfMonth(), 'monthly');
+    }
+
+    public function assertCanCreateAutomation(User $user, int $newAutomations = 1): void
+    {
+        $this->assertSimpleCountLimit(
+            user: $user,
+            count: AutomationConfig::query()->where('user_id', $user->id)->count(),
+            limitKey: 'automation_limit',
+            units: $newAutomations,
+            message: 'Automation config limit reached for your current plan.'
+        );
+    }
+
+    public function assertCanConnectApps(User $user, int $newConnections = 1): void
+    {
+        $this->assertSimpleCountLimit(
+            user: $user,
+            count: FacebookAccount::query()->where('user_id', $user->id)->count(),
+            limitKey: 'connected_apps_limit',
+            units: $newConnections,
+            message: 'Connected app limit reached for your current plan.'
+        );
+    }
+
+    public function assertCanSyncPages(User $user, int $incomingPages): void
+    {
+        $this->assertSimpleCountLimit(
+            user: $user,
+            count: FacebookPage::query()->where('user_id', $user->id)->count(),
+            limitKey: 'synced_pages_limit',
+            units: max(0, $incomingPages),
+            message: 'Synced page limit reached for your current plan.'
+        );
     }
 
     public function consumeQuota(User $user, int $units = 1): void
@@ -108,5 +148,50 @@ class PlanEnforcementService
 
             $subscription->update(['posts_used' => $nextUsage]);
         });
+    }
+
+    private function assertPostWindowLimit(User $user, string $limitKey, \DateTimeInterface $since, string $label): void
+    {
+        $limit = $this->resolvePlanLimit($user, $limitKey);
+        if ($limit <= 0) {
+            return;
+        }
+
+        $count = ScheduledPost::query()
+            ->where('user_id', $user->id)
+            ->where('created_at', '>=', $since)
+            ->count();
+
+        if ($count >= $limit) {
+            throw ValidationException::withMessages([
+                'post_limit' => "Your {$label} post limit ({$limit}) has been reached.",
+            ]);
+        }
+    }
+
+    private function assertSimpleCountLimit(User $user, int $count, string $limitKey, int $units, string $message): void
+    {
+        if ($user->isAdmin()) {
+            return;
+        }
+
+        $limit = $this->resolvePlanLimit($user, $limitKey);
+        if ($limit <= 0) {
+            return;
+        }
+
+        if (($count + max(0, $units)) > $limit) {
+            throw ValidationException::withMessages([
+                $limitKey => $message,
+            ]);
+        }
+    }
+
+    private function resolvePlanLimit(User $user, string $limitKey): int
+    {
+        $subscription = $this->getActiveSubscription($user);
+        $plan = $subscription?->plan;
+
+        return $plan ? $plan->configuredLimit($limitKey) : 0;
     }
 }

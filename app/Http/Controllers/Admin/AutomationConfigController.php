@@ -13,9 +13,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Services\PlanEnforcementService;
 
 class AutomationConfigController extends Controller
 {
+    public function __construct(private readonly PlanEnforcementService $planEnforcementService)
+    {
+    }
+
     public function index()
     {
         $configs = AutomationConfig::query()
@@ -52,6 +57,7 @@ class AutomationConfigController extends Controller
             ->values();
         abort_if($pageIds->isEmpty(), 422, 'Select at least one page.');
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
+        $this->planEnforcementService->assertCanCreateAutomation(Auth::user(), $pageIds->count());
         $baseData = collect($data)->except(['page_ids'])->all();
         $baseData['user_id'] = Auth::id();
 
@@ -94,6 +100,10 @@ class AutomationConfigController extends Controller
         $automation->update(array_merge($baseData, ['page_id' => $primaryPageId]));
 
         $createdCount = 0;
+        $additional = max(0, $pageIds->count() - 1);
+        if ($additional > 0) {
+            $this->planEnforcementService->assertCanCreateAutomation(Auth::user(), $additional);
+        }
         foreach ($pageIds->slice(1) as $pageId) {
             $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $pageId);
             AutomationConfig::create(array_merge($baseData, [

@@ -8,6 +8,7 @@ use App\Models\FacebookAccount;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Services\FacebookGraphService;
+use App\Services\PlanEnforcementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,10 @@ use Throwable;
 
 class FacebookSettingsController extends Controller
 {
-    public function __construct(private readonly FacebookGraphService $facebookGraphService)
+    public function __construct(
+        private readonly FacebookGraphService $facebookGraphService,
+        private readonly PlanEnforcementService $planEnforcementService,
+    )
     {
     }
 
@@ -66,6 +70,12 @@ class FacebookSettingsController extends Controller
             $shortToken = $this->facebookGraphService->exchangeCodeForToken($app, $request->string('code')->toString());
             $tokenData = $this->facebookGraphService->exchangeForLongLivedToken($app, $shortToken);
 
+            $accountExists = FacebookAccount::query()
+                ->where('user_id', Auth::id())
+                ->where('facebook_app_id', $app->id)
+                ->exists();
+            $this->planEnforcementService->assertCanConnectApps(Auth::user(), $accountExists ? 0 : 1);
+
             $account = FacebookAccount::updateOrCreate(
                 [
                     'user_id' => Auth::id(),
@@ -81,6 +91,7 @@ class FacebookSettingsController extends Controller
             );
 
             $pages = $this->facebookGraphService->fetchManagedPages($tokenData['access_token']);
+            $this->planEnforcementService->assertCanSyncPages(Auth::user(), count($pages));
             $this->facebookGraphService->upsertPages($account, $pages);
             session()->forget('facebook_auth_app_id');
 
@@ -124,6 +135,7 @@ class FacebookSettingsController extends Controller
             }
 
             $pages = $this->facebookGraphService->fetchManagedPages($account->long_lived_user_token);
+            $this->planEnforcementService->assertCanSyncPages(Auth::user(), count($pages));
             $this->facebookGraphService->upsertPages($account, $pages);
 
             return back()->with('success', 'Facebook pages synced.');
