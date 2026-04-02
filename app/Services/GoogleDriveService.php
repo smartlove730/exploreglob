@@ -53,23 +53,108 @@ class GoogleDriveService
         }
 
         $images = [];
+        $seenImageIds = [];
+        $visitedFolders = [];
+        $pendingFolders = [[
+            'id' => $folderId,
+            'resource_key' => $folderResourceKey,
+        ]];
+
+        while (!empty($pendingFolders)) {
+            $current = array_shift($pendingFolders);
+            $currentFolderId = (string) ($current['id'] ?? '');
+            $currentFolderResourceKey = (string) ($current['resource_key'] ?? '');
+
+            if ($currentFolderId === '' || isset($visitedFolders[$currentFolderId])) {
+                continue;
+            }
+
+            $visitedFolders[$currentFolderId] = true;
+            $files = $this->listFolderEntries($currentFolderId, $apiKey, $accessToken, $currentFolderResourceKey);
+
+            foreach ($files as $file) {
+                $mimeType = (string) ($file['mimeType'] ?? '');
+                $fileId = (string) ($file['id'] ?? '');
+                $resourceKey = (string) ($file['resourceKey'] ?? '');
+
+                if ($mimeType === 'application/vnd.google-apps.folder' && $fileId !== '') {
+                    $pendingFolders[] = [
+                        'id' => $fileId,
+                        'resource_key' => $resourceKey,
+                    ];
+                    continue;
+                }
+
+                if ($mimeType === 'application/vnd.google-apps.shortcut') {
+                    $targetId = (string) data_get($file, 'shortcutDetails.targetId', '');
+                    $targetMimeType = (string) data_get($file, 'shortcutDetails.targetMimeType', '');
+                    $targetResourceKey = (string) data_get($file, 'shortcutDetails.targetResourceKey', '');
+
+                    if ($targetMimeType === 'application/vnd.google-apps.folder' && $targetId !== '') {
+                        $pendingFolders[] = [
+                            'id' => $targetId,
+                            'resource_key' => $targetResourceKey,
+                        ];
+                        continue;
+                    }
+
+                    if (!str_starts_with($targetMimeType, 'image/')) {
+                        continue;
+                    }
+
+                    $fileId = $targetId !== '' ? $targetId : $fileId;
+                    $resourceKey = $targetResourceKey !== '' ? $targetResourceKey : $resourceKey;
+                    $mimeType = $targetMimeType;
+                }
+
+                if ($fileId === '' || !str_starts_with($mimeType, 'image/')) {
+                    continue;
+                }
+
+                if (isset($seenImageIds[$fileId])) {
+                    continue;
+                }
+
+                $seenImageIds[$fileId] = true;
+
+                $images[] = [
+                    'id' => $fileId,
+                    'name' => (string) ($file['name'] ?? 'Untitled'),
+                    'mime_type' => $mimeType,
+                    'web_view_link' => (string) ($file['webViewLink'] ?? ''),
+                    'resource_key' => $resourceKey,
+                    'preview_url' => $this->buildPreviewUrl($fileId, $resourceKey),
+                    'download_url' => $this->buildDownloadUrl($fileId, $resourceKey),
+                ];
+            }
+        }
+
+        return $images;
+    }
+
+    private function listFolderEntries(string $folderId, ?string $apiKey, ?string $accessToken, string $folderResourceKey = ''): array
+    {
         $pageToken = null;
+        $files = [];
 
         do {
             $request = Http::timeout(30);
-
             if ($accessToken) {
                 $request = $request->withToken($accessToken);
             }
 
             $query = [
-                    'q' => "'{$folderId}' in parents and (mimeType contains 'image/' or mimeType = 'application/vnd.google-apps.shortcut') and trashed = false",
-                    'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey,shortcutDetails(targetId,targetMimeType,targetResourceKey))',
-                    'pageSize' => 200,
-                    'pageToken' => $pageToken,
-                    'supportsAllDrives' => 'true',
-                    'includeItemsFromAllDrives' => 'true',
-                ];
+                'q' => "'{$folderId}' in parents and (mimeType contains 'image/' or mimeType = 'application/vnd.google-apps.folder' or mimeType = 'application/vnd.google-apps.shortcut') and trashed = false",
+                'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey,shortcutDetails(targetId,targetMimeType,targetResourceKey))',
+                'pageSize' => 200,
+                'pageToken' => $pageToken,
+                'supportsAllDrives' => 'true',
+                'includeItemsFromAllDrives' => 'true',
+            ];
+
+            if ($folderResourceKey !== '') {
+                $query['resourceKeys'] = $folderId.'/'.$folderResourceKey;
+            }
 
             if ($folderResourceKey !== '') {
                 $query['resourceKeys'] = $folderId.'/'.$folderResourceKey;
@@ -102,45 +187,47 @@ class GoogleDriveService
             }
 
             $payload = $response->json();
-            $files = $payload['files'] ?? [];
-
-            foreach ($files as $file) {
-                $mimeType = (string) ($file['mimeType'] ?? '');
-                $isShortcut = $mimeType === 'application/vnd.google-apps.shortcut';
-                $shortcutTargetMimeType = (string) data_get($file, 'shortcutDetails.targetMimeType', '');
-
-                if ($isShortcut && !str_starts_with($shortcutTargetMimeType, 'image/')) {
-                    continue;
-                }
-
-                $id = (string) ($file['id'] ?? '');
-                $resourceKey = (string) ($file['resourceKey'] ?? '');
-
-                if ($isShortcut) {
-                    $id = (string) data_get($file, 'shortcutDetails.targetId', $id);
-                    $resourceKey = (string) data_get($file, 'shortcutDetails.targetResourceKey', $resourceKey);
-                    $mimeType = $shortcutTargetMimeType;
-                }
-
-                if ($id === '') {
-                    continue;
-                }
-
-                $images[] = [
-                    'id' => $id,
-                    'name' => (string) ($file['name'] ?? 'Untitled'),
-                    'mime_type' => $mimeType,
-                    'web_view_link' => (string) ($file['webViewLink'] ?? ''),
-                    'resource_key' => $resourceKey,
-                    'preview_url' => $this->buildPreviewUrl($id, $resourceKey),
-                    'download_url' => $this->buildDownloadUrl($id, $resourceKey),
-                ];
-            }
-
+            $files = array_merge($files, (array) ($payload['files'] ?? []));
             $pageToken = $payload['nextPageToken'] ?? null;
         } while ($pageToken);
 
-        return $images;
+        return $files;
+    }
+
+    private function fetchFolderMetadata(string $folderId, ?string $apiKey, ?string $accessToken, string $folderResourceKey = ''): array
+    {
+        $query = [
+            'fields' => 'id,driveId,resourceKey',
+            'supportsAllDrives' => 'true',
+        ];
+
+        if ($folderResourceKey !== '') {
+            $query['resourceKey'] = $folderResourceKey;
+        }
+
+        if (!$accessToken && $apiKey) {
+            $query['key'] = $apiKey;
+        }
+
+        $request = Http::timeout(30);
+        if ($accessToken) {
+            $request = $request->withToken($accessToken);
+        }
+
+        $response = $request->get("https://www.googleapis.com/drive/v3/files/{$folderId}", $query);
+
+        return $response->successful() ? (array) $response->json() : [];
+    }
+
+    private function extractGoogleErrorMessage(\Illuminate\Http\Client\Response $response): string
+    {
+        $message = (string) data_get($response->json(), 'error.message', '');
+
+        if ($message === '') {
+            return 'Make sure the folder is shared publicly (or accessible by the connected Drive account).';
+        }
+
+        return trim($message);
     }
 
     private function fetchFolderMetadata(string $folderId, ?string $apiKey, ?string $accessToken, string $folderResourceKey = ''): array
