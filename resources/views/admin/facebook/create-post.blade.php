@@ -275,6 +275,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const driveApiKeyInput = document.getElementById('drive_api_key_id');
     const folderUrlInput = document.getElementById('drive_folder_url');
     const savedFolderInput = document.getElementById('saved_drive_folder_id');
+    const getSelectedPageIds = () => [...(pageIdsInput?.selectedOptions || [])]
+        .map((option) => option.value)
+        .filter(Boolean);
 
     const modalTitle = document.getElementById('drivePostModalTitle');
     const modalPreview = document.getElementById('drive_modal_preview');
@@ -628,6 +631,3 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 @endpush
-    const getSelectedPageIds = () => [...(pageIdsInput?.selectedOptions || [])]
-        .map((option) => option.value)
-        .filter(Boolean);
