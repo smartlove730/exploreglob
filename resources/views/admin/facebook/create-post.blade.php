@@ -36,13 +36,13 @@
                 </select>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Facebook Page (Active)</label>
-                <select name="page_id" id="drive_page_id" class="form-select" required>
-                    <option value="">Select a page</option>
+                <label class="form-label">Facebook Pages (Active)</label>
+                <select name="page_ids[]" id="drive_page_ids" class="form-select" multiple required>
                     @foreach($pages as $page)
-                        <option value="{{ $page->id }}" {{ $selectedPageId === $page->id ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
+                        <option value="{{ $page->id }}" {{ in_array($page->id, $selectedPageIds, true) ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
                     @endforeach
                 </select>
+                <small class="text-muted">Use Ctrl/Cmd to select multiple pages.</small>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Google Drive Key</label>
@@ -98,13 +98,13 @@
                 @csrf
                 <input type="hidden" name="app_id" value="{{ $selectedAppId }}">
                 <div class="mb-3">
-                    <label class="form-label">Page</label>
-                    <select name="page_id" class="form-select" required>
-                        <option value="">Select page</option>
+                    <label class="form-label">Pages</label>
+                    <select name="page_ids[]" class="form-select" multiple required>
                         @foreach($pages as $page)
-                            <option value="{{ $page->id }}" {{ (int) old('page_id', $selectedPageId) === $page->id ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
+                            <option value="{{ $page->id }}" {{ in_array($page->id, $selectedPageIds, true) ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
                         @endforeach
                     </select>
+                    <small class="text-muted">Use Ctrl/Cmd to select multiple pages.</small>
                 </div>
                 <div class="mb-3">
                     <label class="form-label d-block">Platforms</label>
@@ -271,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = new bootstrap.Modal(modalEl);
 
     const appIdInput = document.getElementById('drive_app_id');
-    const pageIdInput = document.getElementById('drive_page_id');
+    const pageIdsInput = document.getElementById('drive_page_ids');
     const driveApiKeyInput = document.getElementById('drive_api_key_id');
     const folderUrlInput = document.getElementById('drive_folder_url');
     const savedFolderInput = document.getElementById('saved_drive_folder_id');
@@ -359,12 +359,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchBtn?.addEventListener('click', async () => {
         const appId = appIdInput.value;
-        const pageId = pageIdInput.value;
+        const pageIds = getSelectedPageIds();
         const driveApiKeyId = driveApiKeyInput.value;
         const folderUrl = folderUrlInput.value.trim();
 
-        if (!appId || !pageId || !driveApiKeyId || !folderUrl) {
-            setStatus('App, page, Drive key, and folder URL are required.', 'danger');
+        if (!appId || !pageIds.length || !driveApiKeyId || !folderUrl) {
+            setStatus('App, at least one page, Drive key, and folder URL are required.', 'danger');
             return;
         }
 
@@ -379,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ app_id: appId, page_id: pageId, drive_api_key_id: driveApiKeyId, folder_url: folderUrl }),
+                body: JSON.stringify({ app_id: appId, page_ids: pageIds, drive_api_key_id: driveApiKeyId, folder_url: folderUrl }),
             });
 
             const result = await response.json();
@@ -454,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     modalPostBtn?.addEventListener('click', async () => {
         const appId = appIdInput.value;
-        const pageId = pageIdInput.value;
+        const pageIds = getSelectedPageIds();
         const caption = modalCaption.value.trim();
         const platforms = [...document.querySelectorAll('.drive-platform:checked')].map((node) => node.value);
         const postMode = document.querySelector('input[name="drive_post_mode"]:checked')?.value || 'separate';
@@ -474,9 +474,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (!pageIds.length) {
+            setModalStatus('Select at least one page.', 'danger');
+            return;
+        }
+
         const payload = {
             app_id: appId,
-            page_id: pageId,
+            page_ids: pageIds,
             folder_id: state.folderId,
             caption,
             drive_api_key_id: driveApiKeyInput.value,
@@ -623,3 +628,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 @endpush
+    const getSelectedPageIds = () => [...(pageIdsInput?.selectedOptions || [])]
+        .map((option) => option.value)
+        .filter(Boolean);
