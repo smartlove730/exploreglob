@@ -1,8 +1,37 @@
 @extends('marketing.layout')
 @section('title', 'About | ExploreGlob')
+
 @section('content')
-<section class="mx-auto w-full max-w-7xl px-4 pb-10 pt-16 sm:px-6 lg:px-8"><p class="text-sm font-semibold uppercase tracking-[0.2em] text-violet-700">About</p><h1 class="mt-3 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">Our mission is to make consistent social media posting effortless for every business.</h1></section>
-<section class="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8"><div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><h2 class="text-2xl font-bold">Built to solve manual posting frustration</h2><p class="mt-4 text-slate-600">ExploreGlob started after seeing teams juggle spreadsheets and reminders. We built a single workflow for planning, scheduling, collaboration, and analytics.</p></div></section>
-<section class="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8"><h2 class="text-3xl font-bold">Values</h2><div class="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-4">@foreach(['automation-first mindset','simplicity','reliability','customer success'] as $value)<article class="rounded-xl border border-slate-200 bg-white p-6 text-sm font-semibold capitalize shadow-sm">{{ $value }}</article>@endforeach</div></section>
-<section class="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8"><h2 class="text-3xl font-bold">Team</h2><div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">@foreach(['Product','Engineering','Customer Success','Growth'] as $role)<article class="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm"><div class="mx-auto h-16 w-16 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600"></div><p class="mt-4 font-semibold">{{ $role }} Lead</p><p class="text-sm text-slate-500">Team member placeholder</p></article>@endforeach</div></section>
+<section style="padding:3rem 0 1.2rem;">
+    <p class="eyebrow">About ExploreGlob</p>
+    <h1 class="page-title">We help teams publish consistently without burnout.</h1>
+    <p class="lead">ExploreGlob was built to replace fragmented social workflows with one clear operating system for planning, automation, and collaboration.</p>
+</section>
+
+<section class="card" style="margin-bottom:1.2rem;">
+    <h2 style="font-size:1.6rem;font-weight:800;">Why we started</h2>
+    <p>Most teams were juggling spreadsheets, scattered notes, and manual reminders. We built ExploreGlob so any business can run social campaigns with the same confidence and consistency as top agencies.</p>
+</section>
+
+<section style="padding:0 0 1.2rem;">
+    <h2 style="font-size:1.6rem;font-weight:800;">Our values</h2>
+    <div class="cards-4" style="margin-top:.85rem;">
+        @foreach(['Automation-first mindset','Simplicity in every workflow','Reliable publishing infrastructure','Customer-focused execution'] as $value)
+            <article class="card"><h3>{{ $value }}</h3></article>
+        @endforeach
+    </div>
+</section>
+
+<section style="padding-bottom:2rem;">
+    <h2 style="font-size:1.6rem;font-weight:800;">Team highlights</h2>
+    <div class="cards-4" style="margin-top:.85rem;">
+        @foreach(['Product','Engineering','Customer Success','Growth'] as $role)
+            <article class="card" style="text-align:center;">
+                <div style="width:64px;height:64px;margin:0 auto;border-radius:999px;background:linear-gradient(130deg,#4f46e5,#7c3aed);"></div>
+                <h3 style="margin-top:.8rem;">{{ $role }} Lead</h3>
+                <p>Team member placeholder</p>
+            </article>
+        @endforeach
+    </div>
+</section>
 @endsection

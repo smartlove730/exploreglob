@@ -1,15 +1,47 @@
 @extends('marketing.layout')
 @section('title', 'Contact | ExploreGlob')
+
 @section('content')
-<section class="mx-auto w-full max-w-7xl px-4 pb-10 pt-16 sm:px-6 lg:px-8"><h1 class="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">Let’s build your automation workflow</h1></section>
-<section class="mx-auto grid w-full max-w-7xl gap-6 px-4 pb-24 sm:px-6 lg:grid-cols-3 lg:px-8">
-<div class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm lg:col-span-2"><h2 class="text-2xl font-bold">Contact form</h2>@if(session('success'))<p class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ session('success') }}</p>@endif
-<form method="POST" action="{{ route('marketing.contact.send') }}" class="mt-6 grid gap-4 sm:grid-cols-2">@csrf
-<div><label class="mb-2 block text-sm font-medium">Name</label><input name="name" value="{{ old('name') }}" required class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"></div>
-<div><label class="mb-2 block text-sm font-medium">Email</label><input type="email" name="email" value="{{ old('email') }}" required class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"></div>
-<div class="sm:col-span-2"><label class="mb-2 block text-sm font-medium">Company</label><input name="company" value="{{ old('company') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"></div>
-<div class="sm:col-span-2"><label class="mb-2 block text-sm font-medium">Message</label><textarea name="message" rows="6" required class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">{{ old('message') }}</textarea></div>
-<button class="w-fit rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 text-sm font-semibold text-white">Send message</button></form></div>
-<div class="space-y-6"><article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"><h3 class="text-lg font-bold">Sales inquiry</h3><p class="mt-2 text-sm text-slate-600">Need migration support, onboarding, or training? We can help.</p></article><article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"><h3 class="text-lg font-bold">Support request</h3><p class="mt-2 text-sm text-slate-600">Share account context and our support team will jump in quickly.</p></article><article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"><h3 class="text-lg font-bold">Response time</h3><p class="mt-2 text-sm text-slate-600">Typical response is within one business day.</p></article></div>
+<section style="padding:3rem 0 1.3rem;">
+    <p class="eyebrow">Contact us</p>
+    <h1 class="page-title">Let’s design your social automation workflow</h1>
+    <p class="lead">Tell us about your team, current challenges, and goals. We typically respond within one business day.</p>
+</section>
+
+<section class="section-grid" style="grid-template-columns:2fr 1fr;padding-bottom:2.2rem;align-items:start;">
+    <div class="card">
+        <h2 style="font-size:1.5rem;font-weight:800;">Send us a message</h2>
+
+        @if(session('success'))
+            <p class="band" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46;">{{ session('success') }}</p>
+        @endif
+
+        <form method="POST" action="{{ route('marketing.contact.send') }}" class="contact-form">
+            @csrf
+            <div>
+                <label style="display:block;margin-bottom:.3rem;font-weight:600;">Name</label>
+                <input name="name" value="{{ old('name') }}" required style="width:100%;padding:.62rem .7rem;border:1px solid #cfd8ff;border-radius:.65rem;">
+            </div>
+            <div>
+                <label style="display:block;margin-bottom:.3rem;font-weight:600;">Email</label>
+                <input type="email" name="email" value="{{ old('email') }}" required style="width:100%;padding:.62rem .7rem;border:1px solid #cfd8ff;border-radius:.65rem;">
+            </div>
+            <div style="grid-column:1 / -1;">
+                <label style="display:block;margin-bottom:.3rem;font-weight:600;">Company</label>
+                <input name="company" value="{{ old('company') }}" style="width:100%;padding:.62rem .7rem;border:1px solid #cfd8ff;border-radius:.65rem;">
+            </div>
+            <div style="grid-column:1 / -1;">
+                <label style="display:block;margin-bottom:.3rem;font-weight:600;">Message</label>
+                <textarea name="message" rows="6" required style="width:100%;padding:.62rem .7rem;border:1px solid #cfd8ff;border-radius:.65rem;">{{ old('message') }}</textarea>
+            </div>
+            <button class="cta-btn cta-btn-primary" style="width:max-content;">Send message</button>
+        </form>
+    </div>
+
+    <div class="cards-3">
+        <article class="card"><h3>Sales inquiry</h3><p>Need onboarding, migration help, or enterprise rollout support? We can help.</p></article>
+        <article class="card"><h3>Support request</h3><p>Share account context and our support team will guide you quickly.</p></article>
+        <article class="card"><h3>Response time</h3><p>Most replies arrive within one business day.</p></article>
+    </div>
 </section>
 @endsection

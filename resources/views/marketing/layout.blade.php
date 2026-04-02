@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,72 +11,54 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>body{font-family:'Inter',sans-serif;}</style>
 </head>
-<body class="bg-slate-50 text-slate-900 antialiased" x-data="{ mobileOpen: false, scrolled: false }" x-init="window.addEventListener('scroll', () => scrolled = window.scrollY > 10)">
-    <div class="fixed inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_15%_0%,rgba(99,102,241,0.28),transparent_45%),radial-gradient(circle_at_80%_10%,rgba(217,70,239,0.22),transparent_35%)]"></div>
+<body class="marketing-body">
+    <header class="site-header">
+        <div class="site-shell">
+            <nav>
+                <a href="{{ route('marketing.home') }}" class="brand">
+                    <span class="brand-badge">EG</span>
+                    <span>ExploreGlob</span>
+                </a>
 
-    <!-- Sticky Navbar -->
-    <header class="sticky top-0 z-50 border-b border-transparent transition-all duration-300" :class="scrolled ? 'bg-white/80 backdrop-blur-xl border-slate-200 shadow-sm' : 'bg-transparent'">
-        <nav class="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-            <a href="{{ route('marketing.home') }}" class="flex items-center gap-3">
-                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-sm font-bold text-white shadow-lg shadow-indigo-200">EG</span>
-                <span class="text-base font-extrabold tracking-tight text-slate-900">ExploreGlob</span>
-            </a>
-            <div class="hidden items-center gap-7 text-sm md:flex">
-                <a href="{{ route('marketing.features') }}" class="font-medium text-slate-600 transition hover:text-slate-900">Features</a>
-                <a href="{{ route('marketing.pricing') }}" class="font-medium text-slate-600 transition hover:text-slate-900">Pricing</a>
-                <a href="{{ route('marketing.integrations') }}" class="font-medium text-slate-600 transition hover:text-slate-900">Integrations</a>
-                <a href="{{ route('marketing.security') }}" class="font-medium text-slate-600 transition hover:text-slate-900">Security</a>
-                <a href="{{ route('login') }}" class="font-medium text-slate-600 transition hover:text-slate-900">Login</a>
-                <a href="{{ route('register') }}" class="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-300/70 transition hover:-translate-y-0.5">Start Free Trial</a>
-            </div>
-            <button type="button" class="inline-flex items-center rounded-lg border border-slate-300 bg-white p-2 text-slate-700 md:hidden" @click="mobileOpen = !mobileOpen" aria-label="Open menu">
-                <svg x-show="!mobileOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                <svg x-show="mobileOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-        </nav>
-        <div x-show="mobileOpen" x-transition class="border-t border-slate-200 bg-white px-4 py-4 md:hidden">
-            <div class="flex flex-col gap-2 text-sm">
-                @foreach([
-                    ['Features', route('marketing.features')],
-                    ['Pricing', route('marketing.pricing')],
-                    ['Integrations', route('marketing.integrations')],
-                    ['Security', route('marketing.security')],
-                    ['About', route('marketing.about')],
-                    ['Contact', route('marketing.contact')],
-                ] as [$label, $url])
-                    <a href="{{ $url }}" class="rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100">{{ $label }}</a>
-                @endforeach
-                <div class="mt-2 grid grid-cols-2 gap-3">
-                    <a href="{{ route('login') }}" class="rounded-lg border border-slate-300 px-3 py-2 text-center font-medium text-slate-900">Login</a>
-                    <a href="{{ route('register') }}" class="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2 text-center font-medium text-white">Start Trial</a>
+                <div class="main-nav">
+                    <a href="{{ route('marketing.features') }}" class="{{ request()->routeIs('marketing.features') ? 'is-active' : '' }}">Features</a>
+                    <a href="{{ route('marketing.pricing') }}" class="{{ request()->routeIs('marketing.pricing') ? 'is-active' : '' }}">Pricing</a>
+                    <a href="{{ route('marketing.about') }}" class="{{ request()->routeIs('marketing.about') ? 'is-active' : '' }}">About</a>
+                    <a href="{{ route('marketing.contact') }}" class="{{ request()->routeIs('marketing.contact') ? 'is-active' : '' }}">Contact</a>
+                    <a href="{{ route('login') }}">Login</a>
+                    <a href="{{ route('register') }}" class="cta-btn cta-btn-primary">Start Free Trial</a>
                 </div>
-            </div>
+            </nav>
         </div>
     </header>
 
-    <main>@yield('content')</main>
+    <main class="site-shell">@yield('content')</main>
 
-    <!-- Footer -->
-    <footer class="mt-8 border-t border-slate-200 bg-white">
-        <div class="mx-auto grid w-full max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-4 lg:px-8">
+    <footer class="site-footer">
+        <div class="site-shell footer-grid">
             <div>
-                <p class="text-lg font-bold text-slate-900">ExploreGlob</p>
-                <p class="mt-3 text-sm text-slate-600">Automation-first social media publishing for creators, teams, and agencies.</p>
+                <p><strong>ExploreGlob</strong></p>
+                <p class="lead">Automation-first social media publishing for creators, teams, and agencies.</p>
             </div>
-            <div><p class="text-sm font-semibold text-slate-900">Product</p><ul class="mt-3 space-y-2 text-sm text-slate-600"><li><a class="hover:text-slate-900" href="{{ route('marketing.features') }}">Features</a></li><li><a class="hover:text-slate-900" href="{{ route('marketing.pricing') }}">Pricing</a></li><li><a class="hover:text-slate-900" href="{{ route('marketing.integrations') }}">Integrations</a></li><li><a class="hover:text-slate-900" href="{{ route('marketing.security') }}">Security</a></li></ul></div>
-            <div><p class="text-sm font-semibold text-slate-900">Resources</p><ul class="mt-3 space-y-2 text-sm text-slate-600"><li><a class="hover:text-slate-900" href="{{ route('marketing.about') }}">About</a></li><li><a class="hover:text-slate-900" href="{{ route('marketing.contact') }}">Contact</a></li><li><a class="hover:text-slate-900" href="{{ route('marketing.privacy') }}">Privacy Policy</a></li><li><a class="hover:text-slate-900" href="{{ route('marketing.terms') }}">Terms</a></li></ul></div>
             <div>
-                <p class="text-sm font-semibold text-slate-900">Social</p>
-                <div class="mt-3 flex gap-3 text-sm">
-                    <a href="#" class="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 hover:border-slate-400">𝕏</a>
-                    <a href="#" class="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 hover:border-slate-400">in</a>
-                    <a href="#" class="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 hover:border-slate-400">ig</a>
-                </div>
+                <p><strong>Product</strong></p>
+                <a href="{{ route('marketing.features') }}">Features</a>
+                <a href="{{ route('marketing.pricing') }}">Pricing</a>
+                <a href="{{ route('marketing.integrations') }}">Integrations</a>
+            </div>
+            <div>
+                <p><strong>Company</strong></p>
+                <a href="{{ route('marketing.about') }}">About</a>
+                <a href="{{ route('marketing.contact') }}">Contact</a>
+                <a href="{{ route('marketing.security') }}">Security</a>
+            </div>
+            <div>
+                <p><strong>Legal</strong></p>
+                <a href="{{ route('marketing.privacy') }}">Privacy Policy</a>
+                <a href="{{ route('marketing.terms') }}">Terms & Conditions</a>
             </div>
         </div>
-        <div class="border-t border-slate-200 px-4 py-4 text-center text-xs text-slate-500">© {{ now()->year }} ExploreGlob. All rights reserved.</div>
+        <div class="site-shell" style="padding-bottom:1.1rem;color:#6b7390;font-size:.84rem;">© {{ now()->year }} ExploreGlob. All rights reserved.</div>
     </footer>
-
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </body>
 </html>
