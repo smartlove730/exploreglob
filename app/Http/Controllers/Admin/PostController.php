@@ -323,6 +323,15 @@ class PostController extends Controller
 
     public function fetchDriveImages(Request $request): JsonResponse
     {
+        Log::info('google_drive.fetch_drive_images.request', [
+            'user_id' => Auth::id(),
+            'app_id' => $request->input('app_id'),
+            'page_ids' => $request->input('page_ids'),
+            'drive_api_key_id' => $request->input('drive_api_key_id'),
+            'folder_url' => $request->input('folder_url'),
+            'saved_folder_id' => $request->input('folder_id'),
+        ]);
+
         $data = $request->validate([
             'folder_url' => 'nullable|string|max:2048',
             'folder_id' => 'nullable|integer|exists:drive_folders,id',
@@ -334,6 +343,10 @@ class PostController extends Controller
         ]);
 
         if (empty($data['folder_url']) && empty($data['folder_id'])) {
+            Log::warning('google_drive.fetch_drive_images.validation_failed', [
+                'reason' => 'missing_folder_input',
+                'user_id' => Auth::id(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Please provide a folder link or select a saved folder.',
@@ -348,6 +361,12 @@ class PostController extends Controller
             ->all();
         $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $pageIds);
         if ($pages->isEmpty()) {
+            Log::warning('google_drive.fetch_drive_images.validation_failed', [
+                'reason' => 'invalid_pages_for_app',
+                'user_id' => Auth::id(),
+                'app_id' => $data['app_id'] ?? null,
+                'page_ids' => $pageIds,
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Selected page is not valid for this app/user.',
@@ -361,6 +380,11 @@ class PostController extends Controller
             ->first();
 
         if (!$driveApiKey) {
+            Log::warning('google_drive.fetch_drive_images.validation_failed', [
+                'reason' => 'invalid_or_inactive_drive_key',
+                'user_id' => Auth::id(),
+                'drive_api_key_id' => $data['drive_api_key_id'] ?? null,
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Selected Google Drive key is invalid or inactive.',
@@ -371,6 +395,11 @@ class PostController extends Controller
         if (!empty($data['folder_id'])) {
             $savedFolder = DriveFolder::query()->ownedBy(Auth::user())->whereKey((int) $data['folder_id'])->where('is_active', true)->first();
             if (!$savedFolder) {
+                Log::warning('google_drive.fetch_drive_images.validation_failed', [
+                    'reason' => 'invalid_saved_folder',
+                    'user_id' => Auth::id(),
+                    'saved_folder_id' => $data['folder_id'] ?? null,
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Selected saved folder is invalid or inactive.',
@@ -380,7 +409,13 @@ class PostController extends Controller
             $folderUrl = $savedFolder->folder_url;
         }
 
-        $folderId = $this->googleDriveService->extractFolderId($folderUrl);
+        $folderReference = $this->googleDriveService->extractFolderReference($folderUrl);
+        $folderId = $folderReference['id'];
+        Log::info('google_drive.fetch_drive_images.folder_reference', [
+            'user_id' => Auth::id(),
+            'folder_id' => $folderId,
+            'has_resource_key' => !empty($folderReference['resource_key']),
+        ]);
 
         $driveToken = null;
         if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
@@ -388,7 +423,17 @@ class PostController extends Controller
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $images = $this->googleDriveService->listPublicFolderImages($folderId, $driveApiKey->api_key, $driveToken);
+        $images = $this->googleDriveService->listPublicFolderImages(
+            $folderId,
+            $driveApiKey->api_key,
+            $driveToken,
+            (string) ($folderReference['resource_key'] ?? '')
+        );
+        Log::info('google_drive.fetch_drive_images.images_loaded', [
+            'user_id' => Auth::id(),
+            'folder_id' => $folderId,
+            'count' => count($images),
+        ]);
 
         $postedByImage = DriveImagePost::query()->ownedBy(Auth::user())
             ->where('page_id', $primaryPage->id)
