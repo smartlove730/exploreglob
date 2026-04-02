@@ -156,10 +156,6 @@ class GoogleDriveService
                 $query['resourceKeys'] = $folderId.'/'.$folderResourceKey;
             }
 
-            if ($folderResourceKey !== '') {
-                $query['resourceKeys'] = $folderId.'/'.$folderResourceKey;
-            }
-
             if (!$accessToken) {
                 $query['key'] = $apiKey;
             }
@@ -167,7 +163,7 @@ class GoogleDriveService
             $response = $request->get('https://www.googleapis.com/drive/v3/files', $query);
 
             if (!$response->successful() && $accessToken) {
-                $folderMetadata = $this->fetchFolderMetadata($folderId, $apiKey, $accessToken, $folderResourceKey);
+                $folderMetadata = $this->fetchFolderDriveMetadata($folderId, $apiKey, $accessToken, $folderResourceKey);
                 $sharedDriveId = (string) ($folderMetadata['driveId'] ?? '');
 
                 if ($sharedDriveId !== '') {
@@ -194,43 +190,7 @@ class GoogleDriveService
         return $files;
     }
 
-    private function fetchFolderMetadata(string $folderId, ?string $apiKey, ?string $accessToken, string $folderResourceKey = ''): array
-    {
-        $query = [
-            'fields' => 'id,driveId,resourceKey',
-            'supportsAllDrives' => 'true',
-        ];
-
-        if ($folderResourceKey !== '') {
-            $query['resourceKey'] = $folderResourceKey;
-        }
-
-        if (!$accessToken && $apiKey) {
-            $query['key'] = $apiKey;
-        }
-
-        $request = Http::timeout(30);
-        if ($accessToken) {
-            $request = $request->withToken($accessToken);
-        }
-
-        $response = $request->get("https://www.googleapis.com/drive/v3/files/{$folderId}", $query);
-
-        return $response->successful() ? (array) $response->json() : [];
-    }
-
-    private function extractGoogleErrorMessage(\Illuminate\Http\Client\Response $response): string
-    {
-        $message = (string) data_get($response->json(), 'error.message', '');
-
-        if ($message === '') {
-            return 'Make sure the folder is shared publicly (or accessible by the connected Drive account).';
-        }
-
-        return trim($message);
-    }
-
-    private function fetchFolderMetadata(string $folderId, ?string $apiKey, ?string $accessToken, string $folderResourceKey = ''): array
+    private function fetchFolderDriveMetadata(string $folderId, ?string $apiKey, ?string $accessToken, string $folderResourceKey = ''): array
     {
         $query = [
             'fields' => 'id,driveId,resourceKey',
