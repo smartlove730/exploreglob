@@ -25,9 +25,9 @@
 <section style="padding-bottom:2rem;">
     <h2 style="font-size:1.6rem;font-weight:800;">Team highlights</h2>
     <div class="cards-4" style="margin-top:.85rem;">
-        @foreach(['Product','Engineering','Customer Success','Growth'] as $role)
+        @foreach([['Product','🚀'],['Engineering','🛠️'],['Customer Success','🤝'],['Growth','📈']] as [$role, $icon])
             <article class="card" style="text-align:center;">
-                <div style="width:64px;height:64px;margin:0 auto;border-radius:999px;background:linear-gradient(130deg,#4f46e5,#7c3aed);"></div>
+                <div style="width:64px;height:64px;margin:0 auto;border-radius:999px;background:linear-gradient(130deg,#4f46e5,#7c3aed);display:grid;place-items:center;color:#fff;font-size:1.4rem;">{{ $icon }}</div>
                 <h3 style="margin-top:.8rem;">{{ $role }} Lead</h3>
                 <p>Team member placeholder</p>
             </article>

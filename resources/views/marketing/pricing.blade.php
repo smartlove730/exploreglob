@@ -16,19 +16,19 @@
         <article class="card price-card">
             <h2>Starter</h2>
             <p>For individuals</p>
-            <p class="price"><span x-show="!yearly">$19</span><span x-show="yearly">$15</span><small style="font-size:1rem;color:#6b7390;"> /mo</small></p>
+            <p class="price"><span x-show="!yearly" x-cloak>$19</span><span x-show="yearly" x-cloak>$15</span><small style="font-size:1rem;color:#6b7390;"> /mo</small></p>
             <ul style="padding-left:1rem;"><li>1 social account</li><li>Basic scheduling</li><li>Simple analytics</li></ul>
         </article>
         <article class="card price-card featured">
             <h2>Growth</h2>
             <p>For creators and startups</p>
-            <p class="price"><span x-show="!yearly">$49</span><span x-show="yearly">$39</span><small style="font-size:1rem;color:#6b7390;"> /mo</small></p>
+            <p class="price"><span x-show="!yearly" x-cloak>$49</span><span x-show="yearly" x-cloak>$39</span><small style="font-size:1rem;color:#6b7390;"> /mo</small></p>
             <ul style="padding-left:1rem;"><li>Up to 10 accounts</li><li>Auto publishing</li><li>Calendar + team tools</li></ul>
         </article>
         <article class="card price-card">
             <h2>Agency</h2>
             <p>For scaling teams</p>
-            <p class="price"><span x-show="!yearly">$99</span><span x-show="yearly">$79</span><small style="font-size:1rem;color:#6b7390;"> /mo</small></p>
+            <p class="price"><span x-show="!yearly" x-cloak>$99</span><span x-show="yearly" x-cloak>$79</span><small style="font-size:1rem;color:#6b7390;"> /mo</small></p>
             <ul style="padding-left:1rem;"><li>Unlimited accounts</li><li>Client workspaces</li><li>Priority support</li></ul>
         </article>
     </div>
