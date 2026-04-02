@@ -20,6 +20,8 @@ use App\Http\Controllers\{
 Route::get('/', [MarketingController::class, 'home'])->name('marketing.home');
 Route::get('/features', [MarketingController::class, 'features'])->name('marketing.features');
 Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+Route::get('/integrations', [MarketingController::class, 'integrations'])->name('marketing.integrations');
+Route::get('/security', [MarketingController::class, 'security'])->name('marketing.security');
 Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
 Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
 Route::post('/contact', [MarketingController::class, 'sendContact'])->middleware('throttle:contact-form')->name('marketing.contact.send');
