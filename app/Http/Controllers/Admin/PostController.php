@@ -421,6 +421,37 @@ class PostController extends Controller
         if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
             $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
             $driveToken = $driveApiKey->oauth_access_token;
+            Log::info('google_drive.fetch_drive_images.auth_mode', [
+                'user_id' => Auth::id(),
+                'mode' => 'drive_api_key_oauth_token',
+                'drive_api_key_id' => $driveApiKey->id,
+            ]);
+        } else {
+            $googleAccount = GoogleAccount::query()->where('user_id', Auth::id())->first();
+
+            if ($googleAccount && ($googleAccount->access_token || $googleAccount->refresh_token)) {
+                try {
+                    $googleAccount = $this->googleService->ensureValidGoogleAccountToken($googleAccount);
+                    $driveToken = (string) $googleAccount->access_token;
+
+                    Log::info('google_drive.fetch_drive_images.auth_mode', [
+                        'user_id' => Auth::id(),
+                        'mode' => 'google_business_oauth_fallback',
+                        'google_account_id' => $googleAccount->id,
+                    ]);
+                } catch (\Throwable $exception) {
+                    Log::warning('google_drive.fetch_drive_images.auth_fallback_failed', [
+                        'user_id' => Auth::id(),
+                        'message' => $exception->getMessage(),
+                    ]);
+                }
+            } else {
+                Log::info('google_drive.fetch_drive_images.auth_mode', [
+                    'user_id' => Auth::id(),
+                    'mode' => 'api_key_only',
+                    'drive_api_key_id' => $driveApiKey->id,
+                ]);
+            }
         }
 
         $images = $this->googleDriveService->listPublicFolderImages(
