@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class GoogleDriveService
@@ -10,6 +11,9 @@ class GoogleDriveService
     public function extractFolderReference(string $folderUrl): array
     {
         $folderUrl = trim($folderUrl);
+        Log::info('google_drive.extract_folder_reference.start', [
+            'folder_url' => $folderUrl,
+        ]);
         $folderId = null;
 
         if (preg_match('~/folders/([a-zA-Z0-9_-]+)~', $folderUrl, $matches) === 1) {
@@ -19,6 +23,9 @@ class GoogleDriveService
         }
 
         if (!$folderId) {
+            Log::warning('google_drive.extract_folder_reference.failed', [
+                'folder_url' => $folderUrl,
+            ]);
             throw ValidationException::withMessages([
                 'folder_url' => 'Unable to parse Google Drive folder ID from the provided link.',
             ]);
@@ -31,10 +38,17 @@ class GoogleDriveService
             $resourceKey = (string) ($queryParams['resourcekey'] ?? $queryParams['resourceKey'] ?? '');
         }
 
-        return [
+        $reference = [
             'id' => $folderId,
             'resource_key' => trim($resourceKey),
         ];
+
+        Log::info('google_drive.extract_folder_reference.success', [
+            'folder_id' => $reference['id'],
+            'has_resource_key' => $reference['resource_key'] !== '',
+        ]);
+
+        return $reference;
     }
 
     public function extractFolderId(string $folderUrl): string
@@ -44,6 +58,13 @@ class GoogleDriveService
 
     public function listPublicFolderImages(string $folderId, ?string $apiKey = null, ?string $accessToken = null, string $folderResourceKey = ''): array
     {
+        Log::info('google_drive.list_public_folder_images.start', [
+            'folder_id' => $folderId,
+            'has_folder_resource_key' => $folderResourceKey !== '',
+            'has_access_token' => !empty($accessToken),
+            'has_api_key' => !empty($apiKey) || !empty(config('services.google_drive.api_key')),
+        ]);
+
         $apiKey = $apiKey ?: config('services.google_drive.api_key');
 
         if (!$apiKey) {
@@ -70,7 +91,15 @@ class GoogleDriveService
             }
 
             $visitedFolders[$currentFolderId] = true;
+            Log::info('google_drive.list_public_folder_images.folder_scan_start', [
+                'folder_id' => $currentFolderId,
+                'has_resource_key' => $currentFolderResourceKey !== '',
+            ]);
             $files = $this->listFolderEntries($currentFolderId, $apiKey, $accessToken, $currentFolderResourceKey);
+            Log::info('google_drive.list_public_folder_images.folder_scan_result', [
+                'folder_id' => $currentFolderId,
+                'entries_count' => count($files),
+            ]);
 
             foreach ($files as $file) {
                 $mimeType = (string) ($file['mimeType'] ?? '');
@@ -129,6 +158,12 @@ class GoogleDriveService
             }
         }
 
+        Log::info('google_drive.list_public_folder_images.complete', [
+            'folder_id' => $folderId,
+            'visited_folders' => count($visitedFolders),
+            'images_count' => count($images),
+        ]);
+
         return $images;
     }
 
@@ -161,6 +196,12 @@ class GoogleDriveService
             }
 
             $response = $request->get('https://www.googleapis.com/drive/v3/files', $query);
+            Log::debug('google_drive.list_folder_entries.response', [
+                'folder_id' => $folderId,
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'page_token' => $pageToken,
+            ]);
 
             if (!$response->successful() && $accessToken) {
                 $folderMetadata = $this->fetchFolderDriveMetadata($folderId, $apiKey, $accessToken, $folderResourceKey);
@@ -173,10 +214,21 @@ class GoogleDriveService
                     ]);
 
                     $response = $request->get('https://www.googleapis.com/drive/v3/files', $retryQuery);
+                    Log::debug('google_drive.list_folder_entries.retry_shared_drive', [
+                        'folder_id' => $folderId,
+                        'drive_id' => $sharedDriveId,
+                        'status' => $response->status(),
+                        'successful' => $response->successful(),
+                    ]);
                 }
             }
 
             if (!$response->successful()) {
+                Log::warning('google_drive.list_folder_entries.failed', [
+                    'folder_id' => $folderId,
+                    'status' => $response->status(),
+                    'error' => $this->extractGoogleErrorMessage($response),
+                ]);
                 throw ValidationException::withMessages([
                     'folder_url' => 'Unable to fetch images from Google Drive. '.$this->extractGoogleErrorMessage($response),
                 ]);
@@ -211,6 +263,11 @@ class GoogleDriveService
         }
 
         $response = $request->get("https://www.googleapis.com/drive/v3/files/{$folderId}", $query);
+        Log::debug('google_drive.fetch_folder_metadata.response', [
+            'folder_id' => $folderId,
+            'status' => $response->status(),
+            'successful' => $response->successful(),
+        ]);
 
         return $response->successful() ? (array) $response->json() : [];
     }
@@ -253,6 +310,12 @@ class GoogleDriveService
 
     public function fetchImageBinary(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): array
     {
+        Log::debug('google_drive.fetch_image_binary.start', [
+            'file_id' => $fileId,
+            'has_resource_key' => $resourceKey !== '',
+            'has_access_token' => !empty($accessToken),
+            'has_api_key' => !empty($apiKey),
+        ]);
         $query = ['alt' => 'media'];
 
         if (!$accessToken && $apiKey) {
@@ -270,6 +333,11 @@ class GoogleDriveService
         }
 
         $response = $request->get("https://www.googleapis.com/drive/v3/files/{$fileId}", $query);
+        Log::debug('google_drive.fetch_image_binary.response', [
+            'file_id' => $fileId,
+            'status' => $response->status(),
+            'successful' => $response->successful(),
+        ]);
 
         if (!$response->successful()) {
             throw ValidationException::withMessages([

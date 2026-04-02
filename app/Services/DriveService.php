@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\DriveApiKey;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -19,6 +20,12 @@ class DriveService
 
     public function fetchImagesFromDriveLink(string $driveLink, ?DriveApiKey $driveApiKey = null): array
     {
+        Log::info('google_drive.fetch_images_from_drive_link.start', [
+            'drive_link' => $driveLink,
+            'has_drive_api_key' => $driveApiKey !== null,
+            'has_access_token' => !empty($driveApiKey?->oauth_access_token),
+        ]);
+
         $folderReference = $this->googleDriveService->extractFolderReference($driveLink);
         $folderId = (string) $folderReference['id'];
         $images = $this->googleDriveService->listPublicFolderImages(
@@ -27,6 +34,11 @@ class DriveService
             $driveApiKey?->oauth_access_token,
             (string) ($folderReference['resource_key'] ?? '')
         );
+
+        Log::info('google_drive.fetch_images_from_drive_link.complete', [
+            'folder_id' => $folderId,
+            'images_count' => count($images),
+        ]);
 
         return [
             'folder_id' => $folderId,
