@@ -61,7 +61,5 @@
         </div>
         <div class="site-shell" style="padding-bottom:1.1rem;color:#6b7390;font-size:.84rem;">© {{ now()->year }} ExploreGlob. All rights reserved.</div>
     </footer>
-
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </body>
 </html>
