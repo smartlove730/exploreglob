@@ -80,12 +80,32 @@ class AutomationConfigController extends Controller
         $this->authorizeAutomation($automation);
 
         $data = $this->validateData($request);
-        $data['page_id'] = (int) ($data['page_id'] ?? collect($data['page_ids'] ?? [])->first());
-        $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $data['page_id']);
+        $pageIds = collect($data['page_ids'] ?? [($data['page_id'] ?? null)])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        abort_if($pageIds->isEmpty(), 422, 'Select at least one page.');
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
-        $automation->update(collect($data)->except(['page_ids'])->all());
+        $baseData = collect($data)->except(['page_ids', 'page_id'])->all();
 
-        return redirect()->route('admin.automations.index')->with('success', 'Automation config updated successfully.');
+        $primaryPageId = (int) $pageIds->first();
+        $this->assertAuthorizedAppAndPage((int) $data['app_id'], $primaryPageId);
+        $automation->update(array_merge($baseData, ['page_id' => $primaryPageId]));
+
+        $createdCount = 0;
+        foreach ($pageIds->slice(1) as $pageId) {
+            $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $pageId);
+            AutomationConfig::create(array_merge($baseData, [
+                'user_id' => Auth::id(),
+                'page_id' => (int) $pageId,
+            ]));
+            $createdCount++;
+        }
+
+        return redirect()->route('admin.automations.index')->with('success', $createdCount > 0
+            ? "Automation updated and {$createdCount} additional config(s) created."
+            : 'Automation config updated successfully.');
     }
 
     public function destroy(AutomationConfig $automation): RedirectResponse
