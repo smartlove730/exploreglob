@@ -37,12 +37,12 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Facebook Page (Active)</label>
-                <select name="page_id" id="drive_page_id" class="form-select" required>
-                    <option value="">Select a page</option>
+                <select name="page_ids[]" id="drive_page_id" class="form-select" multiple required>
                     @foreach($pages as $page)
-                        <option value="{{ $page->id }}" {{ $selectedPageId === $page->id ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
+                        <option value="{{ $page->id }}" {{ in_array($page->id, $selectedPageIds ?? [$selectedPageId]) ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
                     @endforeach
                 </select>
+                <small class="text-muted">Hold Ctrl/Cmd to select multiple pages.</small>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Google Drive Key</label>
@@ -99,12 +99,21 @@
                 <input type="hidden" name="app_id" value="{{ $selectedAppId }}">
                 <div class="mb-3">
                     <label class="form-label">Page</label>
-                    <select name="page_id" class="form-select" required>
-                        <option value="">Select page</option>
+                    <select name="page_ids[]" class="form-select" multiple required>
                         @foreach($pages as $page)
-                            <option value="{{ $page->id }}" {{ (int) old('page_id', $selectedPageId) === $page->id ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
+                            <option value="{{ $page->id }}" {{ in_array($page->id, old('page_ids', $selectedPageIds ?? [$selectedPageId])) ? 'selected' : '' }}>{{ $page->page_name }} ({{ $page->page_id }})</option>
                         @endforeach
                     </select>
+                    <small class="text-muted">Select one or multiple pages.</small>
+                </div>
+                <div class="alert alert-warning">
+                    <strong>Safety warning:</strong> If auto scheduling is OFF and you post repeatedly without random gaps, Facebook may flag or ban pages.
+                </div>
+                <div class="mb-3 form-check">
+                    <input class="form-check-input" type="checkbox" name="auto_schedule" value="1" id="manual_auto_schedule" {{ old('auto_schedule', 1) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="manual_auto_schedule">
+                        Auto-schedule with random 10 minutes to 2 hours gap between posts
+                    </label>
                 </div>
                 <div class="mb-3">
                     <label class="form-label d-block">Platforms</label>
@@ -224,6 +233,15 @@
                         </label>
                     </div>
                 </div>
+                <div class="alert alert-warning py-2">
+                    <strong>Safety warning:</strong> Keep auto scheduling enabled to reduce risk of Facebook page bans from rapid posting.
+                </div>
+                <div class="mb-3 form-check">
+                    <input class="form-check-input" type="checkbox" id="drive_auto_schedule" checked>
+                    <label class="form-check-label" for="drive_auto_schedule">
+                        Auto-schedule with random 10 minutes to 2 hours gap between post entries
+                    </label>
+                </div>
                 <div class="small" id="drive_modal_status"></div>
             </div>
             <div class="modal-footer">
@@ -282,6 +300,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalPrompt = document.getElementById('drive_modal_prompt');
     const modalStatus = document.getElementById('drive_modal_status');
     const modalPostBtn = document.getElementById('drive_modal_post_btn');
+    const driveAutoScheduleInput = document.getElementById('drive_auto_schedule');
+
+    const selectedPageIds = () => [...pageIdInput.selectedOptions].map((opt) => opt.value).filter(Boolean);
 
     const setStatus = (message, type = 'muted') => {
         statusNode.className = `small mt-3 text-${type}`;
@@ -359,12 +380,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchBtn?.addEventListener('click', async () => {
         const appId = appIdInput.value;
-        const pageId = pageIdInput.value;
+        const pageIds = selectedPageIds();
         const driveApiKeyId = driveApiKeyInput.value;
         const folderUrl = folderUrlInput.value.trim();
 
-        if (!appId || !pageId || !driveApiKeyId || !folderUrl) {
-            setStatus('App, page, Drive key, and folder URL are required.', 'danger');
+        if (!appId || !pageIds.length || !driveApiKeyId || !folderUrl) {
+            setStatus('App, at least one page, Drive key, and folder URL are required.', 'danger');
             return;
         }
 
@@ -379,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ app_id: appId, page_id: pageId, drive_api_key_id: driveApiKeyId, folder_url: folderUrl }),
+                body: JSON.stringify({ app_id: appId, page_ids: pageIds, drive_api_key_id: driveApiKeyId, folder_url: folderUrl }),
             });
 
             const result = await response.json();
@@ -454,13 +475,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     modalPostBtn?.addEventListener('click', async () => {
         const appId = appIdInput.value;
-        const pageId = pageIdInput.value;
+        const pageIds = selectedPageIds();
         const caption = modalCaption.value.trim();
         const platforms = [...document.querySelectorAll('.drive-platform:checked')].map((node) => node.value);
         const postMode = document.querySelector('input[name="drive_post_mode"]:checked')?.value || 'separate';
 
         if (!caption) {
             setModalStatus('Caption is required.', 'danger');
+            return;
+        }
+        if (!pageIds.length) {
+            setModalStatus('Select at least one page.', 'danger');
             return;
         }
 
@@ -476,11 +501,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const payload = {
             app_id: appId,
-            page_id: pageId,
+            page_ids: pageIds,
             folder_id: state.folderId,
             caption,
             drive_api_key_id: driveApiKeyInput.value,
             post_mode: postMode,
+            auto_schedule: driveAutoScheduleInput?.checked ? 1 : 0,
             platforms,
             images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url, resource_key: img.resource_key || '' })),
         };

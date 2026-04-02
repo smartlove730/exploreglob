@@ -45,13 +45,22 @@ class AutomationConfigController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validateData($request);
-        $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $data['page_id']);
+        $pageIds = collect($data['page_ids'] ?? [($data['page_id'] ?? null)])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        abort_if($pageIds->isEmpty(), 422, 'Select at least one page.');
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
-        $data['user_id'] = Auth::id();
+        $baseData = collect($data)->except(['page_ids'])->all();
+        $baseData['user_id'] = Auth::id();
 
-        AutomationConfig::create($data);
+        foreach ($pageIds as $pageId) {
+            $this->assertAuthorizedAppAndPage((int) $data['app_id'], $pageId);
+            AutomationConfig::create(array_merge($baseData, ['page_id' => $pageId]));
+        }
 
-        return redirect()->route('admin.automations.index')->with('success', 'Automation config created successfully.');
+        return redirect()->route('admin.automations.index')->with('success', $pageIds->count().' automation config(s) created successfully.');
     }
 
     public function edit(AutomationConfig $automation)
@@ -71,9 +80,10 @@ class AutomationConfigController extends Controller
         $this->authorizeAutomation($automation);
 
         $data = $this->validateData($request);
+        $data['page_id'] = (int) ($data['page_id'] ?? collect($data['page_ids'] ?? [])->first());
         $this->assertAuthorizedAppAndPage((int) $data['app_id'], (int) $data['page_id']);
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
-        $automation->update($data);
+        $automation->update(collect($data)->except(['page_ids'])->all());
 
         return redirect()->route('admin.automations.index')->with('success', 'Automation config updated successfully.');
     }
@@ -111,7 +121,9 @@ class AutomationConfigController extends Controller
             'drive_link' => 'required|url|max:4096',
             'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'app_id' => 'required|integer|exists:facebook_apps,id',
-            'page_id' => 'required|integer|exists:facebook_pages,id',
+            'page_id' => 'nullable|integer|exists:facebook_pages,id',
+            'page_ids' => 'nullable|array|min:1',
+            'page_ids.*' => 'required|integer|exists:facebook_pages,id',
             'platforms' => 'required|string|in:facebook,instagram,both',
             'runs_per_day' => 'required|integer|min:1|max:24',
             'post_limit_per_day' => 'required|integer|min:1|max:100',
