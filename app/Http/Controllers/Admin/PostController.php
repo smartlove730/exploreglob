@@ -455,12 +455,11 @@ class PostController extends Controller
                     ->ownedBy(Auth::user())
                     ->where('is_active', true)
                     ->whereKeyNot($driveApiKey->id)
-                    ->where(function ($query) {
-                        $query->whereNotNull('oauth_access_token')
-                            ->orWhereNotNull('oauth_refresh_token');
-                    })
                     ->latest('id')
-                    ->first();
+                    ->get()
+                    ->first(function (DriveApiKey $candidate) {
+                        return !empty($candidate->oauth_access_token) || !empty($candidate->oauth_refresh_token);
+                    });
 
                 if ($alternateDriveKey) {
                     try {
