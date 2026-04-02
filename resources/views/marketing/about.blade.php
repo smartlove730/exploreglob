@@ -1,10 +1,8 @@
 @extends('marketing.layout')
-
-@section('title', 'About - ExploreGlob')
-
+@section('title', 'About | ExploreGlob')
 @section('content')
-<div class="bg-white border rounded-3 p-4">
-    <h1 class="h2">About ExploreGlob</h1>
-    <p class="text-muted mb-0">ExploreGlob is a lightweight SaaS platform focused on helping teams publish consistent social content with less manual work. We combine scheduling, media organization, and plan-based controls so businesses can scale publishing safely.</p>
-</div>
+<section class="mx-auto w-full max-w-7xl px-4 pb-10 pt-16 sm:px-6 lg:px-8"><p class="text-sm font-semibold uppercase tracking-[0.2em] text-violet-700">About</p><h1 class="mt-3 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">Our mission is to make consistent social media posting effortless for every business.</h1></section>
+<section class="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8"><div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><h2 class="text-2xl font-bold">Built to solve manual posting frustration</h2><p class="mt-4 text-slate-600">ExploreGlob started after seeing teams juggle spreadsheets and reminders. We built a single workflow for planning, scheduling, collaboration, and analytics.</p></div></section>
+<section class="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8"><h2 class="text-3xl font-bold">Values</h2><div class="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-4">@foreach(['automation-first mindset','simplicity','reliability','customer success'] as $value)<article class="rounded-xl border border-slate-200 bg-white p-6 text-sm font-semibold capitalize shadow-sm">{{ $value }}</article>@endforeach</div></section>
+<section class="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8"><h2 class="text-3xl font-bold">Team</h2><div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">@foreach(['Product','Engineering','Customer Success','Growth'] as $role)<article class="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm"><div class="mx-auto h-16 w-16 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600"></div><p class="mt-4 font-semibold">{{ $role }} Lead</p><p class="text-sm text-slate-500">Team member placeholder</p></article>@endforeach</div></section>
 @endsection

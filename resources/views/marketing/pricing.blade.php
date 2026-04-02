@@ -1,33 +1,14 @@
 @extends('marketing.layout')
-
-@section('title', 'Pricing - ExploreGlob')
-
+@section('title', 'Pricing | ExploreGlob')
 @section('content')
-<h1 class="h2 mb-2">Pricing</h1>
-<p class="text-muted mb-4">Simple plans for teams of every size.</p>
-
-<div class="row g-3">
-    @forelse($plans as $plan)
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body d-flex flex-column">
-                    <h5>{{ $plan->name }}</h5>
-                    <p class="display-6 mb-0">{{ $plan->currency }} {{ number_format((float) $plan->price, 2) }}</p>
-                    <p class="text-muted">per {{ $plan->interval }}</p>
-                    <ul class="small text-muted ps-3 mb-4">
-                        <li>{{ $plan->post_limit }} posts / period</li>
-                        <li>Facebook: {{ $plan->facebook_enabled ? 'Yes' : 'No' }}</li>
-                        <li>Instagram: {{ $plan->instagram_enabled ? 'Yes' : 'No' }}</li>
-                        <li>Google Business: {{ $plan->google_business_enabled ? 'Yes' : 'No' }}</li>
-                    </ul>
-                    <a href="{{ route('register') }}" class="btn btn-primary mt-auto">Choose {{ $plan->name }}</a>
-                </div>
-            </div>
-        </div>
-    @empty
-        <div class="col-12">
-            <div class="alert alert-secondary mb-0">Pricing plans are being updated. Please check back shortly.</div>
-        </div>
-    @endforelse
+<section class="mx-auto w-full max-w-7xl px-4 pb-12 pt-16 sm:px-6 lg:px-8" x-data="{ yearly: true }">
+<h1 class="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">Simple pricing for creators, teams, and agencies</h1>
+<div class="mt-8 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-sm"><button @click="yearly=false" :class="yearly ? 'text-slate-500':'bg-slate-100 text-slate-900'" class="rounded-lg px-4 py-2 font-medium">Monthly</button><button @click="yearly=true" :class="yearly ? 'bg-slate-100 text-slate-900':'text-slate-500'" class="rounded-lg px-4 py-2 font-medium">Yearly <span class="text-emerald-600">(save 20%)</span></button></div>
+<div class="mt-10 grid gap-6 lg:grid-cols-3">
+<article class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm"><h2 class="text-2xl font-bold">Starter</h2><p class="text-sm text-slate-500">for individuals</p><p class="mt-4 text-4xl font-black"><span x-show="!yearly">$19</span><span x-show="yearly">$15</span><span class="text-base text-slate-500">/mo</span></p><ul class="mt-4 space-y-1 text-sm text-slate-600"><li>• 1 social account</li><li>• basic scheduling</li><li>• limited analytics</li></ul></article>
+<article class="rounded-2xl border border-violet-300 bg-gradient-to-b from-violet-50 to-white p-7 shadow-lg shadow-violet-100"><p class="inline-flex rounded-full bg-gradient-to-r from-pink-500 to-purple-500 px-3 py-1 text-xs font-semibold text-white">Most popular</p><h2 class="mt-2 text-2xl font-bold">Growth</h2><p class="text-sm text-slate-500">for creators and startups</p><p class="mt-4 text-4xl font-black"><span x-show="!yearly">$49</span><span x-show="yearly">$39</span><span class="text-base text-slate-500">/mo</span></p><ul class="mt-4 space-y-1 text-sm text-slate-600"><li>• multiple accounts</li><li>• auto publishing</li><li>• content calendar</li><li>• team collaboration</li></ul></article>
+<article class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm"><h2 class="text-2xl font-bold">Agency</h2><p class="text-sm text-slate-500">for marketing teams</p><p class="mt-4 text-4xl font-black"><span x-show="!yearly">$99</span><span x-show="yearly">$79</span><span class="text-base text-slate-500">/mo</span></p><ul class="mt-4 space-y-1 text-sm text-slate-600"><li>• unlimited accounts</li><li>• client workspaces</li><li>• advanced analytics</li><li>• priority support</li></ul></article>
 </div>
+<div class="mt-14 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm"><table class="min-w-full text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left">Feature</th><th class="px-4 py-3 text-left">Starter</th><th class="px-4 py-3 text-left">Growth</th><th class="px-4 py-3 text-left">Agency</th></tr></thead><tbody class="divide-y divide-slate-100 text-slate-600"><tr><td class="px-4 py-3">Facebook + Instagram</td><td class="px-4 py-3">1 account</td><td class="px-4 py-3">Up to 10</td><td class="px-4 py-3">Unlimited</td></tr><tr><td class="px-4 py-3">Team collaboration</td><td class="px-4 py-3">—</td><td class="px-4 py-3">Included</td><td class="px-4 py-3">Advanced</td></tr><tr><td class="px-4 py-3">Google Business Profile</td><td class="px-4 py-3">Coming soon</td><td class="px-4 py-3">Coming soon</td><td class="px-4 py-3">Early access</td></tr></tbody></table></div>
+</section>
 @endsection
