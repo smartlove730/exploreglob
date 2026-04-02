@@ -181,6 +181,8 @@ Route::middleware(['auth', 'admin'])
         Route::get('/overview', [SaasManagementController::class, 'overview'])->name('overview');
         Route::get('/users', [SaasManagementController::class, 'users'])->name('users');
         Route::get('/plans', [SaasManagementController::class, 'plans'])->name('plans');
+        Route::post('/plans', [SaasManagementController::class, 'storePlan'])->name('plans.store');
+        Route::put('/plans/{plan}', [SaasManagementController::class, 'updatePlan'])->name('plans.update');
         Route::post('/plans/{plan}/toggle', [SaasManagementController::class, 'togglePlan'])->name('plans.toggle');
         Route::get('/subscriptions', [SaasManagementController::class, 'subscriptions'])->name('subscriptions');
     });

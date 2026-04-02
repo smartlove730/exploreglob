@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class SaasManagementController extends Controller
 {
@@ -72,6 +74,32 @@ class SaasManagementController extends Controller
         return view('admin.saas.plans', compact('plans'));
     }
 
+    public function storePlan(Request $request): RedirectResponse
+    {
+        $data = $this->validatePlan($request);
+        $data['slug'] = Str::slug((string) $data['slug']);
+
+        $plan = Plan::create($data);
+        app(ActivityLogService::class)->log('admin.plan.created', $request->user(), ['plan_id' => $plan->id]);
+
+        return back()->with('success', "Plan {$plan->name} created.");
+    }
+
+    public function updatePlan(Request $request, Plan $plan): RedirectResponse
+    {
+        $data = $this->validatePlan($request, $plan);
+        $data['slug'] = Str::slug((string) $data['slug']);
+
+        if ((float) $data['price'] !== (float) $plan->price || $data['interval'] !== $plan->interval || strtoupper((string) $data['currency']) !== strtoupper((string) $plan->currency)) {
+            $data['razorpay_plan_id'] = null;
+        }
+
+        $plan->update($data);
+        app(ActivityLogService::class)->log('admin.plan.updated', $request->user(), ['plan_id' => $plan->id]);
+
+        return back()->with('success', "Plan {$plan->name} updated.");
+    }
+
     public function togglePlan(Request $request, Plan $plan): RedirectResponse
     {
         $request->validate([
@@ -95,5 +123,35 @@ class SaasManagementController extends Controller
             ->paginate(30);
 
         return view('admin.saas.subscriptions', compact('subscriptions'));
+    }
+
+    private function validatePlan(Request $request, ?Plan $plan = null): array
+    {
+        return $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['required', 'string', 'max:255', Rule::unique('plans', 'slug')->ignore($plan?->id)],
+            'price' => ['required', 'numeric', 'min:0'],
+            'currency' => ['required', 'string', 'size:3'],
+            'interval' => ['required', Rule::in(['daily', 'weekly', 'monthly', 'yearly'])],
+            'post_limit' => ['required', 'integer', 'min:1'],
+            'posts_per_day_limit' => ['nullable', 'integer', 'min:1'],
+            'posts_per_week_limit' => ['nullable', 'integer', 'min:1'],
+            'posts_per_month_limit' => ['nullable', 'integer', 'min:1'],
+            'automation_limit' => ['nullable', 'integer', 'min:1'],
+            'connected_apps_limit' => ['nullable', 'integer', 'min:1'],
+            'synced_pages_limit' => ['nullable', 'integer', 'min:1'],
+            'facebook_enabled' => ['nullable', 'boolean'],
+            'instagram_enabled' => ['nullable', 'boolean'],
+            'google_business_enabled' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+        ]) + [
+            'currency' => strtoupper((string) $request->input('currency')),
+            'facebook_enabled' => $request->boolean('facebook_enabled'),
+            'instagram_enabled' => $request->boolean('instagram_enabled'),
+            'google_business_enabled' => $request->boolean('google_business_enabled'),
+            'is_active' => $request->boolean('is_active', true),
+            'sort_order' => (int) $request->input('sort_order', 0),
+        ];
     }
 }
