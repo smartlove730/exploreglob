@@ -5,7 +5,7 @@
 <meta name="google-adsense-account" content="ca-pub-3230339294601454">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" type="image/png" href="{{asset('e.avif')}}">
+<link rel="icon" type="image/avif" href="{{ asset('e.avif') }}">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

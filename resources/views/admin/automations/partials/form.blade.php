@@ -39,12 +39,15 @@
     </div>
     <div class="col-md-6">
         <label class="form-label">Page ID</label>
-        <select name="page_id" class="form-select" required>
-            <option value="">Select page</option>
+        <select name="page_ids[]" class="form-select" multiple required>
+            @php($selectedAutomationPages = old('page_ids', $isEdit ? [$automation->page_id] : []))
             @foreach($pages as $page)
-                <option value="{{ $page->id }}" @selected((int) old('page_id', $isEdit ? $automation->page_id : 0) === $page->id)>{{ $page->page_name }} ({{ $page->page_id }})</option>
+                <option value="{{ $page->id }}" @selected(in_array($page->id, $selectedAutomationPages))>{{ $page->page_name }} ({{ $page->page_id }})</option>
             @endforeach
         </select>
+        <small class="text-muted">
+            {{ $isEdit ? 'Select pages to apply this automation. Current config updates first selected page; additional pages create new configs.' : 'Select multiple pages to create one automation config per page.' }}
+        </small>
     </div>
 </div>
 

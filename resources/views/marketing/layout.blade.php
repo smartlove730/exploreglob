@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/avif" href="{{ asset('e.avif') }}">
     <title>@yield('title', 'ExploreGlob | Social Media Automation')</title>
     <meta name="description" content="ExploreGlob helps businesses and creators automate Facebook and Instagram posting, collaboration, and analytics from one dashboard.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
