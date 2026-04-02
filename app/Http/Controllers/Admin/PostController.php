@@ -418,12 +418,14 @@ class PostController extends Controller
         ]);
 
         $driveToken = null;
+        $driveAuthMode = 'api_key_only';
         if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
             $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
             $driveToken = $driveApiKey->oauth_access_token;
+            $driveAuthMode = 'drive_api_key_oauth_token';
             Log::info('google_drive.fetch_drive_images.auth_mode', [
                 'user_id' => Auth::id(),
-                'mode' => 'drive_api_key_oauth_token',
+                'mode' => $driveAuthMode,
                 'drive_api_key_id' => $driveApiKey->id,
             ]);
         } else {
@@ -433,10 +435,11 @@ class PostController extends Controller
                 try {
                     $googleAccount = $this->googleService->ensureValidGoogleAccountToken($googleAccount);
                     $driveToken = (string) $googleAccount->access_token;
+                    $driveAuthMode = 'google_business_oauth_fallback';
 
                     Log::info('google_drive.fetch_drive_images.auth_mode', [
                         'user_id' => Auth::id(),
-                        'mode' => 'google_business_oauth_fallback',
+                        'mode' => $driveAuthMode,
                         'google_account_id' => $googleAccount->id,
                     ]);
                 } catch (\Throwable $exception) {
@@ -445,10 +448,46 @@ class PostController extends Controller
                         'message' => $exception->getMessage(),
                     ]);
                 }
-            } else {
+            }
+
+            if (!$driveToken) {
+                $alternateDriveKey = DriveApiKey::query()
+                    ->ownedBy(Auth::user())
+                    ->where('is_active', true)
+                    ->whereKeyNot($driveApiKey->id)
+                    ->where(function ($query) {
+                        $query->whereNotNull('oauth_access_token')
+                            ->orWhereNotNull('oauth_refresh_token');
+                    })
+                    ->latest('id')
+                    ->first();
+
+                if ($alternateDriveKey) {
+                    try {
+                        $alternateDriveKey = $this->googleService->ensureValidDriveToken($alternateDriveKey);
+                        $driveToken = (string) $alternateDriveKey->oauth_access_token;
+                        $driveAuthMode = 'alternate_drive_key_oauth_fallback';
+
+                        Log::info('google_drive.fetch_drive_images.auth_mode', [
+                            'user_id' => Auth::id(),
+                            'mode' => $driveAuthMode,
+                            'selected_drive_api_key_id' => $driveApiKey->id,
+                            'alternate_drive_api_key_id' => $alternateDriveKey->id,
+                        ]);
+                    } catch (\Throwable $exception) {
+                        Log::warning('google_drive.fetch_drive_images.alternate_drive_key_fallback_failed', [
+                            'user_id' => Auth::id(),
+                            'alternate_drive_api_key_id' => $alternateDriveKey->id,
+                            'message' => $exception->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            if (!$driveToken) {
                 Log::info('google_drive.fetch_drive_images.auth_mode', [
                     'user_id' => Auth::id(),
-                    'mode' => 'api_key_only',
+                    'mode' => $driveAuthMode,
                     'drive_api_key_id' => $driveApiKey->id,
                 ]);
             }
@@ -499,6 +538,7 @@ class PostController extends Controller
             'success' => true,
             'data' => [
                 'folder_id' => $folderId,
+                'drive_auth_mode' => $driveAuthMode,
                 'images' => $payload,
             ],
         ]);
