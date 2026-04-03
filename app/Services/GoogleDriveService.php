@@ -50,6 +50,19 @@ class GoogleDriveService
         string $folderResourceKey = '',
     ): array
     {
+        return $this->listPublicFolderMedia($folderId, $apiKey, $accessToken, $folderResourceKey)
+            ->filter(fn (array $file) => ($file['type'] ?? '') === 'image')
+            ->values()
+            ->all();
+    }
+
+    public function listPublicFolderMedia(
+        string $folderId,
+        ?string $apiKey = null,
+        ?string $accessToken = null,
+        string $folderResourceKey = '',
+    ): \Illuminate\Support\Collection
+    {
         $apiKey = $apiKey ?: config('services.google_drive.api_key');
 
         if (!$apiKey) {
@@ -58,7 +71,7 @@ class GoogleDriveService
             ]);
         }
 
-        $images = [];
+        $filesList = [];
         $pageToken = null;
 
         do {
@@ -75,8 +88,8 @@ class GoogleDriveService
             }
 
             $query = [
-                'q' => "'{$folderId}' in parents and mimeType contains 'image/' and trashed = false",
-                'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey,thumbnailLink,imageMediaMetadata(width,height))',
+                'q' => "'{$folderId}' in parents and (mimeType contains 'image/' or mimeType contains 'video/') and trashed = false",
+                'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey,thumbnailLink,imageMediaMetadata(width,height),videoMediaMetadata(width,height,durationMillis))',
                 'pageSize' => 200,
                 'pageToken' => $pageToken,
                 'supportsAllDrives' => 'true',
@@ -106,15 +119,24 @@ class GoogleDriveService
                     continue;
                 }
 
-                $images[] = [
+                $mimeType = (string) ($file['mimeType'] ?? '');
+                $type = str_starts_with($mimeType, 'video/') ? 'video' : 'image';
+
+                if (!$this->isSupportedMediaMimeType($mimeType)) {
+                    continue;
+                }
+
+                $filesList[] = [
                     'id' => $id,
                     'name' => (string) ($file['name'] ?? 'Untitled'),
-                    'mime_type' => (string) ($file['mimeType'] ?? ''),
+                    'type' => $type,
+                    'mime_type' => $mimeType,
                     'web_view_link' => (string) ($file['webViewLink'] ?? ''),
                     'resource_key' => $resourceKey,
                     'thumbnail_url' => $this->normalizeThumbnailLink((string) ($file['thumbnailLink'] ?? '')),
                     'width' => (int) ($file['imageMediaMetadata']['width'] ?? 0),
                     'height' => (int) ($file['imageMediaMetadata']['height'] ?? 0),
+                    'duration_ms' => (int) ($file['videoMediaMetadata']['durationMillis'] ?? 0),
                     'preview_url' => $this->buildPreviewUrl($id, $resourceKey),
                     'download_url' => $this->buildDownloadUrl($id, $resourceKey),
                 ];
@@ -123,7 +145,7 @@ class GoogleDriveService
             $pageToken = $payload['nextPageToken'] ?? null;
         } while ($pageToken);
 
-        return $images;
+        return collect($filesList);
     }
 
     public function buildPreviewUrl(string $fileId, string $resourceKey = ''): string
@@ -164,6 +186,11 @@ class GoogleDriveService
 
     public function fetchImageBinary(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): array
     {
+        return $this->fetchFileBinary($fileId, $apiKey, $resourceKey, $accessToken);
+    }
+
+    public function fetchFileBinary(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): array
+    {
         $query = ['alt' => 'media'];
 
         if (!$accessToken && $apiKey) {
@@ -174,7 +201,7 @@ class GoogleDriveService
             $query['resourceKey'] = $resourceKey;
         }
 
-        $request = Http::timeout(30)->withHeaders(['Accept' => 'image/*']);
+        $request = Http::timeout(30)->withHeaders(['Accept' => 'image/*,video/*']);
 
         if ($accessToken) {
             $request = $request->withToken($accessToken);
@@ -184,7 +211,7 @@ class GoogleDriveService
 
         if (!$response->successful()) {
             throw ValidationException::withMessages([
-                'file_id' => 'Unable to load this Google Drive image.',
+                'file_id' => 'Unable to load this Google Drive file.',
             ]);
         }
 
@@ -192,5 +219,17 @@ class GoogleDriveService
             'content' => $response->body(),
             'content_type' => $response->header('Content-Type', 'image/jpeg'),
         ];
+    }
+
+    private function isSupportedMediaMimeType(string $mimeType): bool
+    {
+        return in_array($mimeType, [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'image/gif',
+            'video/mp4',
+            'video/quicktime',
+        ], true);
     }
 }

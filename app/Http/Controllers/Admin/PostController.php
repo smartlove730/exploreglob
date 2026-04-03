@@ -325,21 +325,21 @@ class PostController extends Controller
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $images = $this->googleDriveService->listPublicFolderImages(
+        $mediaItems = $this->googleDriveService->listPublicFolderMedia(
             $folderId,
             $driveApiKey->api_key,
             $driveToken,
             $folderResourceKey
-        );
+        )->all();
 
         $postedByImage = DriveImagePost::query()->ownedBy(Auth::user())
             ->whereIn('page_id', $pages->pluck('id')->all())
-            ->whereIn('drive_file_id', collect($images)->pluck('id')->all())
+            ->whereIn('drive_file_id', collect($mediaItems)->pluck('id')->all())
             ->get()
             ->groupBy('drive_file_id');
 
-        $payload = collect($images)->map(function (array $image) use ($postedByImage) {
-            $records = $postedByImage->get($image['id'], collect());
+        $payload = collect($mediaItems)->map(function (array $media) use ($postedByImage) {
+            $records = $postedByImage->get($media['id'], collect());
             $postedPlatforms = $records
                 ->flatMap(fn ($record) => $record->platforms ?? [])
                 ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
@@ -347,8 +347,8 @@ class PostController extends Controller
                 ->values()
                 ->all();
 
-            return array_merge($image, [
-                'preview_url' => (string) ($image['thumbnail_url'] ?: $image['preview_url']),
+            return array_merge($media, [
+                'preview_url' => (string) ($media['thumbnail_url'] ?: $media['preview_url']),
                 'is_posted' => !empty($postedPlatforms),
                 'posted_platforms' => $postedPlatforms,
             ]);
@@ -358,6 +358,7 @@ class PostController extends Controller
             'success' => true,
             'data' => [
                 'folder_id' => $folderId,
+                'media' => $payload,
                 'images' => $payload,
             ],
         ]);
@@ -381,6 +382,7 @@ class PostController extends Controller
             'images.*.id' => 'required|string|max:255',
             'images.*.url' => 'required|url|max:2048',
             'images.*.resource_key' => 'nullable|string|max:255',
+            'images.*.mime_type' => 'nullable|string|max:120',
         ]);
 
         $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? [$data['page_id'] ?? null]);
@@ -405,14 +407,15 @@ class PostController extends Controller
             ], 422);
         }
 
-        $preparedImages = [];
+        $preparedMedia = [];
 
         foreach ($data['images'] as $imageData) {
             try {
-                $preparedImages[] = $this->storeDriveImageLocally(
+                $preparedMedia[] = $this->storeDriveFileLocally(
                     (string) $imageData['id'],
                     (string) $imageData['url'],
                     (string) ($imageData['resource_key'] ?? ''),
+                    (string) ($imageData['mime_type'] ?? ''),
                     $driveApiKey
                 );
             } catch (\Throwable $exception) {
@@ -423,18 +426,35 @@ class PostController extends Controller
             }
         }
 
-        if (empty($preparedImages)) {
+        if (empty($preparedMedia)) {
             return response()->json([
                 'success' => false,
-                'message' => 'No valid images could be prepared for posting.',
+                'message' => 'No valid media files could be prepared for posting.',
                 'data' => ['results' => []],
             ], 422);
         }
 
         $results = [];
 
+        $containsVideo = collect($preparedMedia)->contains(fn (array $item) => ($item['media_type'] ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO);
+        if ($containsVideo && $postMode === 'combined') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Combined posting supports images only. Please use separate mode for videos/reels.',
+                'data' => ['results' => []],
+            ], 422);
+        }
+
+        if ($containsVideo && in_array('google_business', $platforms, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Google Business does not support video/reel publishing in this flow.',
+                'data' => ['results' => []],
+            ], 422);
+        }
+
         if ($postMode === 'combined') {
-            $queueImageUrls = collect($preparedImages)
+            $queueImageUrls = collect($preparedMedia)
                 ->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms))
                 ->all();
             foreach ($queueImageUrls as $queueImageUrl) {
@@ -456,7 +476,7 @@ class PostController extends Controller
                     'last_error' => null,
                 ]);
 
-                foreach ($preparedImages as $imageMeta) {
+                foreach ($preparedMedia as $imageMeta) {
                     $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
 
                     DriveImagePost::create([
@@ -486,17 +506,22 @@ class PostController extends Controller
             return response()->json([
                 'success' => $successCount > 0,
                 'message' => $successCount === count($results)
-                    ? 'Combined post queued for background publishing.'
-                    : "Queued {$successCount} of ".count($results).' images.',
+                ? 'Combined post queued for background publishing.'
+                    : "Queued {$successCount} of ".count($results).' media files.',
                 'data' => ['results' => $results],
             ], $successCount > 0 ? 200 : 422);
         }
 
         foreach ($pages as $page) {
-            foreach ($preparedImages as $imageMeta) {
-                $imageUrl = $imageMeta['public_url'];
-                $imageUrl = $this->ensureInstagramEligibleImage($imageUrl, $platforms);
-                $this->assertPublicHttpsImageUrl($imageUrl);
+            foreach ($preparedMedia as $imageMeta) {
+                $mediaType = $imageMeta['media_type'] ?? FacebookPost::MEDIA_TYPE_IMAGE;
+                $imageUrl = $mediaType === FacebookPost::MEDIA_TYPE_IMAGE
+                    ? $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms)
+                    : null;
+                $videoUrl = $mediaType === FacebookPost::MEDIA_TYPE_VIDEO ? $imageMeta['public_url'] : null;
+                if ($imageUrl) {
+                    $this->assertPublicHttpsImageUrl($imageUrl);
+                }
 
                 try {
                     $googleLocationId = $this->resolveGoogleLocationId($data);
@@ -504,21 +529,26 @@ class PostController extends Controller
                         'user_id' => $page->user_id,
                         'page_id' => $page->id,
                         'message' => $data['caption'],
+                        'media_type' => $mediaType,
                         'image_url' => $imageUrl,
+                        'video_path' => $mediaType === FacebookPost::MEDIA_TYPE_VIDEO ? $imageMeta['storage_path'] : null,
+                        'video_url' => $videoUrl,
                         'platforms' => $platforms,
                         'google_location_id' => $googleLocationId,
                         'status' => FacebookPost::STATUS_PENDING,
                         'last_error' => null,
                     ]);
 
-                    $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
+                    if ($mediaType === FacebookPost::MEDIA_TYPE_IMAGE) {
+                        $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
+                    }
 
                     DriveImagePost::create([
                         'user_id' => $page->user_id,
                         'page_id' => $page->id,
                         'drive_file_id' => $imageMeta['file_id'],
                         'drive_folder_id' => $data['folder_id'] ?? null,
-                        'image_url' => $imageUrl,
+                        'image_url' => $imageMeta['public_url'],
                         'caption' => $data['caption'],
                         'platforms' => $platforms,
                         'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
@@ -554,8 +584,8 @@ class PostController extends Controller
         return response()->json([
             'success' => $successCount > 0,
             'message' => $successCount === count($results)
-                ? 'All images queued for background publishing.'
-                : "Queued {$successCount} of ".count($results).' images.',
+                ? 'All media queued for background publishing.'
+                : "Queued {$successCount} of ".count($results).' media files.',
             'data' => [
                 'results' => $results,
             ],
@@ -582,7 +612,7 @@ class PostController extends Controller
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $binary = $this->downloadImageBinaryFromUrl((string) ($data['source_url'] ?? ''));
+        $binary = $this->downloadDriveBinaryFromUrl((string) ($data['source_url'] ?? ''));
 
         if (!$binary) {
             $binary = $this->googleDriveService->fetchImageBinary(
@@ -775,7 +805,7 @@ class PostController extends Controller
         ];
     }
 
-    private function storeDriveImageLocally(string $fileId, string $sourceUrl, string $resourceKey, DriveApiKey $driveApiKey): array
+    private function storeDriveFileLocally(string $fileId, string $sourceUrl, string $resourceKey, string $mimeType, DriveApiKey $driveApiKey): array
     {
         $driveToken = null;
         if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
@@ -783,27 +813,31 @@ class PostController extends Controller
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $binary = $this->downloadImageBinaryFromUrl($sourceUrl)
-            ?: $this->googleDriveService->fetchImageBinary($fileId, $driveApiKey->api_key, $resourceKey, $driveToken);
-        $contentType = (string) ($binary['content_type'] ?? 'image/jpeg');
+        $binary = $this->downloadDriveBinaryFromUrl($sourceUrl, $mimeType)
+            ?: $this->googleDriveService->fetchFileBinary($fileId, $driveApiKey->api_key, $resourceKey, $driveToken);
+        $contentType = strtolower((string) ($binary['content_type'] ?? $mimeType ?: 'image/jpeg'));
+        $mediaType = str_starts_with($contentType, 'video/') ? FacebookPost::MEDIA_TYPE_VIDEO : FacebookPost::MEDIA_TYPE_IMAGE;
         $extension = match ($contentType) {
             'image/png' => 'png',
             'image/webp' => 'webp',
             'image/gif' => 'gif',
+            'video/quicktime' => 'mov',
+            'video/mp4' => 'mp4',
             default => 'jpg',
         };
 
-        $storagePath = 'drive-posts/'.$fileId.'-'.uniqid().'.'.$extension;
+        $storagePath = ($mediaType === FacebookPost::MEDIA_TYPE_VIDEO ? 'drive-posts/videos/' : 'drive-posts/images/').$fileId.'-'.uniqid().'.'.$extension;
         Storage::disk('public')->put($storagePath, $binary['content']);
 
         return [
             'file_id' => $fileId,
+            'media_type' => $mediaType,
             'storage_path' => $storagePath,
             'public_url' => url(Storage::disk('public')->url($storagePath)),
         ];
     }
 
-    private function downloadImageBinaryFromUrl(string $sourceUrl): ?array
+    private function downloadDriveBinaryFromUrl(string $sourceUrl, string $mimeType = ''): ?array
     {
         if ($sourceUrl === '') {
             return null;
@@ -818,7 +852,7 @@ class PostController extends Controller
             $response = \Illuminate\Support\Facades\Http::timeout(45)
                 ->retry(2, 250)
                 ->withOptions(['allow_redirects' => true])
-                ->withHeaders(['Accept' => 'image/*'])
+                ->withHeaders(['Accept' => $mimeType !== '' ? $mimeType : 'image/*,video/*'])
                 ->get($sourceUrl);
 
             if (!$response->successful()) {
@@ -826,7 +860,7 @@ class PostController extends Controller
             }
 
             $contentType = strtolower((string) $response->header('Content-Type', ''));
-            if (!str_starts_with($contentType, 'image/')) {
+            if (!str_starts_with($contentType, 'image/') && !str_starts_with($contentType, 'video/')) {
                 return null;
             }
 
