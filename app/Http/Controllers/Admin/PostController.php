@@ -823,6 +823,7 @@ class PostController extends Controller
 
         try {
             $response = \Illuminate\Support\Facades\Http::timeout(45)
+                ->retry(2, 250)
                 ->withOptions(['allow_redirects' => true])
                 ->withHeaders(['Accept' => 'image/*'])
                 ->get($sourceUrl);
@@ -831,8 +832,18 @@ class PostController extends Controller
                 return null;
             }
 
+            $contentType = strtolower((string) $response->header('Content-Type', ''));
+            if (!str_starts_with($contentType, 'image/')) {
+                return null;
+            }
+
+            $content = $response->body();
+            if ($content === '') {
+                return null;
+            }
+
             return [
-                'content' => $response->body(),
+                'content' => $content,
                 'content_type' => $response->header('Content-Type', 'image/jpeg'),
             ];
         } catch (\Throwable) {

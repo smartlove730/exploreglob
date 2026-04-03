@@ -315,7 +315,15 @@ document.addEventListener('DOMContentLoaded', () => {
             col.className = 'col-md-3';
             col.innerHTML = `
                 <div class="card h-100">
-                    <img src="${image.preview_url}" class="card-img-top" style="height: 180px; object-fit: cover;" alt="${image.name}">
+                    <img
+                        src="${image.preview_url}"
+                        data-fallback-url="${image.download_url}"
+                        class="card-img-top drive-preview-image"
+                        loading="lazy"
+                        referrerpolicy="no-referrer"
+                        style="height: 180px; object-fit: cover;"
+                        alt="${image.name}"
+                    >
                     <div class="card-body">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <div class="form-check">
@@ -351,7 +359,15 @@ document.addEventListener('DOMContentLoaded', () => {
         modalPreview.innerHTML = images.map((img) => `
             <div class="col-md-3 col-6">
                 <div class="border rounded p-1 h-100">
-                    <img src="${img.preview_url}" class="img-fluid rounded" alt="${img.name}" style="width: 100%; height: 120px; object-fit: cover;">
+                    <img
+                        src="${img.preview_url}"
+                        data-fallback-url="${img.download_url}"
+                        class="img-fluid rounded drive-preview-image"
+                        loading="lazy"
+                        referrerpolicy="no-referrer"
+                        alt="${img.name}"
+                        style="width: 100%; height: 120px; object-fit: cover;"
+                    >
                     <div class="small text-muted text-truncate mt-1" title="${img.name}">${img.name}</div>
                 </div>
             </div>
@@ -441,6 +457,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         openPostModal([image]);
     });
+
+    document.addEventListener('error', (event) => {
+        const imageNode = event.target.closest?.('img.drive-preview-image');
+        if (!imageNode) return;
+
+        if (imageNode.dataset.fallbackApplied === '1') {
+            return;
+        }
+
+        const fallbackUrl = imageNode.dataset.fallbackUrl;
+        if (!fallbackUrl || imageNode.src === fallbackUrl) {
+            return;
+        }
+
+        imageNode.dataset.fallbackApplied = '1';
+        imageNode.src = fallbackUrl;
+    }, true);
 
     postSelectedBtn?.addEventListener('click', () => {
         const selectedImages = [...state.selectedIds]
