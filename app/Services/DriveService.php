@@ -19,18 +19,28 @@ class DriveService
 
     public function fetchImagesFromDriveLink(string $driveLink, ?DriveApiKey $driveApiKey = null): array
     {
+        $media = $this->fetchMediaFromDriveLink($driveLink, $driveApiKey);
+
+        return [
+            'folder_id' => $media['folder_id'],
+            'images' => collect($media['media'])->where('type', 'image')->values()->all(),
+        ];
+    }
+
+    public function fetchMediaFromDriveLink(string $driveLink, ?DriveApiKey $driveApiKey = null): array
+    {
         $folderId = $this->googleDriveService->extractFolderId($driveLink);
         $folderResourceKey = $this->googleDriveService->extractFolderResourceKey($driveLink);
-        $images = $this->googleDriveService->listPublicFolderImages(
+        $media = $this->googleDriveService->listPublicFolderMedia(
             $folderId,
             $driveApiKey?->api_key,
             $driveApiKey?->oauth_access_token,
             $folderResourceKey
-        );
+        )->all();
 
         return [
             'folder_id' => $folderId,
-            'images' => $images,
+            'media' => $media,
         ];
     }
 

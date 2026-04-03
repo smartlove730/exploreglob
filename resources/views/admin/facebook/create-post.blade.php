@@ -10,8 +10,8 @@
 
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-        <h2 class="h5">Google Drive Folder Images</h2>
-        <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images, then post one or many with generated captions.</p>
+        <h2 class="h5">Google Drive Folder Media</h2>
+        <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images/videos, preview them, then post one or many with generated captions.</p>
         @if($driveApiKeys->isEmpty())
             <div class="alert alert-warning">
                 No active Google Drive key found. <a href="{{ route('admin.facebook.google-drive-keys.create') }}">Add a Drive key</a> first.
@@ -57,7 +57,7 @@
                 <label class="form-label">Google Drive Folder URL</label>
                 <div class="input-group">
                     <input type="url" name="folder_url" id="drive_folder_url" class="form-control" placeholder="https://drive.google.com/drive/folders/..." required>
-                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ $driveApiKeys->isEmpty() ? 'disabled' : '' }}>Fetch Images</button>
+                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ $driveApiKeys->isEmpty() ? 'disabled' : '' }}>Fetch Media</button>
                 </div>
             </div>
             <div class="col-12">
@@ -297,6 +297,21 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const getImageById = (id) => state.images.find((img) => img.id === id);
+    const renderPreviewMedia = (media, className = '', style = '') => {
+        if ((media.type || 'image') === 'video') {
+            return `<video class="${className}" style="${style}" controls preload="metadata"><source src="${media.download_url}" type="${media.mime_type || 'video/mp4'}"></video>`;
+        }
+
+        return `<img
+            src="${media.preview_url}"
+            data-fallback-url="${media.download_url}"
+            class="${className} drive-preview-image"
+            loading="lazy"
+            referrerpolicy="no-referrer"
+            style="${style}"
+            alt="${media.name}"
+        >`;
+    };
 
     const renderGrid = () => {
         gridNode.innerHTML = '';
@@ -315,15 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
             col.className = 'col-md-3';
             col.innerHTML = `
                 <div class="card h-100">
-                    <img
-                        src="${image.preview_url}"
-                        data-fallback-url="${image.download_url}"
-                        class="card-img-top drive-preview-image"
-                        loading="lazy"
-                        referrerpolicy="no-referrer"
-                        style="height: 180px; object-fit: cover;"
-                        alt="${image.name}"
-                    >
+                    ${renderPreviewMedia(image, 'card-img-top', 'height: 180px; object-fit: cover;')}
                     <div class="card-body">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <div class="form-check">
@@ -332,7 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             ${postedBadge}
                         </div>
-                        <div class="small text-muted text-truncate mb-2" title="${image.name}">${image.name}</div>
+                        <div class="small text-muted text-truncate mb-1" title="${image.name}">${image.name}</div>
+                        <div class="small text-muted mb-2">${(image.type || 'image').toUpperCase()}</div>
                         <button type="button" class="btn btn-primary btn-sm w-100 drive-single-post-btn" data-id="${image.id}">Post</button>
                     </div>
                 </div>
@@ -351,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const openPostModal = (images) => {
         state.modalImages = images;
-        modalTitle.textContent = images.length > 1 ? `Post ${images.length} Selected Images` : 'Post Image';
+        modalTitle.textContent = images.length > 1 ? `Post ${images.length} Selected Media` : 'Post Media';
         modalCaption.value = '';
         modalPrompt.value = '';
         setModalStatus('');
@@ -359,15 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modalPreview.innerHTML = images.map((img) => `
             <div class="col-md-3 col-6">
                 <div class="border rounded p-1 h-100">
-                    <img
-                        src="${img.preview_url}"
-                        data-fallback-url="${img.download_url}"
-                        class="img-fluid rounded drive-preview-image"
-                        loading="lazy"
-                        referrerpolicy="no-referrer"
-                        alt="${img.name}"
-                        style="width: 100%; height: 120px; object-fit: cover;"
-                    >
+                    ${renderPreviewMedia(img, 'img-fluid rounded', 'width: 100%; height: 120px; object-fit: cover;')}
                     <div class="small text-muted text-truncate mt-1" title="${img.name}">${img.name}</div>
                 </div>
             </div>
@@ -387,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        setStatus('Fetching images from Google Drive...', 'muted');
+        setStatus('Fetching media from Google Drive...', 'muted');
         fetchBtn.disabled = true;
 
         try {
@@ -403,20 +403,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await response.json();
             if (!response.ok || !result.success) {
-                throw new Error(result.message || 'Failed to fetch images.');
+                throw new Error(result.message || 'Failed to fetch media.');
             }
 
             state.folderId = result.data.folder_id;
-            state.images = result.data.images || [];
+            state.images = result.data.media || result.data.images || [];
             state.selectedIds.clear();
 
             renderGrid();
-            setStatus(`Loaded ${state.images.length} image(s).`, 'success');
+            setStatus(`Loaded ${state.images.length} media file(s).`, 'success');
         } catch (error) {
             state.images = [];
             state.selectedIds.clear();
             renderGrid();
-            setStatus(error.message || 'Unexpected error while fetching images.', 'danger');
+            setStatus(error.message || 'Unexpected error while fetching media.', 'danger');
         } finally {
             fetchBtn.disabled = false;
         }
@@ -481,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter(Boolean);
 
         if (!selectedImages.length) {
-            setStatus('Select at least one image first.', 'danger');
+            setStatus('Select at least one media file first.', 'danger');
             return;
         }
 
@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!state.modalImages.length) {
-            setModalStatus('No images selected.', 'danger');
+            setModalStatus('No media selected.', 'danger');
             return;
         }
 
@@ -523,11 +523,11 @@ document.addEventListener('DOMContentLoaded', () => {
             drive_api_key_id: driveApiKeyInput.value,
             post_mode: postMode,
             platforms,
-            images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url, resource_key: img.resource_key || '' })),
+            images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url, resource_key: img.resource_key || '', mime_type: img.mime_type || '' })),
         };
 
         modalPostBtn.disabled = true;
-        setModalStatus('Posting images...', 'muted');
+        setModalStatus('Posting media...', 'muted');
 
         try {
             const response = await fetch(modalPostBtn.dataset.publishUrl, {
@@ -542,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await response.json();
             if (!response.ok || !result.success) {
-                throw new Error(result.message || 'Failed to publish image(s).');
+                throw new Error(result.message || 'Failed to publish media.');
             }
 
             const postedIds = new Set((result.data.results || []).filter((row) => row.success).map((row) => row.file_id));
@@ -561,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             state.selectedIds.clear();
             renderGrid();
-            setStatus(result.message || 'Images posted successfully.', 'success');
+            setStatus(result.message || 'Media posted successfully.', 'success');
             modal.hide();
         } catch (error) {
             setModalStatus(error.message || 'Unexpected error while posting images.', 'danger');

@@ -22,6 +22,7 @@ class AutomationService
         private readonly DriveService $driveService,
         private readonly AiCaptionService $aiCaptionService,
         private readonly MetaPostService $metaPostService,
+        private readonly MetaVideoService $metaVideoService,
     ) {
     }
 
@@ -98,42 +99,52 @@ class AutomationService
                 return;
             }
 
-            $drivePayload = $this->driveService->fetchImagesFromDriveLink($config->drive_link, $config->driveApiKey);
+            $drivePayload = $this->driveService->fetchMediaFromDriveLink($config->drive_link, $config->driveApiKey);
             $folderId = (string) ($drivePayload['folder_id'] ?? '');
-            $images = collect($drivePayload['images'] ?? []);
+            $mediaItems = collect($drivePayload['media'] ?? []);
             $platforms = $this->normalizePlatforms($config->platforms);
 
-            $unusedImage = $this->resolveUnusedImage($config, $images);
+            $unusedMedia = $this->resolveUnusedImage($config, $mediaItems);
 
-            if (!$unusedImage) {
-                $this->logSkipped($config, 'No unused images available in Drive folder.', $automationLogId);
+            if (!$unusedMedia) {
+                $this->logSkipped($config, 'No unused media available in Drive folder.', $automationLogId);
 
                 return;
             }
 
-            $imageUrl = (string) ($unusedImage['download_url'] ?? $unusedImage['preview_url'] ?? '');
-            if (in_array('instagram', $platforms, true)) {
-                $imageUrl = $this->driveService->prepareInstagramEligibleImage($unusedImage, $config->driveApiKey);
+            $mediaType = (string) ($unusedMedia['type'] ?? 'image');
+            $mediaUrl = (string) ($unusedMedia['download_url'] ?? $unusedMedia['preview_url'] ?? '');
+
+            if ($mediaType === 'image' && in_array('instagram', $platforms, true)) {
+                $mediaUrl = $this->driveService->prepareInstagramEligibleImage($unusedMedia, $config->driveApiKey);
             }
 
-            $caption = $this->aiCaptionService->generateCaption($config->prompt, $imageUrl);
+            if ($mediaType === 'video' && in_array('google_business', $platforms, true)) {
+                $platforms = array_values(array_filter($platforms, fn (string $platform) => $platform !== 'google_business'));
+            }
+
+            $caption = $this->aiCaptionService->generateCaption($config->prompt, $mediaUrl);
 
             /** @var FacebookPage|null $page */
             $page = $config->page;
             if (!$page || !$page->is_active) {
-                $this->logFailed($config, $unusedImage, $platforms, 'Selected page is missing or inactive.', $automationLogId);
+                $this->logFailed($config, $unusedMedia, $platforms, 'Selected page is missing or inactive.', $automationLogId);
 
                 return;
             }
 
-            $result = $this->metaPostService->publish($page, $caption, $imageUrl, $platforms);
+            $result = $mediaType === 'video'
+                ? $this->publishVideoAutomation($page, $caption, $mediaUrl, $platforms)
+                : $this->metaPostService->publish($page, $caption, $mediaUrl, $platforms);
 
-            DB::transaction(function () use ($config, $unusedImage, $platforms, $result, $caption, $imageUrl, $folderId, $automationLogId) {
+            DB::transaction(function () use ($config, $unusedMedia, $platforms, $result, $caption, $mediaUrl, $folderId, $automationLogId, $mediaType) {
                 $facebookPost = FacebookPost::create([
                     'user_id' => $config->user_id,
                     'page_id' => $config->page_id,
                     'message' => $caption,
-                    'image_url' => $imageUrl,
+                    'media_type' => $mediaType,
+                    'image_url' => $mediaType === 'image' ? $mediaUrl : null,
+                    'video_url' => $mediaType === 'video' ? $mediaUrl : null,
                     'platforms' => $platforms,
                     'status' => FacebookPost::STATUS_PUBLISHED,
                     'posted_at' => now(),
@@ -142,18 +153,20 @@ class AutomationService
                     'response_json' => $result['response_json'] ?? null,
                 ]);
 
-                PostImage::create([
-                    'user_id' => $config->user_id,
-                    'post_id' => $facebookPost->id,
-                    'image_path' => $this->resolveImagePathForHistory($imageUrl),
-                ]);
+                if ($mediaType === 'image') {
+                    PostImage::create([
+                        'user_id' => $config->user_id,
+                        'post_id' => $facebookPost->id,
+                        'image_path' => $this->resolveImagePathForHistory($mediaUrl),
+                    ]);
+                }
 
                 DriveImagePost::create([
                     'user_id' => $config->user_id,
                     'page_id' => $config->page_id,
-                    'drive_file_id' => (string) ($unusedImage['id'] ?? ''),
+                    'drive_file_id' => (string) ($unusedMedia['id'] ?? ''),
                     'drive_folder_id' => $folderId,
-                    'image_url' => $imageUrl,
+                    'image_url' => $mediaUrl,
                     'caption' => $caption,
                     'platforms' => $platforms,
                     'facebook_post_id' => $result['facebook_post_id'] ?? null,
@@ -166,9 +179,9 @@ class AutomationService
                     'user_id' => $config->user_id,
                     'automation_config_id' => $config->id,
                     'page_id' => $config->page_id,
-                    'drive_file_id' => (string) ($unusedImage['id'] ?? ''),
-                    'drive_file_name' => (string) ($unusedImage['name'] ?? null),
-                    'image_url' => $imageUrl,
+                    'drive_file_id' => (string) ($unusedMedia['id'] ?? ''),
+                    'drive_file_name' => (string) ($unusedMedia['name'] ?? null),
+                    'image_url' => $mediaUrl,
                     'caption' => $caption,
                     'platforms' => $platforms,
                     'facebook_post_id' => $result['facebook_post_id'] ?? null,
@@ -258,6 +271,28 @@ class AutomationService
             'instagram' => ['instagram'],
             default => ['facebook', 'instagram'],
         };
+    }
+
+    private function publishVideoAutomation(FacebookPage $page, string $caption, string $videoUrl, array $platforms): array
+    {
+        $responses = [];
+
+        foreach ($platforms as $platform) {
+            if ($platform === 'facebook') {
+                $responses['facebook'] = $this->metaVideoService->postToFacebookVideo($page, $videoUrl, $caption);
+                continue;
+            }
+
+            if ($platform === 'instagram') {
+                $responses['instagram'] = $this->metaVideoService->postToInstagramVideo($page, $videoUrl, $caption);
+            }
+        }
+
+        return [
+            'facebook_post_id' => data_get($responses, 'facebook.id') ?: data_get($responses, 'facebook.post_id'),
+            'instagram_media_id' => data_get($responses, 'instagram.publish_response.id'),
+            'response_json' => $responses,
+        ];
     }
 
     private function logSkipped(AutomationConfig $config, string $message, ?int $automationLogId = null): void
