@@ -338,9 +338,7 @@ class PostController extends Controller
             ->get()
             ->groupBy('drive_file_id');
 
-        $driveApiKeyId = (int) $data['drive_api_key_id'];
-
-        $payload = collect($images)->map(function (array $image) use ($postedByImage, $driveApiKeyId) {
+        $payload = collect($images)->map(function (array $image) use ($postedByImage) {
             $records = $postedByImage->get($image['id'], collect());
             $postedPlatforms = $records
                 ->flatMap(fn ($record) => $record->platforms ?? [])
@@ -350,12 +348,7 @@ class PostController extends Controller
                 ->all();
 
             return array_merge($image, [
-                'preview_url' => route('admin.posts.drive.image-proxy', [
-                    'source_url' => $image['preview_url'],
-                    'drive_api_key_id' => $driveApiKeyId,
-                    'file_id' => $image['id'],
-                    'resource_key' => $image['resource_key'] ?? null,
-                ]),
+                'preview_url' => (string) ($image['thumbnail_url'] ?: $image['preview_url']),
                 'is_posted' => !empty($postedPlatforms),
                 'posted_platforms' => $postedPlatforms,
             ]);
@@ -823,6 +816,7 @@ class PostController extends Controller
 
         try {
             $response = \Illuminate\Support\Facades\Http::timeout(45)
+                ->retry(2, 250)
                 ->withOptions(['allow_redirects' => true])
                 ->withHeaders(['Accept' => 'image/*'])
                 ->get($sourceUrl);
@@ -831,8 +825,18 @@ class PostController extends Controller
                 return null;
             }
 
+            $contentType = strtolower((string) $response->header('Content-Type', ''));
+            if (!str_starts_with($contentType, 'image/')) {
+                return null;
+            }
+
+            $content = $response->body();
+            if ($content === '') {
+                return null;
+            }
+
             return [
-                'content' => $response->body(),
+                'content' => $content,
                 'content_type' => $response->header('Content-Type', 'image/jpeg'),
             ];
         } catch (\Throwable) {

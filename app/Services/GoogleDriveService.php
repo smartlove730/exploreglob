@@ -75,13 +75,13 @@ class GoogleDriveService
             }
 
             $query = [
-                    'q' => "'{$folderId}' in parents and mimeType contains 'image/' and trashed = false",
-                    'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey)',
-                    'pageSize' => 200,
-                    'pageToken' => $pageToken,
-                    'supportsAllDrives' => 'true',
-                    'includeItemsFromAllDrives' => 'true',
-                ];
+                'q' => "'{$folderId}' in parents and mimeType contains 'image/' and trashed = false",
+                'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey,thumbnailLink,imageMediaMetadata(width,height))',
+                'pageSize' => 200,
+                'pageToken' => $pageToken,
+                'supportsAllDrives' => 'true',
+                'includeItemsFromAllDrives' => 'true',
+            ];
 
             if (!$accessToken) {
                 $query['key'] = $apiKey;
@@ -112,6 +112,9 @@ class GoogleDriveService
                     'mime_type' => (string) ($file['mimeType'] ?? ''),
                     'web_view_link' => (string) ($file['webViewLink'] ?? ''),
                     'resource_key' => $resourceKey,
+                    'thumbnail_url' => $this->normalizeThumbnailLink((string) ($file['thumbnailLink'] ?? '')),
+                    'width' => (int) ($file['imageMediaMetadata']['width'] ?? 0),
+                    'height' => (int) ($file['imageMediaMetadata']['height'] ?? 0),
                     'preview_url' => $this->buildPreviewUrl($id, $resourceKey),
                     'download_url' => $this->buildDownloadUrl($id, $resourceKey),
                 ];
@@ -131,6 +134,17 @@ class GoogleDriveService
     public function buildDownloadUrl(string $fileId, string $resourceKey = ''): string
     {
         return $this->buildUserContentUrl($fileId, 'download', $resourceKey);
+    }
+
+    public function normalizeThumbnailLink(string $thumbnailLink): string
+    {
+        if ($thumbnailLink === '') {
+            return '';
+        }
+
+        $normalized = str_replace('=s220', '=s800', $thumbnailLink);
+
+        return str_replace('&sz=w220-h220', '&sz=w800-h800', $normalized);
     }
 
     private function buildUserContentUrl(string $fileId, string $export, string $resourceKey = ''): string
