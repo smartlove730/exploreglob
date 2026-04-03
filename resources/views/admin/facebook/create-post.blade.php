@@ -125,9 +125,9 @@
             </div>
             <div class="col-lg-6">
                 <label class="form-label">Generated Preview</label>
-                <div class="border rounded bg-light p-3 d-flex justify-content-center align-items-center" style="min-height: 380px;">
-                    <div id="ai_design_preview_container" class="w-100 d-flex justify-content-center align-items-center text-muted">
-                        Generated design preview will appear here.
+                <div class="border rounded bg-light p-3 d-flex justify-content-center align-items-center" style="min-height: 420px;">
+                    <div id="ai_design_preview_container" class="w-100 d-flex justify-content-center align-items-center">
+                        <div class="text-muted">Generated design preview will appear here.</div>
                     </div>
                 </div>
             </div>
@@ -340,10 +340,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiDesignGenerateStatus = document.getElementById('ai_design_generate_status');
     const aiDesignPublishStatus = document.getElementById('ai_design_publish_status');
     const aiDesignPreview = document.getElementById('ai_design_preview_container');
+    const aiDesignShadowRoot = aiDesignPreview?.attachShadow ? aiDesignPreview.attachShadow({ mode: 'open' }) : null;
 
     const aiDesignState = {
         html: '',
         imageData: '',
+    };
+
+    const renderAiDesignPreview = (html) => {
+        if (!aiDesignPreview) {
+            return;
+        }
+
+        if (!aiDesignShadowRoot) {
+            aiDesignPreview.innerHTML = html || '<div class="text-muted">Generated design preview will appear here.</div>';
+            return;
+        }
+
+        if (!html) {
+            aiDesignShadowRoot.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:360px;color:#6c757d;">Generated design preview will appear here.</div>';
+            return;
+        }
+
+        aiDesignShadowRoot.innerHTML = `
+            <style>
+                :host {
+                    display: block;
+                    width: 100%;
+                }
+                .ai-design-surface {
+                    width: 100%;
+                    max-width: 420px;
+                    aspect-ratio: 1 / 1;
+                    margin: 0 auto;
+                    overflow: auto;
+                    background: #fff;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                }
+            </style>
+            <div class="ai-design-surface">${html}</div>
+        `;
     };
 
     const setStatus = (message, type = 'muted') => {
@@ -676,7 +713,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    aiDesignGenerateBtn?.addEventListener('click', async () => {
+    aiDesignGenerateBtn?.addEventListener('click', async (event) => {
+        event.preventDefault();
         const prompt = aiDesignPrompt?.value.trim() || '';
         if (!prompt) {
             aiDesignGenerateStatus.textContent = 'Please write a design prompt first.';
@@ -707,14 +745,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             aiDesignState.html = result.data.html || '';
-            aiDesignPreview.innerHTML = aiDesignState.html;
+            renderAiDesignPreview(aiDesignState.html);
             aiDesignGenerateStatus.textContent = 'Design generated successfully.';
             aiDesignGenerateStatus.className = 'd-block mt-2 text-success';
             aiDesignPostBtn.disabled = false;
         } catch (error) {
             aiDesignState.html = '';
             aiDesignPostBtn.disabled = true;
-            aiDesignPreview.innerHTML = '<div class="text-muted">Generated design preview will appear here.</div>';
+            renderAiDesignPreview('');
             aiDesignGenerateStatus.textContent = error.message || 'Unexpected error while generating design.';
             aiDesignGenerateStatus.className = 'd-block mt-2 text-danger';
         } finally {
@@ -722,7 +760,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    aiDesignPostBtn?.addEventListener('click', async () => {
+    aiDesignPostBtn?.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
         if (!aiDesignState.html) {
             aiDesignPublishStatus.textContent = 'Please generate a design first.';
             aiDesignPublishStatus.className = 'd-block mt-2 text-danger';
@@ -752,7 +793,8 @@ document.addEventListener('DOMContentLoaded', () => {
         aiDesignPublishStatus.className = 'd-block mt-2 text-muted';
 
         try {
-            const canvas = await window.html2canvas(aiDesignPreview, {
+            const previewNode = aiDesignShadowRoot?.querySelector('.ai-design-surface') || aiDesignPreview;
+            const canvas = await window.html2canvas(previewNode, {
                 backgroundColor: '#ffffff',
                 scale: 2,
                 useCORS: true,
@@ -791,6 +833,8 @@ document.addEventListener('DOMContentLoaded', () => {
             aiDesignPostBtn.disabled = false;
         }
     });
+
+    renderAiDesignPreview('');
 });
 </script>
 @endpush

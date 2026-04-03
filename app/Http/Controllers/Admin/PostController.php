@@ -712,7 +712,7 @@ class PostController extends Controller
             'platforms.*' => 'required|string|in:facebook,instagram,google_business',
             'prompt' => 'required|string|max:5000',
             'caption' => 'nullable|string|max:60000',
-            'image_data' => 'required|string',
+            'image_data' => ['required', 'string', 'regex:/^data:image\/png;base64,/'],
             'google_location_id' => 'nullable|integer|exists:google_locations,id',
         ]);
 
@@ -799,7 +799,7 @@ class PostController extends Controller
 
     private function decodeBase64Image(string $raw): ?string
     {
-        if (!str_starts_with($raw, 'data:image/')) {
+        if (!str_starts_with($raw, 'data:image/png;base64,')) {
             return null;
         }
 
