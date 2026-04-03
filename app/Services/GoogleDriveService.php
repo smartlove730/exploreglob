@@ -24,7 +24,31 @@ class GoogleDriveService
         ]);
     }
 
-    public function listPublicFolderImages(string $folderId, ?string $apiKey = null, ?string $accessToken = null): array
+    public function extractFolderResourceKey(string $folderUrl): string
+    {
+        $folderUrl = trim($folderUrl);
+        $query = parse_url($folderUrl, PHP_URL_QUERY);
+
+        if (!is_string($query) || $query === '') {
+            return '';
+        }
+
+        parse_str($query, $params);
+        $resourceKey = (string) ($params['resourcekey'] ?? '');
+
+        if ($resourceKey !== '') {
+            return $resourceKey;
+        }
+
+        return (string) ($params['resourceKey'] ?? '');
+    }
+
+    public function listPublicFolderImages(
+        string $folderId,
+        ?string $apiKey = null,
+        ?string $accessToken = null,
+        string $folderResourceKey = '',
+    ): array
     {
         $apiKey = $apiKey ?: config('services.google_drive.api_key');
 
@@ -44,6 +68,12 @@ class GoogleDriveService
                 $request = $request->withToken($accessToken);
             }
 
+            if ($folderResourceKey !== '') {
+                $request = $request->withHeaders([
+                    'X-Goog-Drive-Resource-Keys' => "{$folderId}/{$folderResourceKey}",
+                ]);
+            }
+
             $query = [
                     'q' => "'{$folderId}' in parents and mimeType contains 'image/' and trashed = false",
                     'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey)',
@@ -60,7 +90,6 @@ class GoogleDriveService
             $response = $request->get('https://www.googleapis.com/drive/v3/files', $query);
 
             if (!$response->successful()) {
-
                 throw ValidationException::withMessages([
                     'folder_url' => 'Unable to fetch images from Google Drive. Make sure the folder is shared publicly.',
                 ]);

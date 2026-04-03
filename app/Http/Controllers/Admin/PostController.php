@@ -317,6 +317,7 @@ class PostController extends Controller
         }
 
         $folderId = $this->googleDriveService->extractFolderId($folderUrl);
+        $folderResourceKey = $this->googleDriveService->extractFolderResourceKey($folderUrl);
 
         $driveToken = null;
         if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
@@ -324,7 +325,12 @@ class PostController extends Controller
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $images = $this->googleDriveService->listPublicFolderImages($folderId, $driveApiKey->api_key, $driveToken);
+        $images = $this->googleDriveService->listPublicFolderImages(
+            $folderId,
+            $driveApiKey->api_key,
+            $driveToken,
+            $folderResourceKey
+        );
 
         $postedByImage = DriveImagePost::query()->ownedBy(Auth::user())
             ->whereIn('page_id', $pages->pluck('id')->all())
