@@ -123,6 +123,85 @@ class GoogleDriveService
         return $images;
     }
 
+    public function listDriveMedia(
+        ?string $apiKey = null,
+        ?string $accessToken = null,
+    ): array
+    {
+        $apiKey = $apiKey ?: config('services.google_drive.api_key');
+
+        if (!$apiKey) {
+            throw ValidationException::withMessages([
+                'drive_api_key_id' => 'Google Drive API key is not configured.',
+            ]);
+        }
+
+        $media = [];
+        $pageToken = null;
+
+        do {
+            $request = Http::timeout(30);
+
+            if ($accessToken) {
+                $request = $request->withToken($accessToken);
+            }
+
+            $query = [
+                'q' => "trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')",
+                'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey)',
+                'pageSize' => 200,
+                'pageToken' => $pageToken,
+                'supportsAllDrives' => 'true',
+                'includeItemsFromAllDrives' => 'true',
+            ];
+
+            if (!$accessToken) {
+                $query['key'] = $apiKey;
+            }
+
+            $response = $request->get('https://www.googleapis.com/drive/v3/files', $query);
+
+            if (!$response->successful()) {
+                throw ValidationException::withMessages([
+                    'drive_api_key_id' => 'Unable to fetch media from Google Drive.',
+                ]);
+            }
+
+            $payload = $response->json();
+            $files = $payload['files'] ?? [];
+
+            foreach ($files as $file) {
+                $id = (string) ($file['id'] ?? '');
+                $mimeType = (string) ($file['mimeType'] ?? '');
+                $resourceKey = (string) ($file['resourceKey'] ?? '');
+
+                if ($id === '') {
+                    continue;
+                }
+
+                $type = str_starts_with($mimeType, 'video/') ? 'video' : (str_starts_with($mimeType, 'image/') ? 'image' : '');
+                if ($type === '') {
+                    continue;
+                }
+
+                $media[] = [
+                    'id' => $id,
+                    'name' => (string) ($file['name'] ?? 'Untitled'),
+                    'mime_type' => $mimeType,
+                    'type' => $type,
+                    'web_view_link' => (string) ($file['webViewLink'] ?? ''),
+                    'resource_key' => $resourceKey,
+                    'preview_url' => $this->buildPreviewUrl($id, $resourceKey),
+                    'download_url' => $this->buildDownloadUrl($id, $resourceKey),
+                ];
+            }
+
+            $pageToken = $payload['nextPageToken'] ?? null;
+        } while ($pageToken);
+
+        return $media;
+    }
+
     public function buildPreviewUrl(string $fileId, string $resourceKey = ''): string
     {
         return $this->buildUserContentUrl($fileId, 'view', $resourceKey);
@@ -150,6 +229,17 @@ class GoogleDriveService
 
     public function fetchImageBinary(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): array
     {
+        return $this->fetchFileBinary($fileId, $apiKey, $resourceKey, $accessToken, 'image/*');
+    }
+
+    public function fetchFileBinary(
+        string $fileId,
+        ?string $apiKey = null,
+        string $resourceKey = '',
+        ?string $accessToken = null,
+        string $accept = '*/*'
+    ): array
+    {
         $query = ['alt' => 'media'];
 
         if (!$accessToken && $apiKey) {
@@ -160,7 +250,7 @@ class GoogleDriveService
             $query['resourceKey'] = $resourceKey;
         }
 
-        $request = Http::timeout(30)->withHeaders(['Accept' => 'image/*']);
+        $request = Http::timeout(30)->withHeaders(['Accept' => $accept]);
 
         if ($accessToken) {
             $request = $request->withToken($accessToken);
@@ -170,7 +260,7 @@ class GoogleDriveService
 
         if (!$response->successful()) {
             throw ValidationException::withMessages([
-                'file_id' => 'Unable to load this Google Drive image.',
+                'file_id' => 'Unable to load this Google Drive file.',
             ]);
         }
 
