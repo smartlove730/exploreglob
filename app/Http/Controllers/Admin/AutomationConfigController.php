@@ -30,7 +30,15 @@ class AutomationConfigController extends Controller
             'last_activity' => AutomationPostLog::query()->ownedBy(Auth::user())->latest('created_at')->value('created_at'),
         ];
 
-        return view('admin.automations.index', compact('configs', 'queueStats'));
+        $inProgressLogs = AutomationPostLog::query()
+            ->ownedBy(Auth::user())
+            ->with(['automationConfig', 'page'])
+            ->whereIn('status', ['scheduled', 'in_progress'])
+            ->orderByRaw('COALESCE(scheduled_for, created_at) asc')
+            ->limit(25)
+            ->get();
+
+        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs'));
     }
 
     public function create()
