@@ -70,4 +70,62 @@
         {{ $configs->links() }}
     </div>
 </div>
+
+<div class="card border-0 shadow-sm mt-3">
+    <div class="card-body">
+        <h2 class="h5">Scheduled / In-Progress Automations</h2>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Automation</th>
+                        <th>Page</th>
+                        <th>Execution Time</th>
+                        <th>Status</th>
+                        <th>Caption</th>
+                        <th>Image</th>
+                        <th>Details</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($inProgressLogs as $log)
+                        <tr>
+                            <td>{{ $log->automationConfig?->name ?: 'Automation #'.$log->automation_config_id }}</td>
+                            <td>{{ $log->page?->page_name ?? '-' }}</td>
+                            <td>{{ $log->scheduled_for?->toDateTimeString() ?? $log->created_at?->toDateTimeString() }}</td>
+                            <td><span class="badge text-bg-{{ $log->status === 'in_progress' ? 'warning' : 'info' }}">{{ str_replace('_', ' ', ucfirst($log->status)) }}</span></td>
+                            <td>{{ $log->caption ? \Illuminate\Support\Str::limit($log->caption, 80) : '-' }}</td>
+                            <td>
+                                @if($log->image_url)
+                                    <a href="{{ $log->image_url }}" target="_blank" rel="noopener">View</a>
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td class="small text-muted">{{ $log->message ?? '-' }}</td>
+                            <td class="text-end">
+                                @if($log->status === 'scheduled')
+                                    <form action="{{ route('admin.automations.executions.run-now', $log) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button class="btn btn-sm btn-outline-success">Execute Immediately</button>
+                                    </form>
+                                @endif
+                                <form action="{{ route('admin.automations.executions.destroy', $log) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this execution?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn btn-sm btn-outline-danger">Delete Execution</button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">No scheduled or in-progress automations.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 @endsection

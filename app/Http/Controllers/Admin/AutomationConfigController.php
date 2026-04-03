@@ -8,6 +8,7 @@ use App\Models\AutomationPostLog;
 use App\Models\DriveApiKey;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
+use App\Jobs\RunAutomationJob;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +31,15 @@ class AutomationConfigController extends Controller
             'last_activity' => AutomationPostLog::query()->ownedBy(Auth::user())->latest('created_at')->value('created_at'),
         ];
 
-        return view('admin.automations.index', compact('configs', 'queueStats'));
+        $inProgressLogs = AutomationPostLog::query()
+            ->ownedBy(Auth::user())
+            ->with(['automationConfig', 'page'])
+            ->whereIn('status', ['scheduled', 'in_progress'])
+            ->orderByRaw('COALESCE(scheduled_for, created_at) asc')
+            ->limit(25)
+            ->get();
+
+        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs'));
     }
 
     public function create()
@@ -125,9 +134,54 @@ class AutomationConfigController extends Controller
         return back()->with('success', 'Automation status updated.');
     }
 
+    public function cancelExecution(AutomationPostLog $execution): RedirectResponse
+    {
+        $this->authorizeExecution($execution);
+
+        if (!in_array($execution->status, ['scheduled', 'in_progress'], true)) {
+            return back()->with('error', 'Only scheduled or in-progress executions can be deleted.');
+        }
+
+        $execution->update([
+            'status' => 'cancelled',
+            'message' => 'Execution cancelled by user.',
+            'completed_at' => now(),
+        ]);
+
+        return back()->with('success', 'Execution deleted successfully.');
+    }
+
+    public function executeNow(AutomationPostLog $execution): RedirectResponse
+    {
+        $this->authorizeExecution($execution);
+
+        if ($execution->status !== 'scheduled') {
+            return back()->with('error', 'Only scheduled executions can be run immediately.');
+        }
+
+        $execution->update([
+            'status' => 'scheduled',
+            'message' => 'Execution promoted to run immediately.',
+            'scheduled_for' => now(),
+            'started_at' => null,
+            'completed_at' => null,
+        ]);
+
+        RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id);
+
+        return back()->with('success', 'Execution queued to run immediately.');
+    }
+
     private function authorizeAutomation(AutomationConfig $automation): void
     {
         if (!Auth::user()?->isAdmin() && $automation->user_id !== Auth::id()) {
+            abort(403);
+        }
+    }
+
+    private function authorizeExecution(AutomationPostLog $execution): void
+    {
+        if (!Auth::user()?->isAdmin() && $execution->user_id !== Auth::id()) {
             abort(403);
         }
     }

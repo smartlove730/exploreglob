@@ -170,6 +170,8 @@ Route::middleware(['auth', 'admin', 'subscription.active'])
         Route::put('automations/{automation}', [AutomationConfigController::class, 'update'])->name('update');
         Route::delete('automations/{automation}', [AutomationConfigController::class, 'destroy'])->name('destroy');
         Route::post('automations/{automation}/toggle', [AutomationConfigController::class, 'toggle'])->name('toggle');
+        Route::delete('automations/executions/{execution}', [AutomationConfigController::class, 'cancelExecution'])->name('executions.destroy');
+        Route::post('automations/executions/{execution}/run-now', [AutomationConfigController::class, 'executeNow'])->name('executions.run-now');
     });
 
 Route::middleware(['auth', 'admin'])

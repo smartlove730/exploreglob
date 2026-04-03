@@ -26,12 +26,18 @@ class AutomationPostLog extends Model
         'status',
         'message',
         'response_json',
+        'scheduled_for',
+        'started_at',
+        'completed_at',
         'posted_at',
     ];
 
     protected $casts = [
         'platforms' => 'array',
         'response_json' => 'array',
+        'scheduled_for' => 'datetime',
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
         'posted_at' => 'datetime',
     ];
 

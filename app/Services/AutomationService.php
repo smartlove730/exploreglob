@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\RunAutomationJob;
 use App\Models\AutomationConfig;
 use App\Models\AutomationPostLog;
 use App\Models\DriveImagePost;
@@ -24,9 +25,48 @@ class AutomationService
     ) {
     }
 
-    public function runAllAutomations(?int $automationConfigId = null, bool $forceRun = false): void
+    public function scheduleAutomations(?int $automationConfigId = null, bool $forceRun = false): Collection
     {
-        Cache::lock('automation:run-all', 300)->block(5, function () use ($automationConfigId, $forceRun) {
+        $configs = AutomationConfig::query()
+            ->with(['page', 'driveApiKey'])
+            ->where('is_active', true)
+            ->when($automationConfigId, fn ($query) => $query->whereKey($automationConfigId))
+            ->get();
+
+        $nextRunAt = now();
+        $scheduledLogs = collect();
+
+        foreach ($configs as $config) {
+            $nextRunAt = $nextRunAt->copy()->addMinutes(random_int(10, 120));
+            $message = 'Scheduled for '.$nextRunAt->toDateTimeString().'.';
+
+            $log = AutomationPostLog::create([
+                'user_id' => $config->user_id,
+                'automation_config_id' => $config->id,
+                'page_id' => $config->page_id,
+                'status' => 'scheduled',
+                'message' => $message,
+                'scheduled_for' => $nextRunAt,
+                'posted_at' => $nextRunAt,
+                'caption' => null,
+                'platforms' => $this->normalizePlatforms($config->platforms),
+                'response_json' => [
+                    'automation_name' => $config->name,
+                    'drive_link' => $config->drive_link,
+                    'prompt' => $config->prompt,
+                ],
+            ]);
+
+            RunAutomationJob::dispatch($config->id, $forceRun, $log->id)->delay($nextRunAt);
+            $scheduledLogs->push($log);
+        }
+
+        return $scheduledLogs;
+    }
+
+    public function runAllAutomations(?int $automationConfigId = null, bool $forceRun = false, ?int $automationLogId = null): void
+    {
+        Cache::lock('automation:run-all', 300)->block(5, function () use ($automationConfigId, $forceRun, $automationLogId) {
             $configs = AutomationConfig::query()
                 ->with(['page.facebookAccount', 'driveApiKey'])
                 ->where('is_active', true)
@@ -34,24 +74,26 @@ class AutomationService
                 ->get();
 
             foreach ($configs as $config) {
-                $this->runSingleAutomation($config, $forceRun);
+                $this->runSingleAutomation($config, $forceRun, $automationLogId);
                 sleep(2); // soft rate-limit between external API calls
             }
         });
     }
 
-    private function runSingleAutomation(AutomationConfig $config, bool $forceRun = false): void
+    private function runSingleAutomation(AutomationConfig $config, bool $forceRun = false, ?int $automationLogId = null): void
     {
+        $this->markLogInProgress($automationLogId);
+
         $blockReason = $this->getRunBlockReason($config, $forceRun);
         if ($blockReason !== null) {
-            $this->logSkipped($config, $blockReason);
+            $this->logSkipped($config, $blockReason, $automationLogId);
 
             return;
         }
 
         try {
             if (!$config->driveApiKey || !$config->driveApiKey->is_active) {
-                $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), 'No active Google Drive key selected.');
+                $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), 'No active Google Drive key selected.', $automationLogId);
 
                 return;
             }
@@ -64,7 +106,7 @@ class AutomationService
             $unusedImage = $this->resolveUnusedImage($config, $images);
 
             if (!$unusedImage) {
-                $this->logSkipped($config, 'No unused images available in Drive folder.');
+                $this->logSkipped($config, 'No unused images available in Drive folder.', $automationLogId);
 
                 return;
             }
@@ -79,14 +121,14 @@ class AutomationService
             /** @var FacebookPage|null $page */
             $page = $config->page;
             if (!$page || !$page->is_active) {
-                $this->logFailed($config, $unusedImage, $platforms, 'Selected page is missing or inactive.');
+                $this->logFailed($config, $unusedImage, $platforms, 'Selected page is missing or inactive.', $automationLogId);
 
                 return;
             }
 
             $result = $this->metaPostService->publish($page, $caption, $imageUrl, $platforms);
 
-            DB::transaction(function () use ($config, $unusedImage, $platforms, $result, $caption, $imageUrl, $folderId) {
+            DB::transaction(function () use ($config, $unusedImage, $platforms, $result, $caption, $imageUrl, $folderId, $automationLogId) {
                 $facebookPost = FacebookPost::create([
                     'user_id' => $config->user_id,
                     'page_id' => $config->page_id,
@@ -120,7 +162,7 @@ class AutomationService
                     'posted_at' => now(),
                 ]);
 
-                AutomationPostLog::create([
+                $this->logSuccess($config, [
                     'user_id' => $config->user_id,
                     'automation_config_id' => $config->id,
                     'page_id' => $config->page_id,
@@ -138,7 +180,7 @@ class AutomationService
                         'drive_folder_id' => $folderId,
                     ],
                     'posted_at' => now(),
-                ]);
+                ], $automationLogId);
 
                 $config->forceFill(['last_run_at' => now()])->save();
             });
@@ -148,7 +190,7 @@ class AutomationService
                 'error' => $exception->getMessage(),
             ]);
 
-            $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), $exception->getMessage());
+            $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), $exception->getMessage(), $automationLogId);
         }
     }
 
@@ -218,9 +260,9 @@ class AutomationService
         };
     }
 
-    private function logSkipped(AutomationConfig $config, string $message): void
+    private function logSkipped(AutomationConfig $config, string $message, ?int $automationLogId = null): void
     {
-        AutomationPostLog::create([
+        $this->upsertLog($automationLogId, [
             'user_id' => $config->user_id,
             'automation_config_id' => $config->id,
             'page_id' => $config->page_id,
@@ -230,9 +272,9 @@ class AutomationService
         ]);
     }
 
-    private function logFailed(AutomationConfig $config, ?array $image, array $platforms, string $message): void
+    private function logFailed(AutomationConfig $config, ?array $image, array $platforms, string $message, ?int $automationLogId = null): void
     {
-        AutomationPostLog::create([
+        $this->upsertLog($automationLogId, [
             'user_id' => $config->user_id,
             'automation_config_id' => $config->id,
             'page_id' => $config->page_id,
@@ -244,5 +286,44 @@ class AutomationService
             'message' => $message,
             'posted_at' => now(),
         ]);
+    }
+
+    private function logSuccess(AutomationConfig $config, array $payload, ?int $automationLogId = null): void
+    {
+        $this->upsertLog($automationLogId, $payload + [
+            'user_id' => $config->user_id,
+            'automation_config_id' => $config->id,
+            'page_id' => $config->page_id,
+        ]);
+    }
+
+    private function markLogInProgress(?int $automationLogId): void
+    {
+        if (!$automationLogId) {
+            return;
+        }
+
+        AutomationPostLog::query()
+            ->whereKey($automationLogId)
+            ->update([
+                'status' => 'in_progress',
+                'message' => 'Automation started.',
+                'started_at' => now(),
+            ]);
+    }
+
+    private function upsertLog(?int $automationLogId, array $payload): void
+    {
+        $payload['completed_at'] = now();
+
+        if (!$automationLogId) {
+            AutomationPostLog::create($payload);
+
+            return;
+        }
+
+        AutomationPostLog::query()
+            ->whereKey($automationLogId)
+            ->update($payload);
     }
 }
