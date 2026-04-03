@@ -145,10 +145,18 @@ Route::middleware(['auth', 'admin', 'subscription.active'])
         Route::post('posts/drive/images', [PostController::class, 'fetchDriveImages'])->name('drive.images');
         Route::get('posts/drive/image-proxy', [PostController::class, 'proxyDriveImage'])->name('drive.image-proxy');
         Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
-        Route::post('posts/ai-design/generate', [PostController::class, 'generateAiDesign'])->name('ai-design.generate');
-        Route::post('posts/ai-design/publish', [PostController::class, 'publishAiDesign'])->name('ai-design.publish');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
+    });
+
+Route::middleware(['auth', 'admin', 'subscription.active'])
+    ->prefix('admin/ai-design')
+    ->name('admin.ai-design.')
+    ->group(function () {
+        Route::get('/', [PostController::class, 'aiDesign'])->name('index');
+        Route::post('generate', [PostController::class, 'generateAiDesign'])->name('generate');
+        Route::post('publish', [PostController::class, 'publishAiDesign'])->name('publish');
+        Route::get('publish', fn () => redirect()->route('admin.ai-design.index'))->name('publish.redirect');
     });
 
 Route::middleware(['auth', 'admin', 'subscription.active'])

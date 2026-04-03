@@ -20,6 +20,7 @@
     $googleDriveKeysUrl = Route::has('admin.facebook.google-drive-keys.index') ? route('admin.facebook.google-drive-keys.index') : url('/admin/facebook/google-drive-keys');
     $googleDriveFoldersUrl = Route::has('admin.facebook.drive-folders.index') ? route('admin.facebook.drive-folders.index') : url('/admin/facebook/drive-folders');
     $googleSettingsUrl = Route::has('admin.google.settings') ? route('admin.google.settings') : url('/admin/google/settings');
+    $aiDesignUrl = Route::has('admin.ai-design.index') ? route('admin.ai-design.index') : url('/admin/ai-design');
 @endphp
 @if(auth()->check())
 <div class="d-flex">
@@ -48,6 +49,7 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.settings') ? 'active' : '' }}" href="{{ $facebookSettingsUrl }}">Facebook Settings</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.google.*') ? 'active' : '' }}" href="{{ $googleSettingsUrl }}">Google Business</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.ai-design.*') ? 'active' : '' }}" href="{{ $aiDesignUrl }}">AI Design Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.automations.*') ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.saas.*') ? 'active' : '' }}" href="{{ route('admin.saas.overview') }}">SaaS Management</a></li>
             </ul>

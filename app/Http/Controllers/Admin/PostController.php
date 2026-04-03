@@ -81,6 +81,33 @@ class PostController extends Controller
         ]);
     }
 
+    public function aiDesign(Request $request)
+    {
+        $apps = FacebookApp::where('is_active', true)->orderBy('name')->get();
+        $selectedAppId = (int) $request->integer('app_id');
+
+        if ($selectedAppId === 0 && $apps->isNotEmpty()) {
+            $selectedAppId = (int) $apps->first()->id;
+        }
+
+        $pages = FacebookPage::query()->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->when($selectedAppId > 0, fn ($query) => $query->where('facebook_app_id', $selectedAppId))
+            ->orderBy('page_name')
+            ->get();
+
+        return view('admin.facebook.ai-design', [
+            'apps' => $apps,
+            'selectedAppId' => $selectedAppId,
+            'pages' => $pages,
+            'selectedPageIds' => collect(old('page_ids', array_filter([(int) old('page_id', $request->integer('page_id'))])))
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->values()
+                ->all(),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validatePostRequest($request);
