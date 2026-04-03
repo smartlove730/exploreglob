@@ -267,12 +267,21 @@ class PostController extends Controller
     public function fetchDriveImages(Request $request): JsonResponse
     {
         $data = $request->validate([
+            'folder_url' => 'nullable|string|max:2048',
+            'folder_id' => 'nullable|integer|exists:drive_folders,id',
             'app_id' => 'required|integer|exists:facebook_apps,id',
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
             'page_ids' => 'required_without:page_id|array|min:1',
             'page_ids.*' => 'required|integer|exists:facebook_pages,id',
             'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
         ]);
+
+        if (empty($data['folder_url']) && empty($data['folder_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please provide a folder link or select a saved folder.',
+            ], 422);
+        }
 
         $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? [$data['page_id'] ?? null]);
         if ($pages->isEmpty()) {
@@ -294,27 +303,45 @@ class PostController extends Controller
             ], 422);
         }
 
+        $folderUrl = (string) ($data['folder_url'] ?? '');
+        if (!empty($data['folder_id'])) {
+            $savedFolder = DriveFolder::query()->ownedBy(Auth::user())->whereKey((int) $data['folder_id'])->where('is_active', true)->first();
+            if (!$savedFolder) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Selected saved folder is invalid or inactive.',
+                ], 422);
+            }
+
+            $folderUrl = $savedFolder->folder_url;
+        }
+
+        $folderId = $this->googleDriveService->extractFolderId($folderUrl);
+        $folderResourceKey = $this->googleDriveService->extractFolderResourceKey($folderUrl);
+
         $driveToken = null;
         if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
             $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $mediaItems = $this->googleDriveService->listDriveMedia(
+        $images = $this->googleDriveService->listPublicFolderImages(
+            $folderId,
             $driveApiKey->api_key,
-            $driveToken
+            $driveToken,
+            $folderResourceKey
         );
 
         $postedByImage = DriveImagePost::query()->ownedBy(Auth::user())
             ->whereIn('page_id', $pages->pluck('id')->all())
-            ->whereIn('drive_file_id', collect($mediaItems)->pluck('id')->all())
+            ->whereIn('drive_file_id', collect($images)->pluck('id')->all())
             ->get()
             ->groupBy('drive_file_id');
 
         $driveApiKeyId = (int) $data['drive_api_key_id'];
 
-        $payload = collect($mediaItems)->map(function (array $mediaItem) use ($postedByImage, $driveApiKeyId) {
-            $records = $postedByImage->get($mediaItem['id'], collect());
+        $payload = collect($images)->map(function (array $image) use ($postedByImage, $driveApiKeyId) {
+            $records = $postedByImage->get($image['id'], collect());
             $postedPlatforms = $records
                 ->flatMap(fn ($record) => $record->platforms ?? [])
                 ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
@@ -322,13 +349,12 @@ class PostController extends Controller
                 ->values()
                 ->all();
 
-            return array_merge($mediaItem, [
+            return array_merge($image, [
                 'preview_url' => route('admin.posts.drive.image-proxy', [
-                    'source_url' => $mediaItem['preview_url'],
+                    'source_url' => $image['preview_url'],
                     'drive_api_key_id' => $driveApiKeyId,
-                    'file_id' => $mediaItem['id'],
-                    'resource_key' => $mediaItem['resource_key'] ?? null,
-                    'media_type' => $mediaItem['type'] ?? 'image',
+                    'file_id' => $image['id'],
+                    'resource_key' => $image['resource_key'] ?? null,
                 ]),
                 'is_posted' => !empty($postedPlatforms),
                 'posted_platforms' => $postedPlatforms,
@@ -338,7 +364,7 @@ class PostController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'folder_id' => null,
+                'folder_id' => $folderId,
                 'images' => $payload,
             ],
         ]);
@@ -550,7 +576,6 @@ class PostController extends Controller
             'file_id' => 'required|string|max:255',
             'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'resource_key' => 'nullable|string|max:255',
-            'media_type' => 'nullable|string|in:image,video',
         ]);
 
         $driveApiKey = DriveApiKey::query()->ownedBy(Auth::user())
@@ -564,17 +589,14 @@ class PostController extends Controller
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $mediaType = (string) ($data['media_type'] ?? 'image');
-        $acceptHeader = $mediaType === 'video' ? 'video/*' : 'image/*';
-        $binary = $this->downloadImageBinaryFromUrl((string) ($data['source_url'] ?? ''), $acceptHeader);
+        $binary = $this->downloadImageBinaryFromUrl((string) ($data['source_url'] ?? ''));
 
         if (!$binary) {
-            $binary = $this->googleDriveService->fetchFileBinary(
+            $binary = $this->googleDriveService->fetchImageBinary(
                 (string) $data['file_id'],
                 (string) $driveApiKey->api_key,
                 (string) ($data['resource_key'] ?? ''),
-                $driveToken,
-                $acceptHeader
+                $driveToken
             );
         }
 
@@ -788,7 +810,7 @@ class PostController extends Controller
         ];
     }
 
-    private function downloadImageBinaryFromUrl(string $sourceUrl, string $acceptHeader = 'image/*'): ?array
+    private function downloadImageBinaryFromUrl(string $sourceUrl): ?array
     {
         if ($sourceUrl === '') {
             return null;
@@ -802,7 +824,7 @@ class PostController extends Controller
         try {
             $response = \Illuminate\Support\Facades\Http::timeout(45)
                 ->withOptions(['allow_redirects' => true])
-                ->withHeaders(['Accept' => $acceptHeader])
+                ->withHeaders(['Accept' => 'image/*'])
                 ->get($sourceUrl);
 
             if (!$response->successful()) {
