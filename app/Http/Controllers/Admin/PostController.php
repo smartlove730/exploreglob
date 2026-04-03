@@ -20,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -629,6 +630,151 @@ class PostController extends Controller
         ]);
     }
 
+    public function generateAiDesign(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'prompt' => 'required|string|max:5000',
+        ]);
+
+        $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
+        if (!$apiKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gemini API key is not configured.',
+            ], 500);
+        }
+
+        try {
+            $model = config('gemini.model', 'gemma-3-27b');
+            $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+            $systemPrompt = 'Design HTML according to the user design requirements in a square div. '
+                .'Act as a senior web designer and use semantic CSS + HTML div structure only. '
+                .'Provide an Instagram-ready 1:1 design (1080x1080 style). '
+                .'Output only valid JSON with this schema: {"html":""}. '
+                .'Put all CSS inside a single <style> tag and the design inside one parent square div.';
+
+            $response = Http::timeout(120)
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->post($apiUrl, [
+                    'contents' => [[
+                        'parts' => [[
+                            'text' => "{$systemPrompt}\n\nUser prompt:\n".$data['prompt'],
+                        ]],
+                    ]],
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('AI design generation request failed', [
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to generate design from AI API.',
+                ], 500);
+            }
+
+            $html = $this->extractHtmlDesignFromAiResponse($response->json());
+            if ($html === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'AI returned an invalid design format.',
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Design generated successfully.',
+                'data' => [
+                    'html' => $html,
+                ],
+            ]);
+        } catch (\Throwable $exception) {
+            Log::error('AI design generation failed', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unexpected error while generating design.',
+            ], 500);
+        }
+    }
+
+    public function publishAiDesign(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'app_id' => 'required|integer|exists:facebook_apps,id',
+            'page_ids' => 'required|array|min:1',
+            'page_ids.*' => 'required|integer|exists:facebook_pages,id',
+            'platforms' => 'required|array|min:1',
+            'platforms.*' => 'required|string|in:facebook,instagram,google_business',
+            'prompt' => 'required|string|max:5000',
+            'caption' => 'nullable|string|max:60000',
+            'image_data' => 'required|string',
+            'google_location_id' => 'nullable|integer|exists:google_locations,id',
+        ]);
+
+        $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids']);
+        if ($pages->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selected pages are not valid for this app/user.',
+            ], 422);
+        }
+
+        $imageBinary = $this->decodeBase64Image((string) $data['image_data']);
+        if (!$imageBinary) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Generated design image is invalid.',
+            ], 422);
+        }
+
+        $fileName = 'ai-design-'.Auth::id().'-'.Str::uuid().'.png';
+        $targetDirectory = public_path('postsbyusers');
+
+        if (!is_dir($targetDirectory)) {
+            mkdir($targetDirectory, 0755, true);
+        }
+
+        $absolutePath = $targetDirectory.DIRECTORY_SEPARATOR.$fileName;
+        file_put_contents($absolutePath, $imageBinary);
+        $publicUrl = url('postsbyusers/'.$fileName);
+
+        $platforms = collect($data['platforms'])->unique()->values()->all();
+        $googleLocationId = $this->resolveGoogleLocationId($data);
+        $message = trim((string) ($data['caption'] ?? '')) ?: trim((string) $data['prompt']);
+        $createdCount = 0;
+
+        foreach ($pages as $page) {
+            $post = FacebookPost::create([
+                'user_id' => $page->user_id,
+                'page_id' => $page->id,
+                'message' => $message,
+                'media_type' => FacebookPost::MEDIA_TYPE_IMAGE,
+                'image_url' => $publicUrl,
+                'platforms' => $platforms,
+                'google_location_id' => $googleLocationId,
+                'status' => FacebookPost::STATUS_PENDING,
+                'last_error' => null,
+            ]);
+
+            PublishPostJob::dispatch($post->id);
+            $createdCount++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $createdCount.' post(s) queued with generated design.',
+            'data' => [
+                'image_url' => $publicUrl,
+                'count' => $createdCount,
+            ],
+        ]);
+    }
+
     private function validatePostRequest(Request $request, bool $isUpdate = false): array
     {
         return $request->validate([
@@ -649,6 +795,48 @@ class PostController extends Controller
             'remove_images' => $isUpdate ? 'nullable|array' : 'nullable',
             'remove_images.*' => 'integer|exists:post_images,id',
         ]);
+    }
+
+    private function decodeBase64Image(string $raw): ?string
+    {
+        if (!str_starts_with($raw, 'data:image/')) {
+            return null;
+        }
+
+        [$meta, $payload] = array_pad(explode(',', $raw, 2), 2, null);
+        if (!$meta || !$payload || !str_contains($meta, ';base64')) {
+            return null;
+        }
+
+        $binary = base64_decode($payload, true);
+        if ($binary === false || $binary === '') {
+            return null;
+        }
+
+        return $binary;
+    }
+
+    private function extractHtmlDesignFromAiResponse(array $aiResponse): string
+    {
+        $rawText = trim((string) data_get($aiResponse, 'candidates.0.content.parts.0.text', ''));
+        if ($rawText === '') {
+            return '';
+        }
+
+        $rawText = preg_replace('/^```json\s*/i', '', $rawText) ?? $rawText;
+        $rawText = preg_replace('/\s*```$/', '', $rawText) ?? $rawText;
+
+        $decoded = json_decode($rawText, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            return '';
+        }
+
+        $html = trim((string) ($decoded['html'] ?? ''));
+        if ($html === '') {
+            return '';
+        }
+
+        return preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html) ?? $html;
     }
 
 

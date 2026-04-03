@@ -88,6 +88,53 @@
     </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h5">AI Instagram Design Generator</h2>
+        <p class="text-muted mb-3">Write a prompt, generate an Instagram-ready square design, preview it instantly, and post it to selected platforms.</p>
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <label class="form-label">Design Prompt</label>
+                <textarea id="ai_design_prompt" class="form-control" rows="5" placeholder="Example: Luxury skincare product launch post with pastel palette, premium typography, and CTA button."></textarea>
+                <small id="ai_design_generate_status" class="d-block mt-2 text-muted"></small>
+
+                <label class="form-label mt-3">Caption (optional)</label>
+                <textarea id="ai_design_caption" class="form-control" rows="4" placeholder="If empty, prompt text will be used as caption."></textarea>
+
+                <div class="mt-3">
+                    <label class="form-label d-block">Platforms</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input ai-design-platform" type="checkbox" value="facebook" id="ai_design_platform_facebook" checked>
+                        <label class="form-check-label" for="ai_design_platform_facebook">Facebook</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input ai-design-platform" type="checkbox" value="instagram" id="ai_design_platform_instagram">
+                        <label class="form-check-label" for="ai_design_platform_instagram">Instagram</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input ai-design-platform" type="checkbox" value="google_business" id="ai_design_platform_google_business">
+                        <label class="form-check-label" for="ai_design_platform_google_business">Google Business</label>
+                    </div>
+                </div>
+
+                <div class="mt-3 d-flex gap-2 flex-wrap">
+                    <button type="button" id="ai_design_generate_btn" class="btn btn-outline-primary" data-generate-url="{{ route('admin.posts.ai-design.generate') }}">Generate Design</button>
+                    <button type="button" id="ai_design_post_btn" class="btn btn-success" data-publish-url="{{ route('admin.posts.ai-design.publish') }}" disabled>Post Generated Content</button>
+                </div>
+                <small id="ai_design_publish_status" class="d-block mt-2 text-muted"></small>
+            </div>
+            <div class="col-lg-6">
+                <label class="form-label">Generated Preview</label>
+                <div class="border rounded bg-light p-3 d-flex justify-content-center align-items-center" style="min-height: 380px;">
+                    <div id="ai_design_preview_container" class="w-100 d-flex justify-content-center align-items-center text-muted">
+                        Generated design preview will appear here.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <h2 class="h5">Manual Post (existing flow)</h2>
@@ -236,6 +283,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const mediaTypeInputs = Array.from(document.querySelectorAll('.js-media-type'));
@@ -285,6 +333,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalPrompt = document.getElementById('drive_modal_prompt');
     const modalStatus = document.getElementById('drive_modal_status');
     const modalPostBtn = document.getElementById('drive_modal_post_btn');
+    const aiDesignPrompt = document.getElementById('ai_design_prompt');
+    const aiDesignCaption = document.getElementById('ai_design_caption');
+    const aiDesignGenerateBtn = document.getElementById('ai_design_generate_btn');
+    const aiDesignPostBtn = document.getElementById('ai_design_post_btn');
+    const aiDesignGenerateStatus = document.getElementById('ai_design_generate_status');
+    const aiDesignPublishStatus = document.getElementById('ai_design_publish_status');
+    const aiDesignPreview = document.getElementById('ai_design_preview_container');
+
+    const aiDesignState = {
+        html: '',
+        imageData: '',
+    };
 
     const setStatus = (message, type = 'muted') => {
         statusNode.className = `small mt-3 text-${type}`;
@@ -616,50 +676,120 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.querySelectorAll('.generate-caption-btn').forEach((button) => {
-        button.addEventListener('click', async () => {
-            const promptInput = document.querySelector(button.dataset.targetPrompt);
-            const captionInput = document.querySelector(button.dataset.targetCaption);
-            const localStatus = document.querySelector(button.dataset.status);
+    aiDesignGenerateBtn?.addEventListener('click', async () => {
+        const prompt = aiDesignPrompt?.value.trim() || '';
+        if (!prompt) {
+            aiDesignGenerateStatus.textContent = 'Please write a design prompt first.';
+            aiDesignGenerateStatus.className = 'd-block mt-2 text-danger';
+            return;
+        }
 
-            if (!promptInput || !captionInput || !localStatus) return;
+        aiDesignGenerateBtn.disabled = true;
+        aiDesignGenerateStatus.textContent = 'Generating design...';
+        aiDesignGenerateStatus.className = 'd-block mt-2 text-muted';
+        aiDesignPublishStatus.textContent = '';
 
-            const prompt = promptInput.value.trim();
-            if (!prompt) {
-                localStatus.textContent = 'Please enter a prompt first.';
-                localStatus.className = 'text-danger d-block mt-1';
-                return;
+        try {
+            const response = await fetch(aiDesignGenerateBtn.dataset.generateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ prompt }),
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Failed to generate AI design.');
             }
 
-            button.disabled = true;
-            localStatus.textContent = 'Generating caption...';
-            localStatus.className = 'text-muted d-block mt-1';
+            aiDesignState.html = result.data.html || '';
+            aiDesignPreview.innerHTML = aiDesignState.html;
+            aiDesignGenerateStatus.textContent = 'Design generated successfully.';
+            aiDesignGenerateStatus.className = 'd-block mt-2 text-success';
+            aiDesignPostBtn.disabled = false;
+        } catch (error) {
+            aiDesignState.html = '';
+            aiDesignPostBtn.disabled = true;
+            aiDesignPreview.innerHTML = '<div class="text-muted">Generated design preview will appear here.</div>';
+            aiDesignGenerateStatus.textContent = error.message || 'Unexpected error while generating design.';
+            aiDesignGenerateStatus.className = 'd-block mt-2 text-danger';
+        } finally {
+            aiDesignGenerateBtn.disabled = false;
+        }
+    });
 
-            try {
-                const response = await fetch(button.dataset.generateUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({ prompt }),
-                });
+    aiDesignPostBtn?.addEventListener('click', async () => {
+        if (!aiDesignState.html) {
+            aiDesignPublishStatus.textContent = 'Please generate a design first.';
+            aiDesignPublishStatus.className = 'd-block mt-2 text-danger';
+            return;
+        }
 
-                const result = await response.json();
-                if (!response.ok || !result.success) throw new Error(result.message || 'Failed to generate caption.');
+        const appId = appIdInput?.value;
+        const pageIds = getSelectedPageIds();
+        const platforms = [...document.querySelectorAll('.ai-design-platform:checked')].map((node) => node.value);
+        const prompt = aiDesignPrompt?.value.trim() || '';
+        const caption = aiDesignCaption?.value.trim() || '';
 
-                captionInput.value = result.data.caption || '';
-                localStatus.textContent = 'Caption generated successfully.';
-                localStatus.className = 'text-success d-block mt-1';
-            } catch (error) {
-                localStatus.textContent = error.message || 'Unexpected error while generating caption.';
-                localStatus.className = 'text-danger d-block mt-1';
-            } finally {
-                button.disabled = false;
+        if (!appId || !pageIds.length) {
+            aiDesignPublishStatus.textContent = 'Select an app and at least one page first.';
+            aiDesignPublishStatus.className = 'd-block mt-2 text-danger';
+            return;
+        }
+
+        if (!platforms.length) {
+            aiDesignPublishStatus.textContent = 'Select at least one platform.';
+            aiDesignPublishStatus.className = 'd-block mt-2 text-danger';
+            return;
+        }
+
+        aiDesignPostBtn.disabled = true;
+        aiDesignPublishStatus.textContent = 'Converting design to image and posting...';
+        aiDesignPublishStatus.className = 'd-block mt-2 text-muted';
+
+        try {
+            const canvas = await window.html2canvas(aiDesignPreview, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                useCORS: true,
+            });
+            aiDesignState.imageData = canvas.toDataURL('image/png');
+
+            const response = await fetch(aiDesignPostBtn.dataset.publishUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    app_id: appId,
+                    page_ids: pageIds,
+                    platforms,
+                    prompt,
+                    caption,
+                    image_data: aiDesignState.imageData,
+                }),
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Failed to publish generated design.');
             }
-        });
+
+            aiDesignPublishStatus.textContent = result.message || 'Generated design post queued successfully.';
+            aiDesignPublishStatus.className = 'd-block mt-2 text-success';
+        } catch (error) {
+            aiDesignPublishStatus.textContent = error.message || 'Unexpected error while posting generated design.';
+            aiDesignPublishStatus.className = 'd-block mt-2 text-danger';
+        } finally {
+            aiDesignPostBtn.disabled = false;
+        }
     });
 });
 </script>

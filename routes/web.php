@@ -145,6 +145,8 @@ Route::middleware(['auth', 'admin', 'subscription.active'])
         Route::post('posts/drive/images', [PostController::class, 'fetchDriveImages'])->name('drive.images');
         Route::get('posts/drive/image-proxy', [PostController::class, 'proxyDriveImage'])->name('drive.image-proxy');
         Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
+        Route::post('posts/ai-design/generate', [PostController::class, 'generateAiDesign'])->name('ai-design.generate');
+        Route::post('posts/ai-design/publish', [PostController::class, 'publishAiDesign'])->name('ai-design.publish');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
     });
