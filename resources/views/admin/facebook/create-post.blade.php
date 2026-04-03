@@ -10,8 +10,8 @@
 
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-        <h2 class="h5">Google Drive Media</h2>
-        <p class="text-muted mb-3">Fetch images and videos from your connected Google Drive, then post selected images with generated captions.</p>
+        <h2 class="h5">Google Drive Folder Images</h2>
+        <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images, then post one or many with generated captions.</p>
         @if($driveApiKeys->isEmpty())
             <div class="alert alert-warning">
                 No active Google Drive key found. <a href="{{ route('admin.facebook.google-drive-keys.create') }}">Add a Drive key</a> first.
@@ -54,14 +54,14 @@
                 </select>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Drive Scope</label>
+                <label class="form-label">Google Drive Folder URL</label>
                 <div class="input-group">
-                    <input type="text" class="form-control" value="Whole connected drive" readonly>
-                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ $driveApiKeys->isEmpty() ? 'disabled' : '' }}>Fetch Media</button>
+                    <input type="url" name="folder_url" id="drive_folder_url" class="form-control" placeholder="https://drive.google.com/drive/folders/..." required>
+                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ $driveApiKeys->isEmpty() ? 'disabled' : '' }}>Fetch Images</button>
                 </div>
             </div>
             <div class="col-12">
-                <label class="form-label">Saved folders (optional, connection helper only)</label>
+                <label class="form-label">Or select saved folder</label>
                 <div class="input-group">
                     <select class="form-select" id="saved_drive_folder_id">
                         <option value="">Select saved folder</option>
@@ -273,6 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const appIdInput = document.getElementById('drive_app_id');
     const pageIdsInput = document.getElementById('drive_page_ids');
     const driveApiKeyInput = document.getElementById('drive_api_key_id');
+    const folderUrlInput = document.getElementById('drive_folder_url');
     const savedFolderInput = document.getElementById('saved_drive_folder_id');
     const getSelectedPageIds = () => [...(pageIdsInput?.selectedOptions || [])]
         .map((option) => option.value)
@@ -309,31 +310,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const postedBadge = image.is_posted
                 ? `<span class="badge text-bg-success">Posted (${(image.posted_platforms || []).join(', ')})</span>`
                 : '<span class="badge text-bg-secondary">Not posted</span>';
-            const isVideo = image.type === 'video';
-            const previewHtml = isVideo
-                ? `<video src="${image.preview_url}" class="card-img-top" style="height: 180px; object-fit: cover;" controls preload="metadata"></video>`
-                : `<img src="${image.preview_url}" class="card-img-top" style="height: 180px; object-fit: cover;" alt="${image.name}">`;
-            const actionButton = isVideo
-                ? '<button type="button" class="btn btn-outline-secondary btn-sm w-100" disabled>Video preview only</button>'
-                : `<button type="button" class="btn btn-primary btn-sm w-100 drive-single-post-btn" data-id="${image.id}">Post</button>`;
-            const disabledSelect = isVideo ? 'disabled' : '';
 
             const col = document.createElement('div');
             col.className = 'col-md-3';
             col.innerHTML = `
                 <div class="card h-100">
-                    ${previewHtml}
+                    <img src="${image.preview_url}" class="card-img-top" style="height: 180px; object-fit: cover;" alt="${image.name}">
                     <div class="card-body">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <div class="form-check">
-                                <input class="form-check-input drive-image-select" type="checkbox" value="${image.id}" id="drive_img_${image.id}" ${isChecked ? 'checked' : ''} ${disabledSelect}>
+                                <input class="form-check-input drive-image-select" type="checkbox" value="${image.id}" id="drive_img_${image.id}" ${isChecked ? 'checked' : ''}>
                                 <label class="form-check-label small" for="drive_img_${image.id}">Select</label>
                             </div>
                             ${postedBadge}
                         </div>
-                        <div class="small text-muted text-truncate mb-1" title="${image.name}">${image.name}</div>
-                        <div class="small text-muted mb-2">${isVideo ? 'Video' : 'Image'}</div>
-                        ${actionButton}
+                        <div class="small text-muted text-truncate mb-2" title="${image.name}">${image.name}</div>
+                        <button type="button" class="btn btn-primary btn-sm w-100 drive-single-post-btn" data-id="${image.id}">Post</button>
                     </div>
                 </div>
             `;
@@ -372,12 +364,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const appId = appIdInput.value;
         const pageIds = getSelectedPageIds();
         const driveApiKeyId = driveApiKeyInput.value;
-        if (!appId || !pageIds.length || !driveApiKeyId) {
-            setStatus('App, at least one page, and Drive key are required.', 'danger');
+        const folderUrl = folderUrlInput.value.trim();
+
+        if (!appId || !pageIds.length || !driveApiKeyId || !folderUrl) {
+            setStatus('App, at least one page, Drive key, and folder URL are required.', 'danger');
             return;
         }
 
-        setStatus('Fetching media from Google Drive...', 'muted');
+        setStatus('Fetching images from Google Drive...', 'muted');
         fetchBtn.disabled = true;
 
         try {
@@ -388,12 +382,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ app_id: appId, page_ids: pageIds, drive_api_key_id: driveApiKeyId }),
+                body: JSON.stringify({ app_id: appId, page_ids: pageIds, drive_api_key_id: driveApiKeyId, folder_url: folderUrl }),
             });
 
             const result = await response.json();
             if (!response.ok || !result.success) {
-                throw new Error(result.message || 'Failed to fetch media.');
+                throw new Error(result.message || 'Failed to fetch images.');
             }
 
             state.folderId = result.data.folder_id;
@@ -401,14 +395,12 @@ document.addEventListener('DOMContentLoaded', () => {
             state.selectedIds.clear();
 
             renderGrid();
-            const imageCount = state.images.filter((item) => item.type === 'image').length;
-            const videoCount = state.images.filter((item) => item.type === 'video').length;
-            setStatus(`Loaded ${state.images.length} media file(s): ${imageCount} image(s), ${videoCount} video(s).`, 'success');
+            setStatus(`Loaded ${state.images.length} image(s).`, 'success');
         } catch (error) {
             state.images = [];
             state.selectedIds.clear();
             renderGrid();
-            setStatus(error.message || 'Unexpected error while fetching media.', 'danger');
+            setStatus(error.message || 'Unexpected error while fetching images.', 'danger');
         } finally {
             fetchBtn.disabled = false;
         }
@@ -417,6 +409,10 @@ document.addEventListener('DOMContentLoaded', () => {
     savedFolderInput?.addEventListener('change', () => {
         const selected = savedFolderInput.options[savedFolderInput.selectedIndex];
         if (!selected || !selected.value) return;
+
+        if (selected.dataset.folderUrl) {
+            folderUrlInput.value = selected.dataset.folderUrl;
+        }
 
         if (selected.dataset.driveKeyId) {
             driveApiKeyInput.value = selected.dataset.driveKeyId;
@@ -441,7 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!postBtn) return;
 
         const image = getImageById(postBtn.dataset.id);
-        if (!image || image.type !== 'image') return;
+        if (!image) return;
 
         openPostModal([image]);
     });
