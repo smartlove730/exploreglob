@@ -85,6 +85,7 @@
                         <th>Caption</th>
                         <th>Image</th>
                         <th>Details</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -103,10 +104,23 @@
                                 @endif
                             </td>
                             <td class="small text-muted">{{ $log->message ?? '-' }}</td>
+                            <td class="text-end">
+                                @if($log->status === 'scheduled')
+                                    <form action="{{ route('admin.automations.executions.run-now', $log) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button class="btn btn-sm btn-outline-success">Execute Immediately</button>
+                                    </form>
+                                @endif
+                                <form action="{{ route('admin.automations.executions.destroy', $log) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this execution?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn btn-sm btn-outline-danger">Delete Execution</button>
+                                </form>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted">No scheduled or in-progress automations.</td>
+                            <td colspan="8" class="text-center text-muted">No scheduled or in-progress automations.</td>
                         </tr>
                     @endforelse
                 </tbody>
