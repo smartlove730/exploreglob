@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\App\BillingController;
 use App\Http\Controllers\App\ContentCalendarController;
-use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\MediaLibraryController;
 use App\Http\Controllers\MarketingController;
 
@@ -38,7 +37,7 @@ Route::prefix('app')
     ->name('app.')
     ->middleware(['auth', 'verified', 'role:customer,admin'])
     ->group(function () {
-        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/', fn () => redirect()->route('admin.dashboard'))->name('dashboard');
 
         Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
         Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->middleware('throttle:billing-checkout')->name('billing.subscribe');
