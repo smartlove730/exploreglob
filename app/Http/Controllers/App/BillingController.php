@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Services\ActivityLogService;
 use App\Services\RazorpayService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Throwable;
@@ -35,7 +36,7 @@ class BillingController extends Controller
         return view('app.billing.plans', compact('plans', 'subscription'));
     }
 
-    public function startCheckout(Request $request): JsonResponse
+    public function startCheckout(Request $request): JsonResponse|RedirectResponse
     {
         $data = $request->validate([
             'plan_id' => 'required|integer|exists:plans,id',
@@ -46,25 +47,48 @@ class BillingController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        $subscription = $this->razorpayService->createSubscriptionForUser($request->user(), $plan);
-        app(ActivityLogService::class)->log('billing.checkout.started', $request->user(), [
-            'plan_id' => $plan->id,
-            'subscription_id' => $subscription->id,
-        ]);
+        try {
+            $subscription = $this->razorpayService->createSubscriptionForUser($request->user(), $plan);
+            app(ActivityLogService::class)->log('billing.checkout.started', $request->user(), [
+                'plan_id' => $plan->id,
+                'subscription_id' => $subscription->id,
+            ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'key' => config('services.razorpay.key_id'),
-                'subscription_id' => $subscription->razorpay_subscription_id,
-                'plan' => [
-                    'id' => $plan->id,
-                    'name' => $plan->name,
-                    'price' => $plan->price,
-                    'currency' => $plan->currency,
+            $payload = [
+                'success' => true,
+                'data' => [
+                    'key' => config('services.razorpay.key_id'),
+                    'subscription_id' => $subscription->razorpay_subscription_id,
+                    'plan' => [
+                        'id' => $plan->id,
+                        'name' => $plan->name,
+                        'price' => $plan->price,
+                        'currency' => $plan->currency,
+                    ],
                 ],
-            ],
-        ]);
+            ];
+
+            if ($request->expectsJson()) {
+                return response()->json($payload);
+            }
+
+            return redirect()
+                ->route('app.billing.plans')
+                ->with('success', 'Checkout started. Please complete payment in Razorpay.');
+        } catch (Throwable $exception) {
+            report($exception);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to start checkout right now. Please contact support.',
+                ], 422);
+            }
+
+            return back()->withErrors([
+                'billing' => 'Unable to start checkout right now. Please contact support.',
+            ]);
+        }
     }
 
     public function webhook(Request $request): JsonResponse
