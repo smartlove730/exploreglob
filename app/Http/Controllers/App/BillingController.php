@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use RuntimeException;
 use Throwable;
 
 class BillingController extends Controller
@@ -77,16 +78,19 @@ class BillingController extends Controller
                 ->with('success', 'Checkout started. Please complete payment in Razorpay.');
         } catch (Throwable $exception) {
             report($exception);
+            $message = $exception instanceof RuntimeException
+                ? $exception->getMessage()
+                : 'Unable to start checkout right now. Please contact support.';
 
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unable to start checkout right now. Please contact support.',
+                    'message' => $message,
                 ], 422);
             }
 
             return back()->withErrors([
-                'billing' => 'Unable to start checkout right now. Please contact support.',
+                'billing' => $message,
             ]);
         }
     }

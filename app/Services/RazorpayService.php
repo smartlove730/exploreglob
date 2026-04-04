@@ -38,8 +38,8 @@ class RazorpayService
         $autoCreatePlans = (bool) config('services.razorpay.auto_create_plans', false);
         if (!$autoCreatePlans) {
             throw new RuntimeException(
-                "Razorpay plan is not mapped for plan [{$plan->id}] {$plan->name}. ".
-                'Set razorpay_plan_id in database, or enable RAZORPAY_AUTO_CREATE_PLANS=true.'
+                "Checkout is not configured for plan \"{$plan->name}\" yet. ".
+                'Please set razorpay_plan_id for this plan, or enable RAZORPAY_AUTO_CREATE_PLANS=true.'
             );
         }
 
@@ -68,7 +68,8 @@ class RazorpayService
             ]);
 
             throw new RuntimeException(
-                'Unable to create plan on Razorpay. Please configure a valid razorpay_plan_id for this plan.',
+                'Razorpay rejected plan creation for this plan. Please verify Razorpay plan/subscription API access, '.
+                'or save a valid razorpay_plan_id in the plans table.',
                 previous: $exception
             );
         }
