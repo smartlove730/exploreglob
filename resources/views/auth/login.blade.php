@@ -47,6 +47,11 @@
                 <button type="submit" class="btn btn-primary w-100">Log in</button>
             </form>
 
+            @if(!empty($facebookLoginAppId))
+                <div class="text-center text-muted my-3">or</div>
+                <button type="button" id="facebook_login_btn" class="btn btn-outline-primary w-100">Continue with Facebook</button>
+            @endif
+
             <div class="d-flex justify-content-between mt-3 small">
                 <a href="{{ route('password.request') }}">Forgot password?</a>
                 <a href="{{ route('register') }}">Create account</a>
@@ -54,4 +59,67 @@
         </div>
     </div>
 </body>
+
+@if(!empty($facebookLoginAppId))
+<script>
+    window.fbAsyncInit = function () {
+        FB.init({
+            appId: '{{ $facebookLoginAppId }}',
+            cookie: true,
+            xfbml: false,
+            version: 'v20.0'
+        });
+    };
+
+    (function (d, s, id) {
+        if (d.getElementById(id)) {
+            return;
+        }
+
+        const js = d.createElement(s);
+        js.id = id;
+        js.src = 'https://connect.facebook.net/en_US/sdk.js';
+        d.head.appendChild(js);
+    }(document, 'script', 'facebook-jssdk'));
+
+    const facebookLoginButton = document.getElementById('facebook_login_btn');
+    if (facebookLoginButton) {
+        facebookLoginButton.addEventListener('click', function () {
+            if (typeof FB === 'undefined') {
+                alert('Facebook SDK is still loading. Please try again in a moment.');
+                return;
+            }
+
+            FB.login(function (response) {
+                const token = response?.authResponse?.accessToken;
+                if (!token) {
+                    alert('Facebook login was cancelled or failed.');
+                    return;
+                }
+
+                fetch('{{ route('login.facebook-sdk') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: JSON.stringify({ access_token: token }),
+                    credentials: 'same-origin',
+                })
+                .then(async (res) => {
+                    const payload = await res.json();
+                    if (!res.ok) {
+                        throw new Error(payload.message || 'Facebook login failed.');
+                    }
+
+                    window.location.assign(payload.redirect || '{{ route('admin.dashboard') }}');
+                })
+                .catch((error) => {
+                    alert(error.message || 'Facebook login failed.');
+                });
+            }, { scope: 'email,public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_metadata' });
+        });
+    }
+</script>
+@endif
 </html>

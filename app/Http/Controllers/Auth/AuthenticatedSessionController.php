@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\FacebookApp;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,7 +14,15 @@ class AuthenticatedSessionController extends Controller
 {
     public function create()
     {
-        return view('auth.login');
+        $facebookAppId = FacebookApp::query()
+            ->where('is_active', true)
+            ->whereHas('user', fn ($query) => $query->where('is_admin', true)->orWhere('role', User::ROLE_ADMIN))
+            ->orderBy('name')
+            ->value('app_id');
+
+        return view('auth.login', [
+            'facebookLoginAppId' => $facebookAppId,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse

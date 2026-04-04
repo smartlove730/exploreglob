@@ -25,6 +25,8 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $fillable = [
         'name',
         'email',
+        'facebook_id',
+        'facebook_avatar',
         'password',
         'role',
         'is_admin',
