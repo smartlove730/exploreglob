@@ -96,4 +96,27 @@ class SaasManagementController extends Controller
 
         return view('admin.saas.subscriptions', compact('subscriptions'));
     }
+
+    public function toggleSubscription(Request $request, Subscription $subscription): RedirectResponse
+    {
+        $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $nextStatus = $request->boolean('is_active')
+            ? Subscription::STATUS_ACTIVE
+            : Subscription::STATUS_CANCELLED;
+
+        $subscription->update([
+            'status' => $nextStatus,
+        ]);
+
+        app(ActivityLogService::class)->log('admin.subscription.toggled', $request->user(), [
+            'subscription_id' => $subscription->id,
+            'user_id' => $subscription->user_id,
+            'status' => $subscription->status,
+        ]);
+
+        return back()->with('success', "Subscription #{$subscription->id} updated to {$subscription->status}.");
+    }
 }
