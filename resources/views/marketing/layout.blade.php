@@ -41,6 +41,7 @@
         <div class="d-flex gap-3">
             <a href="{{ route('marketing.privacy') }}" class="text-decoration-none">Privacy Policy</a>
             <a href="{{ route('marketing.terms') }}" class="text-decoration-none">Terms & Conditions</a>
+            <a href="{{ route('marketing.data-deletion') }}" class="text-decoration-none">Data Deletion Instructions</a>
         </div>
     </div>
 </footer>

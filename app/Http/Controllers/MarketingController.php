@@ -72,4 +72,9 @@ class MarketingController extends Controller
     {
         return view('marketing.terms');
     }
+
+    public function dataDeletion()
+    {
+        return view('marketing.data-deletion');
+    }
 }

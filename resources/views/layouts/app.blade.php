@@ -172,6 +172,7 @@
                     <li><a href="{{ url('/contact') }}" class="text-decoration-none text-white">Contact</a></li>
                     <li><a href="{{ url('/policy') }}" class="text-decoration-none text-white">Privacy Policy</a></li>
                     <li><a href="{{ url('/terms') }}" class="text-decoration-none text-white">Terms & Conditions</a></li>
+                    <li><a href="{{ url('/data-deletion') }}" class="text-decoration-none text-white">Data Deletion Instructions</a></li>
                 </ul>
             </div>
 
