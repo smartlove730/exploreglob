@@ -31,7 +31,7 @@ Route::get('/home/categories/load', [HomeController::class, 'loadCategories'])->
 Route::get('/search', [HomeController::class, 'search'])->name('home.search');
 
 Route::middleware(['auth', 'verified'])->get('/dashboard', function () {
-    return redirect()->route('app.dashboard');
+    return redirect()->route('admin.dashboard');
 })->name('dashboard');
 
 Route::prefix('app')
@@ -42,6 +42,9 @@ Route::prefix('app')
 
         Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
         Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->middleware('throttle:billing-checkout')->name('billing.subscribe');
+        Route::post('/billing/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
+        Route::get('/settings', [\App\Http\Controllers\App\SettingsController::class, 'index'])->name('settings.index');
+        Route::put('/settings/password', [\App\Http\Controllers\App\SettingsController::class, 'updatePassword'])->name('settings.password');
         Route::get('/facebook/settings', [FacebookSettingsController::class, 'index'])->name('facebook.settings');
         Route::get('/facebook/connect', [FacebookSettingsController::class, 'redirectToFacebook'])->name('facebook.connect');
         Route::post('/facebook/sync-pages', [FacebookSettingsController::class, 'syncPages'])->name('facebook.sync-pages');
@@ -108,14 +111,14 @@ use App\Http\Controllers\Admin\SaasManagementController;
 use App\Http\Controllers\AutomationController;
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
-Route::middleware(['auth', 'admin', 'subscription.active'])->get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
+Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])->get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
 
 Route::middleware(['auth'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('oauth.facebook.callback');
 Route::middleware(['auth'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('oauth.google.callback');
-Route::middleware(['auth', 'admin'])->get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
+Route::middleware(['auth', 'role:customer,admin'])->get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
 
 
-Route::middleware(['auth', 'admin'])
+Route::middleware(['auth', 'role:customer,admin'])
     ->prefix('admin/facebook')
     ->name('admin.facebook.')
     ->group(function () {
@@ -131,7 +134,7 @@ Route::middleware(['auth', 'admin'])
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
     });
 
-Route::middleware(['auth', 'admin'])
+Route::middleware(['auth', 'role:customer,admin'])
     ->prefix('admin/google')
     ->name('admin.google.')
     ->group(function () {
@@ -141,7 +144,7 @@ Route::middleware(['auth', 'admin'])
         Route::post('locations/{location}/default', [GoogleController::class, 'setDefaultLocation'])->name('locations.default');
     });
 
-Route::middleware(['auth', 'admin', 'subscription.active'])
+Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
     ->prefix('admin')
     ->name('admin.posts.')
     ->group(function () {
@@ -155,7 +158,7 @@ Route::middleware(['auth', 'admin', 'subscription.active'])
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
     });
 
-Route::middleware(['auth', 'admin', 'subscription.active'])
+Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
     ->prefix('admin')
     ->name('admin.scheduled-posts.')
     ->group(function () {
@@ -165,7 +168,7 @@ Route::middleware(['auth', 'admin', 'subscription.active'])
         Route::delete('scheduled-posts/{id}', [ScheduledPostController::class, 'destroy'])->name('destroy');
     });
 
-Route::middleware(['auth', 'admin', 'subscription.active'])
+Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
     ->prefix('admin')
     ->name('admin.automations.')
     ->group(function () {
@@ -198,8 +201,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('login', [AdminAuthController::class, 'login'])->name('login.post');
     Route::post('logout', [AdminAuthController::class, 'logout'])->name('logout');
 
-    Route::middleware(['auth', 'admin'])->group(function () {
+    Route::middleware(['auth', 'role:customer,admin'])->group(function () {
         Route::get('/', function () { return view('admin.dashboard'); })->name('dashboard');
+        Route::middleware('admin')->group(function () {
             // Modal endpoints for dynamic forms
             Route::get('blogs/create-modal', [AdminBlogController::class, 'createModal'])->name('blogs.createModal');
             Route::get('blogs/{blog}/edit-modal', [AdminBlogController::class, 'editModal'])->name('blogs.editModal');
@@ -210,7 +214,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('categories/create-modal', [AdminCategoryController::class, 'createModal'])->name('categories.createModal');
             Route::get('categories/{category}/edit-modal', [AdminCategoryController::class, 'editModal'])->name('categories.editModal');
             Route::resource('categories', AdminCategoryController::class);
-
+        });
     });
 });
 

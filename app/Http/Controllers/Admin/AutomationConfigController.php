@@ -45,7 +45,7 @@ class AutomationConfigController extends Controller
     public function create()
     {
         return view('admin.automations.create', [
-            'apps' => FacebookApp::query()->where('is_active', true)->orderBy('name')->get(),
+            'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
             'pages' => $this->pagesForUser(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
         ]);
@@ -74,7 +74,7 @@ class AutomationConfigController extends Controller
 
         return view('admin.automations.edit', [
             'automation' => $automation,
-            'apps' => FacebookApp::query()->where('is_active', true)->orderBy('name')->get(),
+            'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
             'pages' => $this->pagesForUser(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
         ]);

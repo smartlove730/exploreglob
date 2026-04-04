@@ -129,4 +129,30 @@ class BillingController extends Controller
             ], 422);
         }
     }
+
+    public function cancel(Request $request): RedirectResponse
+    {
+        $subscription = Subscription::query()
+            ->where('user_id', Auth::id())
+            ->whereIn('status', [Subscription::STATUS_ACTIVE, Subscription::STATUS_AUTHENTICATED, Subscription::STATUS_PENDING])
+            ->latest('id')
+            ->first();
+
+        if (!$subscription) {
+            return back()->with('error', 'No active subscription found.');
+        }
+
+        try {
+            $this->razorpayService->cancelSubscription($subscription);
+            app(ActivityLogService::class)->log('billing.subscription.cancelled', $request->user(), [
+                'subscription_id' => $subscription->id,
+            ]);
+
+            return back()->with('success', 'Subscription cancelled successfully.');
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'Unable to cancel subscription right now. Please contact support.');
+        }
+    }
 }
