@@ -72,7 +72,7 @@ class GoogleService
         }
 
         if (function_exists('route')) {
-            return route('admin.google.callback');
+            return route('oauth.google.callback');
         }
 
         throw new RuntimeException('Google redirect URI is not configured.');

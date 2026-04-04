@@ -101,7 +101,10 @@
                             <a href="{{ route('admin.google.settings') }}" class="btn btn-outline-secondary btn-sm">Google Settings</a>
                         </div>
                     @else
-                        <p class="small text-muted mb-0">Need to connect accounts? Ask your workspace admin to complete setup.</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="{{ route('app.facebook.connect') }}" class="btn btn-outline-primary btn-sm">Connect Facebook</a>
+                            <a href="{{ route('app.google.connect') }}" class="btn btn-outline-danger btn-sm">Connect Google</a>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -117,7 +120,8 @@
                 @if(auth()->user()->isAdmin())
                     <a href="{{ route('admin.facebook.settings') }}" class="btn btn-outline-secondary">Connect Accounts</a>
                 @else
-                    <button class="btn btn-outline-secondary" type="button" disabled>Connect Accounts</button>
+                    <a href="{{ route('app.facebook.connect') }}" class="btn btn-outline-secondary">Connect Facebook</a>
+                    <a href="{{ route('app.google.connect') }}" class="btn btn-outline-secondary">Connect Google</a>
                 @endif
                 <a href="{{ route('app.media.index') }}" class="btn btn-outline-secondary">Open Media Library</a>
                 <a href="{{ route('app.billing.plans') }}" class="btn btn-outline-secondary">Manage Subscription</a>

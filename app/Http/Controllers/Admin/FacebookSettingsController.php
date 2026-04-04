@@ -44,8 +44,10 @@ class FacebookSettingsController extends Controller
 
     public function redirectToFacebook(Request $request): RedirectResponse
     {
+        $appId = $request->integer('app_id');
         $app = FacebookApp::where('is_active', true)
-            ->whereKey($request->integer('app_id'))
+            ->when($appId > 0, fn ($query) => $query->whereKey($appId))
+            ->orderBy('id')
             ->firstOrFail();
 
         session(['facebook_auth_app_id' => $app->id]);
@@ -84,13 +86,13 @@ class FacebookSettingsController extends Controller
             $this->facebookGraphService->upsertPages($account, $pages);
             session()->forget('facebook_auth_app_id');
 
-            $target = route('admin.facebook.settings', ['app_id' => $app->id]);
+            $target = route(Auth::user()?->isAdmin() ? 'admin.facebook.settings' : 'app.facebook.settings', ['app_id' => $app->id]);
 
             return redirect($target)->with('success', 'Facebook account connected and pages synced successfully.');
         } catch (Throwable $exception) {
             Log::error('Facebook OAuth callback failed', ['error' => $exception->getMessage()]);
 
-            $target = route('admin.facebook.settings', ['app_id' => $app->id]);
+            $target = route(Auth::user()?->isAdmin() ? 'admin.facebook.settings' : 'app.facebook.settings', ['app_id' => $app->id]);
 
             return redirect($target)->with('error', 'Facebook connection failed. Please try again.');
         }

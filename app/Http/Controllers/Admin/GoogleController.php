@@ -40,6 +40,7 @@ class GoogleController extends Controller
     public function callback(): RedirectResponse
     {
         request()->validate(['code' => 'required|string']);
+        $settingsRoute = Auth::user()?->isAdmin() ? 'admin.google.settings' : 'app.google.settings';
 
         try {
             $tokenData = $this->googleService->exchangeCodeForToken((string) request('code'));
@@ -47,13 +48,13 @@ class GoogleController extends Controller
             $refreshToken = (string) ($tokenData['refresh_token'] ?? '');
 
             if ($accessToken === '') {
-                return redirect()->route('admin.google.settings')->with('error', 'Unable to connect Google account.');
+                return redirect()->route($settingsRoute)->with('error', 'Unable to connect Google account.');
             }
 
             $accounts = $this->googleService->fetchAccounts($accessToken);
             $primaryAccount = $accounts[0]['name'] ?? null;
             if (!$primaryAccount) {
-                return redirect()->route('admin.google.settings')->with('error', 'No Google Business account found.');
+                return redirect()->route($settingsRoute)->with('error', 'No Google Business account found.');
             }
 
             $account = GoogleAccount::updateOrCreate(
@@ -92,11 +93,11 @@ class GoogleController extends Controller
 
             $count = $this->googleService->syncLocations($account);
 
-            return redirect()->route('admin.google.settings')->with('success', "Google connected successfully. Synced {$count} location(s).");
+            return redirect()->route($settingsRoute)->with('success', "Google connected successfully. Synced {$count} location(s).");
         } catch (\Throwable $exception) {
             Log::error('Google OAuth callback failed', ['error' => $exception->getMessage()]);
 
-            return redirect()->route('admin.google.settings')->with('error', 'Google connection failed. Please try again.');
+            return redirect()->route($settingsRoute)->with('error', 'Google connection failed. Please try again.');
         }
     }
 
