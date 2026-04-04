@@ -84,7 +84,7 @@ class RazorpayService
         $existing = Subscription::query()
             ->where('user_id', $user->id)
             ->where('plan_id', $plan->id)
-            ->whereIn('status', [Subscription::STATUS_PENDING, Subscription::STATUS_ACTIVE])
+            ->whereIn('status', [Subscription::STATUS_PENDING, Subscription::STATUS_AUTHENTICATED, Subscription::STATUS_ACTIVE])
             ->latest('id')
             ->first();
 
@@ -120,7 +120,7 @@ class RazorpayService
             [
                 'user_id' => $user->id,
                 'plan_id' => $plan->id,
-                'status' => (string) Arr::get($remoteSubscription->toArray(), 'status', Subscription::STATUS_PENDING),
+                'status' => $this->mapRemoteSubscriptionStatus((string) Arr::get($remoteSubscription->toArray(), 'status', Subscription::STATUS_PENDING)),
                 'current_period_start' => $this->timestampToDateTime(Arr::get($remoteSubscription->toArray(), 'current_start')),
                 'current_period_end' => $this->timestampToDateTime(Arr::get($remoteSubscription->toArray(), 'current_end')),
                 'posts_used' => 0,
@@ -146,6 +146,12 @@ class RazorpayService
     public function handleWebhook(array $event): ?Subscription
     {
         $subscriptionPayload = Arr::get($event, 'payload.subscription.entity');
+        if (!is_array($subscriptionPayload) || empty($subscriptionPayload['id'])) {
+            $subscriptionIdFromPayment = (string) Arr::get($event, 'payload.payment.entity.subscription_id', '');
+            if ($subscriptionIdFromPayment !== '') {
+                $subscriptionPayload = $this->api->subscription->fetch($subscriptionIdFromPayment)->toArray();
+            }
+        }
 
         if (!is_array($subscriptionPayload) || empty($subscriptionPayload['id'])) {
             return null;
@@ -167,7 +173,7 @@ class RazorpayService
             }
 
             $subscription->update([
-                'status' => (string) Arr::get($subscriptionPayload, 'status', $subscription->status),
+                'status' => $this->mapRemoteSubscriptionStatus((string) Arr::get($subscriptionPayload, 'status', $subscription->status)),
                 'current_period_start' => $this->timestampToDateTime(Arr::get($subscriptionPayload, 'current_start')),
                 'current_period_end' => $this->timestampToDateTime(Arr::get($subscriptionPayload, 'current_end')),
             ]);
@@ -198,5 +204,17 @@ class RazorpayService
         }
 
         return now()->setTimestamp((int) $timestamp)->toDateTimeString();
+    }
+
+    private function mapRemoteSubscriptionStatus(string $status): string
+    {
+        return match (strtolower($status)) {
+            'active' => Subscription::STATUS_ACTIVE,
+            'authenticated' => Subscription::STATUS_AUTHENTICATED,
+            'created', 'pending' => Subscription::STATUS_PENDING,
+            'halted', 'cancelled' => Subscription::STATUS_CANCELLED,
+            'completed', 'expired' => Subscription::STATUS_EXPIRED,
+            default => Subscription::STATUS_PENDING,
+        };
     }
 }

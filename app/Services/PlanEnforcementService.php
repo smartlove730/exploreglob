@@ -18,7 +18,7 @@ class PlanEnforcementService
 
         return Subscription::query()
             ->where('user_id', $user->id)
-            ->where('status', Subscription::STATUS_ACTIVE)
+            ->whereIn('status', [Subscription::STATUS_ACTIVE, Subscription::STATUS_AUTHENTICATED])
             ->where(function ($query) {
                 $query->whereNull('current_period_end')
                     ->orWhere('current_period_end', '>=', now());
@@ -83,7 +83,7 @@ class PlanEnforcementService
         DB::transaction(function () use ($user, $units) {
             $subscription = Subscription::query()
                 ->where('user_id', $user->id)
-                ->where('status', Subscription::STATUS_ACTIVE)
+                ->whereIn('status', [Subscription::STATUS_ACTIVE, Subscription::STATUS_AUTHENTICATED])
                 ->where(function ($query) {
                     $query->whereNull('current_period_end')
                         ->orWhere('current_period_end', '>=', now());
