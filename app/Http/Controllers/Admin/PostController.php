@@ -49,7 +49,7 @@ class PostController extends Controller
 
     public function create(Request $request)
     {
-        $apps = FacebookApp::where('is_active', true)->orderBy('name')->get();
+        $apps = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
         $selectedAppId = (int) $request->integer('app_id');
 
         if ($selectedAppId === 0 && $apps->isNotEmpty()) {

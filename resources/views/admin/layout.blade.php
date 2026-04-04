@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Admin Panel - @yield('title', 'Dashboard')</title>
+    <title>Control Panel - @yield('title', 'Dashboard')</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     @vite(['resources/css/app.css'])
     <style>
@@ -14,6 +14,7 @@
 </head>
 <body>
 @php
+    $isAdmin = auth()->user()?->isAdmin();
     $facebookSettingsUrl = Route::has('admin.facebook.settings') ? route('admin.facebook.settings') : url('/admin/facebook/settings');
     $facebookPostsUrl = Route::has('admin.posts.index') ? route('admin.posts.index') : url('/admin/posts');
     $facebookAppsUrl = Route::has('admin.facebook.apps.index') ? route('admin.facebook.apps.index') : url('/admin/facebook/apps');
@@ -25,7 +26,7 @@
 <div class="d-flex">
     <nav class="navbar navbar-dark bg-dark d-lg-none w-100 position-fixed top-0 z-3">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ route('admin.dashboard') }}">Admin</a>
+            <a class="navbar-brand" href="{{ route('admin.dashboard') }}">Panel</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -34,14 +35,16 @@
 
     <div class="offcanvas-lg offcanvas-start text-bg-dark" tabindex="-1" id="adminSidebar" style="width: 260px;">
         <div class="offcanvas-header border-bottom border-secondary">
-            <h5 class="offcanvas-title">Admin Panel</h5>
+            <h5 class="offcanvas-title">{{ $isAdmin ? 'Admin Panel' : 'User Panel' }}</h5>
             <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body d-flex flex-column p-3 vh-100">
             <ul class="nav nav-pills flex-column gap-2">
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">Dashboard</a></li>
+                @if($isAdmin)
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.blogs.*') ? 'active' : '' }}" href="{{ route('admin.blogs.index') }}">Blogs</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}">Categories</a></li>
+                @endif
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.apps.*') ? 'active' : '' }}" href="{{ $facebookAppsUrl }}">Facebook Apps</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.google-drive-keys.*') ? 'active' : '' }}" href="{{ $googleDriveKeysUrl }}">Google Drive Keys</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.drive-folders.*') ? 'active' : '' }}" href="{{ $googleDriveFoldersUrl }}">Google Drive Folders</a></li>
@@ -49,7 +52,11 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.google.*') ? 'active' : '' }}" href="{{ $googleSettingsUrl }}">Google Business</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.automations.*') ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.billing.*') ? 'active' : '' }}" href="{{ route('app.billing.plans') }}">Subscription</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.settings.*') ? 'active' : '' }}" href="{{ route('app.settings.index') }}">Settings</a></li>
+                @if($isAdmin)
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.saas.*') ? 'active' : '' }}" href="{{ route('admin.saas.overview') }}">SaaS Management</a></li>
+                @endif
             </ul>
 
             <form method="POST" action="{{ route('admin.logout') }}" class="mt-auto pt-3 border-top border-secondary">
