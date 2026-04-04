@@ -8,6 +8,7 @@ use App\Models\AutomationPostLog;
 use App\Models\DriveApiKey;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
+use App\Models\User;
 use App\Jobs\RunAutomationJob;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,15 +46,16 @@ class AutomationConfigController extends Controller
     public function create()
     {
         return view('admin.automations.create', [
-            'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'apps' => $this->availableApps(),
             'pages' => $this->pagesForUser(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'selectedAppId' => $this->resolveSelectedAppId(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $this->validateData($request);
+        $data = $this->applyDefaultAppSelection($this->validateData($request));
         $pageIds = collect($data['page_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
         $this->assertAuthorizedAppAndPages((int) $data['app_id'], $pageIds);
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
@@ -74,9 +76,10 @@ class AutomationConfigController extends Controller
 
         return view('admin.automations.edit', [
             'automation' => $automation,
-            'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'apps' => $this->availableApps(),
             'pages' => $this->pagesForUser(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'selectedAppId' => $this->resolveSelectedAppId(),
         ]);
     }
 
@@ -84,7 +87,7 @@ class AutomationConfigController extends Controller
     {
         $this->authorizeAutomation($automation);
 
-        $data = $this->validateData($request);
+        $data = $this->applyDefaultAppSelection($this->validateData($request));
         $pageIds = collect($data['page_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
         $this->assertAuthorizedAppAndPages((int) $data['app_id'], $pageIds);
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
@@ -213,6 +216,37 @@ class AutomationConfigController extends Controller
             ->where('is_active', true)
             ->orderBy('page_name')
             ->get();
+    }
+
+    private function availableApps()
+    {
+        if (Auth::user()?->isAdmin()) {
+            return FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
+        }
+
+        return FacebookApp::query()
+            ->where('is_active', true)
+            ->whereHas('user', fn ($query) => $query->where('is_admin', true)->orWhere('role', User::ROLE_ADMIN))
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function resolveSelectedAppId(): int
+    {
+        return (int) $this->availableApps()->first()?->id;
+    }
+
+    private function applyDefaultAppSelection(array $data): array
+    {
+        if (Auth::user()?->isAdmin()) {
+            return $data;
+        }
+
+        $appId = $this->resolveSelectedAppId();
+        abort_unless($appId > 0, 422, 'No active admin Facebook app is configured.');
+        $data['app_id'] = $appId;
+
+        return $data;
     }
 
     private function assertAuthorizedAppAndPages(int $appId, array $pageIds): void

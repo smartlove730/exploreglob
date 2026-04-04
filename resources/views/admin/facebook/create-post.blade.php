@@ -3,6 +3,7 @@
 @section('title', 'Create Social Post')
 
 @section('content')
+@php($isAdmin = auth()->user()?->isAdmin())
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">Create Social Post</h1>
     <a class="btn btn-outline-secondary" href="{{ route('admin.posts.index') }}">View History</a>
@@ -26,7 +27,7 @@
 
         <form id="driveFilterForm" class="row g-3">
             @csrf
-            <div class="col-md-3">
+            <div class="col-md-3 {{ $isAdmin ? '' : 'd-none' }}">
                 <label class="form-label">Facebook App</label>
                 <select name="app_id" id="drive_app_id" class="form-select" required>
                     <option value="">Select an app</option>
@@ -35,6 +36,9 @@
                     @endforeach
                 </select>
             </div>
+            @unless($isAdmin)
+                <input type="hidden" name="app_id" value="{{ $selectedAppId }}">
+            @endunless
             <div class="col-md-3">
                 <label class="form-label">Facebook Pages (Active)</label>
                 <select name="page_ids[]" id="drive_page_ids" class="form-select" multiple required>

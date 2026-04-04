@@ -1,5 +1,6 @@
 @php($isEdit = isset($automation))
 @php($selectedPageIds = collect(old('page_ids', $isEdit ? [$automation->page_id] : []))->map(fn ($id) => (int) $id)->all())
+@php($isAdmin = auth()->user()?->isAdmin())
 
 <div class="mb-3">
     <label class="form-label">Config Name (optional)</label>
@@ -29,15 +30,18 @@
 </div>
 
 <div class="row g-3">
-    <div class="col-md-6">
+    <div class="col-md-6 {{ $isAdmin ? '' : 'd-none' }}">
         <label class="form-label">App ID</label>
         <select name="app_id" class="form-select" required>
             <option value="">Select app</option>
             @foreach($apps as $app)
-                <option value="{{ $app->id }}" @selected((int) old('app_id', $isEdit ? $automation->app_id : 0) === $app->id)>{{ $app->name }} ({{ $app->app_id }})</option>
+                <option value="{{ $app->id }}" @selected((int) old('app_id', $isEdit ? $automation->app_id : ($selectedAppId ?? 0)) === $app->id)>{{ $app->name }} ({{ $app->app_id }})</option>
             @endforeach
         </select>
     </div>
+    @unless($isAdmin)
+        <input type="hidden" name="app_id" value="{{ old('app_id', $isEdit ? $automation->app_id : ($selectedAppId ?? 0)) }}">
+    @endunless
     <div class="col-md-6">
         <label class="form-label">Page IDs</label>
         <select name="page_ids[]" class="form-select" multiple required>

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacebookPage;
+use App\Models\FacebookApp;
 use App\Models\ScheduledPost;
+use App\Models\User;
 use App\Services\PlanEnforcementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,7 +35,7 @@ class ScheduledPostController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $this->validatePayload($request);
+        $data = $this->applyDefaultAppSelection($this->validatePayload($request));
 
         $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
         if (!$page) {
@@ -66,7 +68,7 @@ class ScheduledPostController extends Controller
             throw ValidationException::withMessages(['status' => 'Published scheduled posts cannot be edited.']);
         }
 
-        $data = $this->validatePayload($request);
+        $data = $this->applyDefaultAppSelection($this->validatePayload($request));
         $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
         if (!$page) {
             return back()->withInput()->with('error', 'Selected page is not valid for this app/user.');
@@ -138,5 +140,23 @@ class ScheduledPostController extends Controller
             ->where('facebook_app_id', $appId)
             ->where('is_active', true)
             ->first();
+    }
+
+    private function applyDefaultAppSelection(array $data): array
+    {
+        if (Auth::user()?->isAdmin()) {
+            return $data;
+        }
+
+        $defaultAppId = (int) FacebookApp::query()
+            ->where('is_active', true)
+            ->whereHas('user', fn ($query) => $query->where('is_admin', true)->orWhere('role', User::ROLE_ADMIN))
+            ->orderBy('name')
+            ->value('id');
+
+        abort_unless($defaultAppId > 0, 422, 'No active admin Facebook app is configured.');
+        $data['app_id'] = $defaultAppId;
+
+        return $data;
     }
 }

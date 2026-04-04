@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacebookAccount;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
+use App\Models\User;
 use App\Services\FacebookGraphService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,8 +23,8 @@ class FacebookSettingsController extends Controller
 
     public function index(Request $request)
     {
-        $apps = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
-        $selectedAppId = (int) $request->integer('app_id');
+        $apps = $this->availableApps();
+        $selectedAppId = $this->resolveSelectedAppId($request, $apps);
 
         $accountQuery = FacebookAccount::with(['pages', 'app'])
             ->where('user_id', Auth::id());
@@ -44,11 +45,9 @@ class FacebookSettingsController extends Controller
 
     public function redirectToFacebook(Request $request): RedirectResponse
     {
-        $appId = $request->integer('app_id');
-        $app = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)
-            ->when($appId > 0, fn ($query) => $query->whereKey($appId))
-            ->orderBy('id')
-            ->firstOrFail();
+        $apps = $this->availableApps();
+        $selectedAppId = $this->resolveSelectedAppId($request, $apps);
+        $app = $apps->where('id', $selectedAppId)->firstOrFail();
 
         session(['facebook_auth_app_id' => $app->id]);
 
@@ -62,7 +61,7 @@ class FacebookSettingsController extends Controller
         ]);
 
         $appId = (int) session('facebook_auth_app_id');
-        $app = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->findOrFail($appId);
+        $app = $this->availableApps()->where('id', $appId)->firstOrFail();
 
         try {
             $shortToken = $this->facebookGraphService->exchangeCodeForToken($app, $request->string('code')->toString());
@@ -100,8 +99,10 @@ class FacebookSettingsController extends Controller
 
     public function syncPages(Request $request): RedirectResponse
     {
+        $selectedAppId = $this->resolveSelectedAppId($request, $this->availableApps());
+
         $account = FacebookAccount::where('user_id', Auth::id())
-            ->where('facebook_app_id', $request->integer('app_id'))
+            ->where('facebook_app_id', $selectedAppId)
             ->first();
 
         if (!$account) {
@@ -152,5 +153,41 @@ class FacebookSettingsController extends Controller
         $page->update(['is_active' => true]);
 
         return back()->with('success', 'Page marked as active.');
+    }
+
+    private function availableApps()
+    {
+        if (Auth::user()?->isAdmin()) {
+            return FacebookApp::query()
+                ->ownedBy(Auth::user())
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+        }
+
+        return FacebookApp::query()
+            ->where('is_active', true)
+            ->whereHas('user', fn ($query) => $query->where('is_admin', true)->orWhere('role', User::ROLE_ADMIN))
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function resolveSelectedAppId(Request $request, $apps): int
+    {
+        if ($apps->isEmpty()) {
+            return 0;
+        }
+
+        if (!Auth::user()?->isAdmin()) {
+            return (int) $apps->first()->id;
+        }
+
+        $selectedAppId = (int) $request->integer('app_id');
+
+        if ($selectedAppId > 0 && $apps->contains('id', $selectedAppId)) {
+            return $selectedAppId;
+        }
+
+        return (int) $apps->first()->id;
     }
 }

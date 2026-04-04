@@ -6,20 +6,25 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <h1 class="h3 mb-0">Facebook Settings</h1>
 </div>
+@php($isAdmin = auth()->user()?->isAdmin())
 
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
         <form method="GET" action="{{ route('admin.facebook.settings') }}" class="row g-2 align-items-end">
-            <div class="col-md-6">
-                <label class="form-label">Facebook App</label>
-                <select name="app_id" class="form-select" onchange="this.form.submit()">
-                    <option value="">Select an app</option>
-                    @foreach($apps as $app)
-                        <option value="{{ $app->id }}" {{ $selectedAppId === $app->id ? 'selected' : '' }}>{{ $app->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-6 d-flex gap-2">
+            @if($isAdmin)
+                <div class="col-md-6">
+                    <label class="form-label">Facebook App</label>
+                    <select name="app_id" class="form-select" onchange="this.form.submit()">
+                        <option value="">Select an app</option>
+                        @foreach($apps as $app)
+                            <option value="{{ $app->id }}" {{ $selectedAppId === $app->id ? 'selected' : '' }}>{{ $app->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @else
+                <input type="hidden" name="app_id" value="{{ $selectedAppId }}">
+            @endif
+            <div class="{{ $isAdmin ? 'col-md-6' : 'col-12' }} d-flex gap-2">
                 <a href="{{ route('admin.facebook.connect', ['app_id' => $selectedAppId]) }}" class="btn btn-primary {{ $selectedAppId ? '' : 'disabled' }}">Connect Facebook</a>
             </div>
         </form>

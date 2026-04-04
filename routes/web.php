@@ -128,7 +128,9 @@ Route::middleware(['auth', 'role:customer,admin'])
         Route::post('sync-pages', [FacebookSettingsController::class, 'syncPages'])->name('sync-pages');
         Route::post('pages/{page}/activate', [FacebookSettingsController::class, 'activatePage'])->name('pages.activate');
 
-        Route::resource('apps', FacebookAppController::class)->except(['show']);
+        Route::middleware('admin')->group(function () {
+            Route::resource('apps', FacebookAppController::class)->except(['show']);
+        });
         Route::resource('google-drive-keys', DriveApiKeyController::class)->except(['show']);
         Route::resource('drive-folders', DriveFolderController::class)->except(['show']);
 

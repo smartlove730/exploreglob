@@ -12,6 +12,7 @@ use App\Models\FacebookPage;
 use App\Models\FacebookPost;
 use App\Models\GoogleAccount;
 use App\Models\GoogleLocation;
+use App\Models\User;
 use App\Services\DriveService;
 use App\Services\GoogleDriveService;
 use App\Services\GoogleService;
@@ -49,12 +50,8 @@ class PostController extends Controller
 
     public function create(Request $request)
     {
-        $apps = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
-        $selectedAppId = (int) $request->integer('app_id');
-
-        if ($selectedAppId === 0 && $apps->isNotEmpty()) {
-            $selectedAppId = (int) $apps->first()->id;
-        }
+        $apps = $this->availableApps();
+        $selectedAppId = $this->resolveSelectedAppId($request, $apps);
 
         $pages = FacebookPage::query()->ownedBy(Auth::user())
             ->where('is_active', true)
@@ -82,7 +79,7 @@ class PostController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $this->validatePostRequest($request);
+        $data = $this->applyDefaultAppSelection($this->validatePostRequest($request));
         $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? []);
         if ($pages->isEmpty()) {
             return back()->withInput()->with('error', 'Select at least one valid page for this app/user.');
@@ -155,7 +152,7 @@ class PostController extends Controller
     {
         $post = FacebookPost::query()->ownedBy(Auth::user())->with(['images', 'page.facebookAccount'])->findOrFail($id);
 
-        $data = $this->validatePostRequest($request, true);
+        $data = $this->applyDefaultAppSelection($this->validatePostRequest($request, true));
 
         $page = $this->resolveAuthorizedPage((int) $data['app_id'], (int) $data['page_id']);
         if (!$page) {
@@ -275,6 +272,7 @@ class PostController extends Controller
             'page_ids.*' => 'required|integer|exists:facebook_pages,id',
             'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
         ]);
+        $data = $this->applyDefaultAppSelection($data);
 
         if (empty($data['folder_url']) && empty($data['folder_id'])) {
             return response()->json([
@@ -384,6 +382,7 @@ class PostController extends Controller
             'images.*.resource_key' => 'nullable|string|max:255',
             'images.*.mime_type' => 'nullable|string|max:120',
         ]);
+        $data = $this->applyDefaultAppSelection($data);
 
         $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? [$data['page_id'] ?? null]);
         if ($pages->isEmpty()) {
@@ -649,6 +648,55 @@ class PostController extends Controller
             'remove_images' => $isUpdate ? 'nullable|array' : 'nullable',
             'remove_images.*' => 'integer|exists:post_images,id',
         ]);
+    }
+
+    private function availableApps(): Collection
+    {
+        if (Auth::user()?->isAdmin()) {
+            return FacebookApp::query()
+                ->ownedBy(Auth::user())
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+        }
+
+        return FacebookApp::query()
+            ->where('is_active', true)
+            ->whereHas('user', fn ($query) => $query->where('is_admin', true)->orWhere('role', User::ROLE_ADMIN))
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function resolveSelectedAppId(Request $request, Collection $apps): int
+    {
+        if ($apps->isEmpty()) {
+            return 0;
+        }
+
+        if (!Auth::user()?->isAdmin()) {
+            return (int) $apps->first()->id;
+        }
+
+        $selectedAppId = (int) $request->integer('app_id');
+
+        if ($selectedAppId > 0 && $apps->contains('id', $selectedAppId)) {
+            return $selectedAppId;
+        }
+
+        return (int) $apps->first()->id;
+    }
+
+    private function applyDefaultAppSelection(array $data): array
+    {
+        if (Auth::user()?->isAdmin()) {
+            return $data;
+        }
+
+        $defaultAppId = (int) $this->availableApps()->first()?->id;
+        abort_unless($defaultAppId > 0, 422, 'No active admin Facebook app is configured.');
+        $data['app_id'] = $defaultAppId;
+
+        return $data;
     }
 
 
