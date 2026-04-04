@@ -7,6 +7,14 @@
 <body>
     <h1>Subscription Plans</h1>
 
+    @if (session('success'))
+        <p style="color: green;">{{ session('success') }}</p>
+    @endif
+
+    @if ($errors->has('billing'))
+        <p style="color: red;">{{ $errors->first('billing') }}</p>
+    @endif
+
     @if ($subscription)
         <p>Current subscription: {{ $subscription->status }} ({{ $subscription->razorpay_subscription_id }})</p>
     @endif
