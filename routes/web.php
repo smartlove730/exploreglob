@@ -24,6 +24,7 @@ Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing
 Route::post('/contact', [MarketingController::class, 'sendContact'])->middleware('throttle:contact-form')->name('marketing.contact.send');
 Route::get('/privacy-policy', [MarketingController::class, 'privacy'])->name('marketing.privacy');
 Route::get('/terms-and-conditions', [MarketingController::class, 'terms'])->name('marketing.terms');
+Route::get('/data-deletion-instructions', [MarketingController::class, 'dataDeletion'])->name('marketing.data-deletion');
 
 Route::get('/explore', [HomeController::class, 'index'])->name('home');
 Route::get('/home/categories/load', [HomeController::class, 'loadCategories'])->name('home.categories.load');
@@ -89,6 +90,7 @@ Route::get('/tools/convert-category-images', [ImageConversionController::class, 
 // Legacy aliases for existing public pages
 Route::redirect('/policy', '/privacy-policy', 301)->name('policy');
 Route::redirect('/terms', '/terms-and-conditions', 301)->name('terms');
+Route::redirect('/data-deletion', '/data-deletion-instructions', 301)->name('data-deletion');
 Route::redirect('/about-us', '/about', 301)->name('about.alternate');
 Route::post('/addblog', [BlogController::class, 'store'])->name('store');
 Route::post('/genimage', [BlogController::class, 'genImage'])->name('genImage');
