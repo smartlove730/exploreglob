@@ -57,6 +57,7 @@ return [
         'key_id' => env('RAZORPAY_KEY_ID'),
         'key_secret' => env('RAZORPAY_KEY_SECRET'),
         'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET'),
+        'auto_create_plans' => env('RAZORPAY_AUTO_CREATE_PLANS', false),
     ],
 
 ];
