@@ -42,6 +42,12 @@ Route::prefix('app')
 
         Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
         Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->middleware('throttle:billing-checkout')->name('billing.subscribe');
+        Route::get('/facebook/settings', [FacebookSettingsController::class, 'index'])->name('facebook.settings');
+        Route::get('/facebook/connect', [FacebookSettingsController::class, 'redirectToFacebook'])->name('facebook.connect');
+        Route::post('/facebook/sync-pages', [FacebookSettingsController::class, 'syncPages'])->name('facebook.sync-pages');
+        Route::get('/google/settings', [GoogleController::class, 'index'])->name('google.settings');
+        Route::get('/google/connect', [GoogleController::class, 'redirect'])->name('google.connect');
+        Route::post('/google/sync-locations', [GoogleController::class, 'syncLocations'])->name('google.sync-locations');
 
         Route::get('/calendar', [ContentCalendarController::class, 'index'])->name('calendar.index');
         Route::get('/calendar/events', [ContentCalendarController::class, 'events'])->name('calendar.events');
@@ -104,8 +110,8 @@ use App\Http\Controllers\AutomationController;
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
 Route::middleware(['auth', 'admin', 'subscription.active'])->get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
 
-Route::middleware(['auth', 'admin'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('admin.facebook.callback');
-Route::middleware(['auth', 'admin'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('admin.google.callback');
+Route::middleware(['auth'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('oauth.facebook.callback');
+Route::middleware(['auth'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('oauth.google.callback');
 Route::middleware(['auth', 'admin'])->get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
 
 
