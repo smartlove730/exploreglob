@@ -187,6 +187,29 @@ class RazorpayService
         });
     }
 
+    public function cancelSubscription(Subscription $subscription): Subscription
+    {
+        if (!empty($subscription->razorpay_subscription_id)) {
+            try {
+                $this->api->subscription->fetch($subscription->razorpay_subscription_id)->cancel([
+                    'cancel_at_cycle_end' => 0,
+                ]);
+            } catch (\Throwable $exception) {
+                Log::warning('Razorpay subscription cancel failed, applying local cancellation.', [
+                    'subscription_id' => $subscription->id,
+                    'razorpay_subscription_id' => $subscription->razorpay_subscription_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $subscription->update([
+            'status' => Subscription::STATUS_CANCELLED,
+        ]);
+
+        return $subscription->fresh();
+    }
+
     private function mapIntervalToPeriod(string $interval): string
     {
         return match (strtolower($interval)) {

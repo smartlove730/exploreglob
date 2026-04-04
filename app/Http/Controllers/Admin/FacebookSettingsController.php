@@ -22,7 +22,7 @@ class FacebookSettingsController extends Controller
 
     public function index(Request $request)
     {
-        $apps = FacebookApp::where('is_active', true)->orderBy('name')->get();
+        $apps = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
         $selectedAppId = (int) $request->integer('app_id');
 
         $accountQuery = FacebookAccount::with(['pages', 'app'])
@@ -45,7 +45,7 @@ class FacebookSettingsController extends Controller
     public function redirectToFacebook(Request $request): RedirectResponse
     {
         $appId = $request->integer('app_id');
-        $app = FacebookApp::where('is_active', true)
+        $app = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)
             ->when($appId > 0, fn ($query) => $query->whereKey($appId))
             ->orderBy('id')
             ->firstOrFail();
@@ -62,7 +62,7 @@ class FacebookSettingsController extends Controller
         ]);
 
         $appId = (int) session('facebook_auth_app_id');
-        $app = FacebookApp::where('is_active', true)->findOrFail($appId);
+        $app = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->findOrFail($appId);
 
         try {
             $shortToken = $this->facebookGraphService->exchangeCodeForToken($app, $request->string('code')->toString());
