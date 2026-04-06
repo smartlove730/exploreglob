@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FacebookPage;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class MetaVideoService
 {
@@ -117,8 +118,37 @@ class MetaVideoService
             throw new RuntimeException('Video URL must be publicly reachable.');
         }
 
-        if ($path !== '' && !str_ends_with($path, '.mp4')) {
+        if ($path !== '' && !str_ends_with($path, '.mp4') && !$this->urlServesMp4Content($videoUrl)) {
             throw new RuntimeException('Video URL must point to an MP4 file.');
         }
+    }
+
+    private function urlServesMp4Content(string $videoUrl): bool
+    {
+        $requests = [
+            fn () => Http::timeout(10)->head($videoUrl),
+            fn () => Http::timeout(10)->withHeaders(['Range' => 'bytes=0-0'])->get($videoUrl),
+        ];
+
+        foreach ($requests as $request) {
+            try {
+                $response = $request();
+            } catch (Throwable) {
+                continue;
+            }
+
+            if (!in_array($response->status(), [200, 206], true)) {
+                continue;
+            }
+
+            $contentType = strtolower((string) $response->header('Content-Type'));
+            $normalizedType = trim(strtok($contentType, ';') ?: '');
+
+            if (in_array($normalizedType, ['video/mp4', 'application/mp4'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
