@@ -297,6 +297,60 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const getImageById = (id) => state.images.find((img) => img.id === id);
+    const getIndianDateTokens = () => {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).formatToParts(new Date()).reduce((acc, part) => {
+            acc[part.type] = part.value;
+            return acc;
+        }, {});
+
+        const year = parts.year || '';
+        const month = parts.month || '';
+        const day = parts.day || '';
+
+        return [
+            `${year}-${month}-${day}`,
+            `${year}_${month}_${day}`,
+            `${year}${month}${day}`,
+            `${day}-${month}-${year}`,
+            `${day}_${month}_${year}`,
+            `${day}${month}${year}`,
+            `${day}.${month}.${year}`,
+        ].filter(Boolean);
+    };
+
+    const prioritizeTodayIndianMedia = (mediaList = []) => {
+        const tokens = getIndianDateTokens().map((token) => token.toLowerCase());
+        const hasTodayToken = (media) => {
+            const name = (media?.name || '').toLowerCase();
+            return tokens.some((token) => token && name.includes(token));
+        };
+
+        return [...mediaList].sort((left, right) => {
+            const leftPriority = hasTodayToken(left) ? 1 : 0;
+            const rightPriority = hasTodayToken(right) ? 1 : 0;
+
+            if (leftPriority === rightPriority) return 0;
+            return leftPriority > rightPriority ? -1 : 1;
+        });
+    };
+
+    const buildPromptWithMediaNames = (images = []) => {
+        const cleanedNames = images
+            .map((img) => (img?.name || '').trim().replace(/\.[^/.]+$/, ''))
+            .filter(Boolean);
+
+        if (!cleanedNames.length) {
+            return '';
+        }
+
+        return `Generate a caption using these media filename details as context: ${cleanedNames.join(', ')}`;
+    };
+
     const renderPreviewMedia = (media, className = '', style = '') => {
         if ((media.type || 'image') === 'video') {
             return `<video class="${className}" style="${style}" controls preload="metadata"><source src="${media.download_url}" type="${media.mime_type || 'video/mp4'}"></video>`;
@@ -358,13 +412,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const openPostModal = (images) => {
-        state.modalImages = images;
+        state.modalImages = prioritizeTodayIndianMedia(images);
+        const promptFromNames = buildPromptWithMediaNames(state.modalImages);
         modalTitle.textContent = images.length > 1 ? `Post ${images.length} Selected Media` : 'Post Media';
         modalCaption.value = '';
-        modalPrompt.value = '';
+        modalPrompt.value = promptFromNames;
         setModalStatus('');
 
-        modalPreview.innerHTML = images.map((img) => `
+        modalPreview.innerHTML = state.modalImages.map((img) => `
             <div class="col-md-3 col-6">
                 <div class="border rounded p-1 h-100">
                     ${renderPreviewMedia(img, 'img-fluid rounded', 'width: 100%; height: 120px; object-fit: cover;')}
@@ -523,7 +578,13 @@ document.addEventListener('DOMContentLoaded', () => {
             drive_api_key_id: driveApiKeyInput.value,
             post_mode: postMode,
             platforms,
-            images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url, resource_key: img.resource_key || '', mime_type: img.mime_type || '' })),
+            images: state.modalImages.map((img) => ({
+                id: img.id,
+                url: img.download_url,
+                resource_key: img.resource_key || '',
+                mime_type: img.mime_type || '',
+                name: img.name || '',
+            })),
         };
 
         modalPostBtn.disabled = true;

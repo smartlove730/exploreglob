@@ -383,6 +383,7 @@ class PostController extends Controller
             'images.*.url' => 'required|url|max:2048',
             'images.*.resource_key' => 'nullable|string|max:255',
             'images.*.mime_type' => 'nullable|string|max:120',
+            'images.*.name' => 'nullable|string|max:255',
         ]);
 
         $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? [$data['page_id'] ?? null]);
@@ -416,7 +417,8 @@ class PostController extends Controller
                     (string) $imageData['url'],
                     (string) ($imageData['resource_key'] ?? ''),
                     (string) ($imageData['mime_type'] ?? ''),
-                    $driveApiKey
+                    $driveApiKey,
+                    (string) ($imageData['name'] ?? '')
                 );
             } catch (\Throwable $exception) {
                 Log::error('Drive image preparation failed', [
@@ -433,6 +435,8 @@ class PostController extends Controller
                 'data' => ['results' => []],
             ], 422);
         }
+
+        $preparedMedia = $this->prioritizeIndianTodayMedia($preparedMedia);
 
         $results = [];
 
@@ -805,7 +809,7 @@ class PostController extends Controller
         ];
     }
 
-    private function storeDriveFileLocally(string $fileId, string $sourceUrl, string $resourceKey, string $mimeType, DriveApiKey $driveApiKey): array
+    private function storeDriveFileLocally(string $fileId, string $sourceUrl, string $resourceKey, string $mimeType, DriveApiKey $driveApiKey, string $fileName = ''): array
     {
         $driveToken = null;
         if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
@@ -831,9 +835,60 @@ class PostController extends Controller
 
         return [
             'file_id' => $fileId,
+            'file_name' => $fileName,
             'media_type' => $mediaType,
             'storage_path' => $storagePath,
             'public_url' => url(Storage::disk('public')->url($storagePath)),
+        ];
+    }
+
+    private function prioritizeIndianTodayMedia(array $mediaItems): array
+    {
+        if (empty($mediaItems)) {
+            return $mediaItems;
+        }
+
+        $todayTokens = $this->indianDateTokens();
+
+        usort($mediaItems, function (array $left, array $right) use ($todayTokens): int {
+            $leftPriority = $this->containsIndianTodayToken((string) ($left['file_name'] ?? ''), $todayTokens) ? 1 : 0;
+            $rightPriority = $this->containsIndianTodayToken((string) ($right['file_name'] ?? ''), $todayTokens) ? 1 : 0;
+
+            if ($leftPriority === $rightPriority) {
+                return 0;
+            }
+
+            return $leftPriority > $rightPriority ? -1 : 1;
+        });
+
+        return $mediaItems;
+    }
+
+    private function containsIndianTodayToken(string $fileName, array $tokens): bool
+    {
+        $normalizedName = mb_strtolower($fileName);
+
+        foreach ($tokens as $token) {
+            if ($token !== '' && str_contains($normalizedName, mb_strtolower($token))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function indianDateTokens(): array
+    {
+        $todayInIndia = \Carbon\Carbon::now('Asia/Kolkata');
+
+        return [
+            $todayInIndia->format('Y-m-d'),
+            $todayInIndia->format('Y_m_d'),
+            $todayInIndia->format('Ymd'),
+            $todayInIndia->format('d-m-Y'),
+            $todayInIndia->format('d_m_Y'),
+            $todayInIndia->format('dmY'),
+            $todayInIndia->format('d.m.Y'),
         ];
     }
 

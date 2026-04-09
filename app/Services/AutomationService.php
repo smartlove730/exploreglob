@@ -123,7 +123,8 @@ class AutomationService
                 $platforms = array_values(array_filter($platforms, fn (string $platform) => $platform !== 'google_business'));
             }
 
-            $caption = $this->aiCaptionService->generateCaption($config->prompt, $mediaUrl);
+            $captionPrompt = $this->buildCaptionPromptWithMediaName($config->prompt, (string) ($unusedMedia['name'] ?? ''));
+            $caption = $this->aiCaptionService->generateCaption($captionPrompt, $mediaUrl);
 
             /** @var FacebookPage|null $page */
             $page = $config->page;
@@ -258,10 +259,56 @@ class AutomationService
             ->pluck('drive_file_id')
             ->all();
 
-        return $images
+        $unusedImages = $images
             ->filter(fn ($image) => !in_array((string) ($image['id'] ?? ''), $usedIds, true))
-            ->values()
-            ->first();
+            ->values();
+
+        if ($unusedImages->isEmpty()) {
+            return null;
+        }
+
+        $todayDateTokens = $this->indianDateTokens();
+        $prioritized = $unusedImages
+            ->sortByDesc(function ($image) use ($todayDateTokens) {
+                $name = mb_strtolower((string) ($image['name'] ?? ''));
+
+                foreach ($todayDateTokens as $token) {
+                    if ($token !== '' && str_contains($name, mb_strtolower($token))) {
+                        return 1;
+                    }
+                }
+
+                return 0;
+            })
+            ->values();
+
+        return $prioritized->first();
+    }
+
+    private function buildCaptionPromptWithMediaName(string $basePrompt, string $mediaName): string
+    {
+        $sanitizedName = trim(pathinfo($mediaName, PATHINFO_FILENAME));
+
+        if ($sanitizedName === '') {
+            return $basePrompt;
+        }
+
+        return trim($basePrompt)."\n\nMedia filename context: {$sanitizedName}";
+    }
+
+    private function indianDateTokens(): array
+    {
+        $nowInIndia = Carbon::now('Asia/Kolkata');
+
+        return [
+            $nowInIndia->format('Y-m-d'),
+            $nowInIndia->format('Y_m_d'),
+            $nowInIndia->format('Ymd'),
+            $nowInIndia->format('d-m-Y'),
+            $nowInIndia->format('d_m_Y'),
+            $nowInIndia->format('dmY'),
+            $nowInIndia->format('d.m.Y'),
+        ];
     }
 
     private function normalizePlatforms(string $platform): array
