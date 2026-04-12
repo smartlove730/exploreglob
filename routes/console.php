@@ -11,8 +11,14 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('automations:run {userId : User ID to run automations for} {automationConfigId? : Optional automation config ID} {--force : Ignore schedule and daily limit checks}', function (int $userId, ?int $automationConfigId = null, AutomationService $automationService) {
+Artisan::command('automations:run {userId : User ID to run automations for} {automationConfigId? : Optional automation config ID} {--force : Ignore schedule and daily limit checks}', function () {
+    $userId = (int) $this->argument('userId');
+    $automationConfigId = $this->argument('automationConfigId');
+    $automationConfigId = $automationConfigId !== null ? (int) $automationConfigId : null;
     $forceRun = (bool) $this->option('force');
+
+    /** @var AutomationService $automationService */
+    $automationService = app(AutomationService::class);
     $scheduledLogs = $automationService->scheduleAutomations($automationConfigId, $forceRun, $userId);
 
     $this->info(
