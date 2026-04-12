@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Plan;
+use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -33,6 +35,25 @@ class RegisteredUserController extends Controller
             'role' => User::ROLE_CUSTOMER,
             'is_admin' => false,
         ]);
+
+        // Auto-activate Free plan subscription
+        $freePlan = Plan::query()
+            ->where('is_active', true)
+            ->where('price', '0.00')
+            ->orderBy('sort_order')
+            ->first();
+
+        if ($freePlan) {
+            Subscription::create([
+                'user_id' => $user->id,
+                'plan_id' => $freePlan->id,
+                'razorpay_subscription_id' => null,
+                'status' => Subscription::STATUS_ACTIVE,
+                'current_period_start' => now(),
+                'current_period_end' => now()->addDays(30),
+                'posts_used' => 0,
+            ]);
+        }
 
         event(new Registered($user));
 

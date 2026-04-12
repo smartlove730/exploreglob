@@ -59,6 +59,27 @@ class AutomationConfigController extends Controller
         $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
         $data['user_id'] = Auth::id();
 
+        // Enforce automation limit from the user's active plan
+        $user = Auth::user();
+        if ($user && !$user->isAdmin()) {
+            $activeSubscription = \App\Models\Subscription::query()
+                ->where('user_id', $user->id)
+                ->whereIn('status', [\App\Models\Subscription::STATUS_ACTIVE, \App\Models\Subscription::STATUS_AUTHENTICATED])
+                ->with('plan')
+                ->latest('id')
+                ->first();
+
+            if ($activeSubscription && $activeSubscription->plan) {
+                $currentCount = AutomationConfig::where('user_id', $user->id)->count();
+                $limit = (int) $activeSubscription->plan->automation_limit;
+
+                if (($currentCount + count($pageIds)) > $limit) {
+                    return redirect()->route('admin.automations.index')
+                        ->with('error', "Automation limit reached. Your plan allows {$limit} automation(s). You currently have {$currentCount}.");
+                }
+            }
+        }
+
         $created = 0;
         foreach ($pageIds as $pageId) {
             AutomationConfig::create($data + ['page_id' => $pageId]);

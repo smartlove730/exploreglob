@@ -119,4 +119,20 @@ class SaasManagementController extends Controller
 
         return back()->with('success', "Subscription #{$subscription->id} updated to {$subscription->status}.");
     }
+
+    public function verifyEmail(Request $request, User $user): RedirectResponse
+    {
+        if ($user->hasVerifiedEmail()) {
+            return back()->with('info', "{$user->name}'s email is already verified.");
+        }
+
+        $user->markEmailAsVerified();
+
+        app(ActivityLogService::class)->log('admin.user.email_verified', $request->user(), [
+            'verified_user_id' => $user->id,
+            'verified_email' => $user->email,
+        ]);
+
+        return back()->with('success', "Email verified for {$user->name} ({$user->email}).");
+    }
 }

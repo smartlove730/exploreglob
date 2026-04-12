@@ -34,7 +34,9 @@ class BillingController extends Controller
             ->latest('id')
             ->first();
 
-        return view('app.billing.plans', compact('plans', 'subscription'));
+        $activePlanId = $subscription?->plan_id;
+
+        return view('app.billing.plans', compact('plans', 'subscription', 'activePlanId'));
     }
 
     public function startCheckout(Request $request): JsonResponse|RedirectResponse

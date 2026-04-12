@@ -194,6 +194,7 @@ Route::middleware(['auth', 'admin'])
         Route::post('/plans/{plan}/toggle', [SaasManagementController::class, 'togglePlan'])->name('plans.toggle');
         Route::get('/subscriptions', [SaasManagementController::class, 'subscriptions'])->name('subscriptions');
         Route::post('/subscriptions/{subscription}/toggle', [SaasManagementController::class, 'toggleSubscription'])->name('subscriptions.toggle');
+        Route::post('/users/{user}/verify-email', [SaasManagementController::class, 'verifyEmail'])->name('users.verify-email');
     });
 
 // Admin auth
