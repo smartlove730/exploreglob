@@ -5,10 +5,21 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use App\Jobs\RunAutomationJob;
 use App\Jobs\DispatchDueScheduledPostsJob;
+use App\Services\AutomationService;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('automations:run {userId : User ID to run automations for} {automationConfigId? : Optional automation config ID} {--force : Ignore schedule and daily limit checks}', function (int $userId, ?int $automationConfigId = null, AutomationService $automationService) {
+    $forceRun = (bool) $this->option('force');
+    $scheduledLogs = $automationService->scheduleAutomations($automationConfigId, $forceRun, $userId);
+
+    $this->info(
+        ($forceRun ? 'Automation scheduling started (forced).' : 'Automation scheduling started.')
+        .' Jobs queued: '.$scheduledLogs->count()
+    );
+})->purpose('Queue automation jobs for a specific user without requiring login');
 
 // Schedule blog generation
 // This runs daily at 2 AM - you can customize the schedule
