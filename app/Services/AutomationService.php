@@ -26,11 +26,12 @@ class AutomationService
     ) {
     }
 
-    public function scheduleAutomations(?int $automationConfigId = null, bool $forceRun = false): Collection
+    public function scheduleAutomations(?int $automationConfigId = null, bool $forceRun = false, ?int $userId = null): Collection
     {
         $configs = AutomationConfig::query()
             ->with(['page', 'driveApiKey'])
             ->where('is_active', true)
+            ->when($userId, fn ($query) => $query->where('user_id', $userId))
             ->when($automationConfigId, fn ($query) => $query->whereKey($automationConfigId))
             ->get();
 

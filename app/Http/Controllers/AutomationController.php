@@ -13,10 +13,10 @@ class AutomationController extends Controller
     ) {
     }
 
-    public function run(Request $request, ?int $automationConfigId = null): Response
+    public function run(Request $request, int $userId, ?int $automationConfigId = null): Response
     {
         $forceRun = $request->boolean('force', false);
-        $scheduledLogs = $this->automationService->scheduleAutomations($automationConfigId, $forceRun);
+        $scheduledLogs = $this->automationService->scheduleAutomations($automationConfigId, $forceRun, $userId);
 
         return response(
             ($forceRun ? 'Automation scheduling started (forced).' : 'Automation scheduling started.')
