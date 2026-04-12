@@ -15,7 +15,7 @@
 <div class="container my-5">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <div class="animated-card">
+            <div class="animated-card" style="opacity:1;transform:none">
                 <div class="card-body p-5">
                     @if($errors->any())
                         <div class="alert alert-danger">

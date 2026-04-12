@@ -5,7 +5,7 @@
 <meta name="google-adsense-account" content="ca-pub-3230339294601454">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" type="image/png" href="{{asset('e.avif')}}">
+<link rel="icon" type="image/png" href="{{asset('images/postzy-favicon.png')}}">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,71 +18,6 @@
     <!-- Custom CSS -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="{{ asset('/css/custom.css') }}">
-<style>
-
-.navbar-toggler {
-    border: 1px solid rgba(0,0,0,.2);
-}
-
-.navbar-toggler-icon {
-    background-image: var(--bs-navbar-toggler-icon-bg);
-}
-
-.header-search-wrapper {
-    position: relative;
-    max-width: 420px;
-    width: 100%;
-}
-
-.header-search-dropdown {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-    z-index: 1051;
-    max-height: 320px;
-    overflow-y: auto;
-}
-
-.header-search-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #6c757d;
-    padding: 0.5rem 0.75rem 0.35rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.header-search-item {
-    display: block;
-    padding: 0.45rem 0.75rem;
-    color: #212529;
-    text-decoration: none;
-    border-top: 1px solid #f1f3f5;
-}
-
-.header-search-item:hover {
-    background-color: #f8f9fa;
-}
-
-.header-search-empty {
-    padding: 0.25rem 0.75rem 0.75rem;
-    color: #6c757d;
-    font-size: 0.85rem;
-}
-
-@media (max-width: 991.98px) {
-    .header-search-wrapper {
-        margin-top: 0.75rem;
-        max-width: none;
-    }
-}
-
-</style>
 
  <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-REDTM9GQ3P"></script>
@@ -98,23 +33,28 @@
 <body>
 
 <header>
-  <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top shadow-sm">
+  <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top shadow-sm" id="mainNavbar">
   <div class="container">
-      <img src="{{ asset('e.avif') }}" alt="Global Explorer logo" style="height:20px!important;" loading="eager" decoding="async">
-    <a class="navbar-brand fw-bold" href="{{ url('/') }}">  Global Explorer</a>
+      <a class="navbar-brand fw-bold" href="{{ url('/') }}">
+        <img src="{{ asset('images/postzy-logo.png') }}" alt="Postzy logo" loading="eager" decoding="async">
+        Postzy
+      </a>
  
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-      data-bs-target="#navbarNav">
+      data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
    
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav me-auto  d-none d-lg-flex">
+      <ul class="navbar-nav me-auto d-none d-lg-flex">
         <li class="nav-item">
           <a class="nav-link" href="{{ url('/') }}">Home</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ url('/travel') }}">Travel</a>
+          <a class="nav-link" href="{{ url('/explore') }}">Explore</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url('/travel') }}">Categories</a>
         </li>
         @foreach($travelNavCategories ?? [] as $navCategory)
         <li class="nav-item">
@@ -131,7 +71,7 @@
           type="search"
           id="header-search-input"
           class="form-control form-control-sm"
-          placeholder="Search travel categories and blogs..."
+          placeholder="Search categories and blogs..."
           autocomplete="off"
         >
         <div id="header-search-results" class="header-search-dropdown d-none"></div>
@@ -156,32 +96,33 @@
 </main>
 
 <footer class="site-footer">
-    <div class="container">
+    <div class="container position-relative" style="z-index:1">
         <div class="row g-4">
             <div class="col-12 col-md-6 col-lg-3">
                 <a href="{{ url('/') }}" class="footer-brand text-decoration-none d-inline-flex align-items-center gap-2 mb-3">
-                    <img src="{{ asset('e.avif') }}" alt="Global Explorer logo" class="footer-logo"> 
+                    <img src="{{ asset('images/postzy-logo.png') }}" alt="Postzy logo" class="footer-logo">
+                    <span class="footer-brand-text">Postzy</span>
                 </a>
-                
+                <p class="footer-muted mt-2" style="font-size:0.85rem;">Your premium destination for discovering stories, guides, and insights from around the world.</p>
             </div>
 
             <div class="col-12 col-md-6 col-lg-3">
                 <h5 class="footer-title">Company</h5>
                 <ul class="footer-links list-unstyled mb-0">
-                    <li><a href="{{ url('/about') }}" class="text-decoration-none text-white">About Us</a></li>
-                    <li><a href="{{ url('/contact') }}" class="text-decoration-none text-white">Contact</a></li>
-                    <li><a href="{{ url('/policy') }}" class="text-decoration-none text-white">Privacy Policy</a></li>
-                    <li><a href="{{ url('/terms') }}" class="text-decoration-none text-white">Terms & Conditions</a></li>
-                    <li><a href="{{ url('/data-deletion') }}" class="text-decoration-none text-white">Data Deletion Instructions</a></li>
+                    <li><a href="{{ url('/about') }}">About Us</a></li>
+                    <li><a href="{{ url('/contact') }}">Contact</a></li>
+                    <li><a href="{{ url('/policy') }}">Privacy Policy</a></li>
+                    <li><a href="{{ url('/terms') }}">Terms & Conditions</a></li>
+                    <li><a href="{{ url('/data-deletion') }}">Data Deletion</a></li>
                 </ul>
             </div>
 
             <div class="col-12 col-md-6 col-lg-3">
-                <h5 class="footer-title">Top Travel Categories</h5>
+                <h5 class="footer-title">Top Categories</h5>
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterCategories as $footerCategory)
                         <li>
-                            <a href="{{ url('/travel/' . $footerCategory->slug) }}" class="text-decoration-none text-white">
+                            <a href="{{ url('/travel/' . $footerCategory->slug) }}">
                                 {{ $footerCategory->name }}
                             </a>
                         </li>
@@ -192,12 +133,12 @@
             </div>
 
             <div class="col-12 col-md-6 col-lg-3">
-                <h5 class="footer-title">Top Travel Blogs</h5>
+                <h5 class="footer-title">Popular Posts</h5>
                 <ul class="footer-links list-unstyled mb-0">
                     @forelse($topFooterBlogs as $footerBlog)
                         <li>
-                            <a href="{{ url('/travel/' . ($footerBlog->category?->slug ?? 'travel') . '/' . $footerBlog->slug) }}" class="text-decoration-none text-white">
-                                {{ \Illuminate\Support\Str::limit($footerBlog->title, 45) }}
+                            <a href="{{ url('/travel/' . ($footerBlog->category?->slug ?? 'travel') . '/' . $footerBlog->slug) }}">
+                                {{ \Illuminate\Support\Str::limit($footerBlog->title, 40) }}
                             </a>
                         </li>
                     @empty
@@ -206,15 +147,25 @@
                 </ul>
             </div>
         </div>
-        <p class="footer-copy mb-0">© {{ date('Y') }} Global Explorer. All rights reserved.</p>
+        <p class="footer-copy mb-0">&copy; {{ date('Y') }} Postzy. All rights reserved.</p>
     </div>
 </footer>
     
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const navbar = document.getElementById('navbarNav');
-    if (navbar) navbar.classList.remove('collapse');
+    // Navbar scroll effect
+    const navbar = document.getElementById('mainNavbar');
+    if (navbar) {
+        window.addEventListener('scroll', () => {
+            navbar.classList.toggle('scrolled', window.scrollY > 20);
+        });
+    }
 
+    // Collapse fix
+    const navbarCollapse = document.getElementById('navbarNav');
+    if (navbarCollapse && window.innerWidth >= 992) navbarCollapse.classList.remove('collapse');
+
+    // Search functionality
     const searchInput = document.getElementById('header-search-input');
     const searchResults = document.getElementById('header-search-results');
     let controller = null;
@@ -251,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderResults = (data) => {
         const categories = Array.isArray(data.categories) ? data.categories : [];
         const blogs = Array.isArray(data.blogs) ? data.blogs : [];
-        searchResults.innerHTML = `${renderSection('Travel Categories', categories, 'category')}${renderSection('Blogs', blogs, 'blog')}`;
+        searchResults.innerHTML = `${renderSection('Categories', categories, 'category')}${renderSection('Blogs', blogs, 'blog')}`;
         searchResults.classList.remove('d-none');
     };
 

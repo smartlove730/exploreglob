@@ -5,7 +5,7 @@
         <div class="container">
             <div class="hero-content">
                 <h1 class="hero-title">Terms & Conditions</h1>
-                <p class="hero-subtitle">Please read these terms carefully before using Global Explorer.</p>
+                <p class="hero-subtitle">Please read these terms carefully before using Postzy.</p>
             </div>
         </div>
     </section>
@@ -16,10 +16,10 @@
                 <div class="animated-card">
                     <div class="card-body p-5">
                         <h2 class="mb-4">Acceptance of Terms</h2>
-                        <p>By accessing or using Global Explorer, you agree to comply with these Terms & Conditions. If you do not agree, please discontinue use of the platform.</p>
+                        <p>By accessing or using Postzy, you agree to comply with these Terms & Conditions. If you do not agree, please discontinue use of the platform.</p>
 
                         <h2 class="mb-4 mt-5">Content Disclaimer</h2>
-                        <p>Content on Global Explorer is provided for informational purposes only. While we strive for accuracy, we do not guarantee that all information is complete, up-to-date, or error-free. Use the content at your own discretion.</p>
+                        <p>Content on Postzy is provided for informational purposes only. While we strive for accuracy, we do not guarantee that all information is complete, up-to-date, or error-free. Use the content at your own discretion.</p>
 
                         <h2 class="mb-4 mt-5">User Conduct</h2>
                         <ul>
@@ -29,7 +29,7 @@
                         </ul>
 
                         <h2 class="mb-4 mt-5">Intellectual Property</h2>
-                        <p>All site content, including text, graphics, and branding, is owned by Global Explorer or its contributors and may not be reused without permission.</p>
+                        <p>All site content, including text, graphics, and branding, is owned by Postzy or its contributors and may not be reused without permission.</p>
 
                         <h2 class="mb-4 mt-5">Changes to These Terms</h2>
                         <p>We may update these terms periodically. Continued use of the platform after changes means you accept the revised terms.</p>

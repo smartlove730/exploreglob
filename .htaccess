@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # If the request is already for /public, let it through.
+    RewriteRule ^public(/|$) - [L]
+
+    # If the request matches a real file or directory in the project root, serve it.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Otherwise, route everything to /public.
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

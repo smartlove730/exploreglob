@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Explore-Glob'),
+    'name' => env('APP_NAME', 'Postzy'),
 
     /*
     |--------------------------------------------------------------------------
@@ -52,7 +52,7 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'https://explore-glob.blog'),
+    'url' => env('APP_URL', 'https://postzy.co.in'),
 
     /*
     |--------------------------------------------------------------------------

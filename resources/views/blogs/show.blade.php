@@ -71,10 +71,10 @@
 <section class="blog-header-section">
     <div class="container">
         <div class="row">
-            <div class="col-lg-10 mx-auto text-center">
+            <div class="col-lg-10 mx-auto text-center" style="position:relative;z-index:1">
                 <h1 class="blog-title-main">{{ $blog->title }}</h1>
                 @if($subtitle)
-                    <p class="lead mb-4" style="opacity: 0.95;">{{ $subtitle }}</p>
+                    <p class="lead mb-4" style="opacity: 0.9;">{{ $subtitle }}</p>
                 @endif
                 <div class="d-flex justify-content-center align-items-center gap-4 flex-wrap mb-4">
                     <span class="d-flex align-items-center gap-2">
@@ -214,13 +214,13 @@
 <section class="container my-5">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <div class="p-5 rounded-4" style="background: var(--gradient-1); color: white; text-align: center;">
-                <h2 class="mb-3">📬 Join Our Newsletter</h2>
-                <p class="mb-4">Get weekly articles, tips, and updates straight to your inbox</p>
+            <div class="newsletter-section">
+                <h2 class="mb-3" style="position:relative;z-index:1">📬 Join Our Newsletter</h2>
+                <p class="mb-4" style="position:relative;z-index:1">Get weekly articles, tips, and updates straight to your inbox</p>
                 @if(session('newsletter_success'))
-                    <div class="alert alert-success">{{ session('newsletter_success') }}</div>
+                    <div class="alert alert-success" style="position:relative;z-index:1">{{ session('newsletter_success') }}</div>
                 @endif
-                <form class="row g-3 justify-content-center" method="POST" action="{{ url('/newsletter/subscribe') }}">
+                <form class="row g-3 justify-content-center" method="POST" action="{{ url('/newsletter/subscribe') }}" style="position:relative;z-index:1">
                     @csrf
                     <input type="hidden" name="blog_id" value="{{ $blog->id }}">
                     <div class="col-md-5">

@@ -1,10 +1,10 @@
 @extends('layouts.app')
 @section('SeoTags')
     @include('partials.seo', [
-        'seo_title' => 'Global Explorer | Travel Stories, Guides, and Tips',
-        'seo_description' => 'Discover travel guides, destination highlights, and practical tips for your next journey. Read inspiring travel stories on Global Explorer.',
-        'seo_keywords' => 'travel blogs, travel guides, destinations, travel tips, itineraries, budget travel, adventure travel',
-        'og_image' => asset('images/home-og-image.jpg'),
+        'seo_title' => 'Postzy | Discover Stories, Guides & Insights',
+        'seo_description' => 'Discover curated stories, expert guides, and trending insights on Postzy. Your premium destination for quality content.',
+        'seo_keywords' => 'blogs, guides, stories, tips, categories, content, articles, postzy',
+        'og_image' => asset('images/postzy-logo.png'),
     ])  
 @endsection
 @section('content')
@@ -16,9 +16,9 @@
 <section class="hero-section">
     <div class="container">
         <div class="hero-content">
-            <h1 class="hero-title">Discover Travel Stories</h1>
-            <p class="hero-subtitle">Explore guides, destinations, and tips crafted for your next adventure.</p>
-            <a href="#latest-blogs" class="btn btn-primary btn-lg mt-3">
+            <h1 class="hero-title">Discover Amazing Stories</h1>
+            <p class="hero-subtitle">Explore curated guides, expert insights, and trending content crafted for the curious mind.</p>
+            <a href="#latest-blogs" class="btn btn-light btn-lg mt-3">
                 Explore Now ↓
             </a>
         </div>
@@ -29,7 +29,7 @@
     <!-- Most Recent Blogs Section -->
     @if(isset($blogs) && $blogs->count() > 0)
     <section class="mb-5">
-        <h2 class="section-title">Latest Travel Blogs</h2>
+        <h2 class="section-title">Latest Posts</h2>
         <div class="row g-4">
             @foreach($blogs as $index => $blog)
                  
@@ -82,7 +82,7 @@
     <!-- Categories Section -->
     @if(isset($categories) && count($categories) > 0)
     <section class="mt-5 pt-5">
-        <h2 class="section-title">Browse Travel Categories</h2>
+        <h2 class="section-title">Browse Categories</h2>
         <div class="row g-4" id="category-grid">
             @include('partials.category-cards', ['categories' => $categories])
         </div>
@@ -102,7 +102,7 @@
         <div class="empty-state">
             <div class="empty-state-icon">📝</div>
             <h3 class="mb-3">No content available yet</h3>
-            <p>Check back soon for new blog posts!</p>
+            <p>Check back soon for new posts!</p>
         </div>
     @endif
 </div>
@@ -207,17 +207,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-<style>
-    .category-loader {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-top: 1.5rem;
-    }
-
-    .category-scroll-trigger {
-        width: 100%;
-        height: 1px;
-    }
-</style>
 @endpush

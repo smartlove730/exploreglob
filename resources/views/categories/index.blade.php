@@ -1,10 +1,10 @@
 @extends('layouts.app')
 @section('SeoTags')
     @include('partials.seo', [
-    'seo_title' => 'Global Explorer | Travel Categories & Guides',
-    'seo_description' => 'Explore travel guides, destinations, itineraries, and tips. Discover inspiring travel stories and practical advice on Global Explorer.',
-    'seo_keywords' => 'travel blogs, travel guides, destinations, itineraries, travel tips, budget travel, adventure travel, luxury travel',
-    'og_image' => asset('images/category-og-image.jpg'), // Consider a specific category-themed image
+    'seo_title' => 'Postzy | Categories & Guides',
+    'seo_description' => 'Explore guides, destinations, itineraries, and tips. Discover inspiring stories and practical advice on Postzy.',
+    'seo_keywords' => 'blogs, guides, destinations, itineraries, tips, categories, content',
+    'og_image' => asset('images/postzy-logo.png'),
 ])  
 @endsection
 @section('content')
@@ -17,7 +17,7 @@
 <section class="hero-section" style="min-height: 35vh;">
     <div class="container">
         <div class="hero-content">
-            <h1 class="hero-title">Explore Travel Categories</h1>
+            <h1 class="hero-title">Explore Categories</h1>
             <p class="hero-subtitle">Find guides, destinations, itineraries, and tips for your next adventure</p>
         </div>
     </div>

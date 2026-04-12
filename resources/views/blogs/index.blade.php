@@ -8,8 +8,8 @@
 <section class="hero-section" style="min-height: 40vh;">
     <div class="container">
         <div class="hero-content">
-            <h1 class="hero-title">Travel Blogs</h1>
-            <p class="hero-subtitle">Discover our complete collection of travel articles and stories</p>
+            <h1 class="hero-title">All Posts</h1>
+            <p class="hero-subtitle">Discover our complete collection of articles and stories</p>
         </div>
     </div>
 </section>
@@ -73,4 +73,3 @@
 </div>
 
 @endsection
-

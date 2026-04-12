@@ -1,20 +1,27 @@
 @extends('marketing.layout')
 
-@section('title', 'ExploreGlob - Social Publishing Platform')
+@section('title', 'Postzy - Social Publishing Platform')
 
 @section('content')
-<div class="p-5 bg-white border rounded-3 mb-4">
-    <h1 class="display-6 fw-bold">Plan, schedule, and publish social content in one place.</h1>
-    <p class="lead text-muted">ExploreGlob helps teams manage Facebook, Instagram, and Google Business posting with scheduling, media management, and subscription-based usage controls.</p>
-    <div class="d-flex flex-wrap gap-2">
-        <a href="{{ route('register') }}" class="btn btn-primary">Start Free</a>
-        <a href="{{ route('marketing.pricing') }}" class="btn btn-outline-primary">View Pricing</a>
+<section class="hero-section" style="min-height:50vh;">
+    <div class="container">
+        <div class="hero-content">
+            <h1 class="hero-title">Plan, Schedule & Publish Content</h1>
+            <p class="hero-subtitle">Postzy helps teams manage Facebook, Instagram, and Google Business posting with scheduling, media management, and subscription-based controls.</p>
+            <div class="d-flex flex-wrap gap-3 justify-content-center">
+                <a href="{{ route('register') }}" class="btn btn-light btn-lg">Start Free</a>
+                <a href="{{ route('marketing.pricing') }}" class="btn btn-primary btn-lg" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.4)">View Pricing</a>
+            </div>
+        </div>
     </div>
-</div>
+</section>
 
-<div class="row g-3">
-    <div class="col-md-4"><div class="card h-100 border-0 shadow-sm"><div class="card-body"><h5>Smart Scheduling</h5><p class="text-muted mb-0">Queue content in advance and let background workers publish on time.</p></div></div></div>
-    <div class="col-md-4"><div class="card h-100 border-0 shadow-sm"><div class="card-body"><h5>Media Library</h5><p class="text-muted mb-0">Reuse your approved images/videos across future campaigns.</p></div></div></div>
-    <div class="col-md-4"><div class="card h-100 border-0 shadow-sm"><div class="card-body"><h5>Usage Visibility</h5><p class="text-muted mb-0">Track plan usage and account status from your customer dashboard.</p></div></div></div>
+<div class="container my-5">
+    <h2 class="section-title">Why Postzy?</h2>
+    <div class="row g-4">
+        <div class="col-md-4"><div class="animated-card" style="opacity:1;transform:none"><div class="card-body text-center py-5"><div style="font-size:2.5rem;margin-bottom:1rem">⚡</div><h5 class="card-title">Smart Scheduling</h5><p class="card-text">Queue content in advance and let background workers publish on time.</p></div></div></div>
+        <div class="col-md-4"><div class="animated-card" style="opacity:1;transform:none"><div class="card-body text-center py-5"><div style="font-size:2.5rem;margin-bottom:1rem">🖼️</div><h5 class="card-title">Media Library</h5><p class="card-text">Reuse your approved images/videos across future campaigns.</p></div></div></div>
+        <div class="col-md-4"><div class="animated-card" style="opacity:1;transform:none"><div class="card-body text-center py-5"><div style="font-size:2.5rem;margin-bottom:1rem">📊</div><h5 class="card-title">Usage Visibility</h5><p class="card-text">Track plan usage and account status from your customer dashboard.</p></div></div></div>
+    </div>
 </div>
 @endsection
