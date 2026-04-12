@@ -112,7 +112,7 @@ use App\Http\Controllers\Admin\SaasManagementController;
 use App\Http\Controllers\AutomationController;
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
-Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])->get('/run-automations/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
+Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])->get('/run-automations/{userId}/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
 
 Route::middleware(['auth'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('oauth.facebook.callback');
 Route::middleware(['auth'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('oauth.google.callback');
