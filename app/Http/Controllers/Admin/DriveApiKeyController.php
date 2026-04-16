@@ -29,6 +29,17 @@ class DriveApiKeyController extends Controller
         return view('admin.google-drive-keys.create');
     }
 
+    public function redirectToGoogleOauth(): RedirectResponse
+    {
+        try {
+            return redirect()->away(
+                $this->googleService->getDriveOauthRedirectUrl(route('admin.google-drive.callback'))
+            );
+        } catch (\Throwable $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validateData($request);
@@ -82,7 +93,19 @@ class DriveApiKeyController extends Controller
         }
 
         try {
-            $tokenData = $this->googleService->exchangeCodeForToken($code);
+            $tokenData = [];
+            $driveRedirectUri = route('admin.google-drive.callback');
+
+            try {
+                $tokenData = $this->googleService->exchangeCodeForToken($code, $driveRedirectUri);
+            } catch (\Throwable $exception) {
+                Log::warning('Drive OAuth token exchange failed with explicit drive callback; retrying default redirect URI.', [
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $tokenData = $this->googleService->exchangeCodeForToken($code);
+            }
+
             $accessToken = (string) ($tokenData['access_token'] ?? '');
             $refreshToken = (string) ($tokenData['refresh_token'] ?? '');
 
@@ -144,11 +167,14 @@ class DriveApiKeyController extends Controller
                 ->route('admin.posts.create')
                 ->with('success', 'Google Drive OAuth connected. You can now fetch media by pasting a folder link.');
         } catch (\Throwable $exception) {
-            Log::error('Google Drive OAuth callback failed', ['error' => $exception->getMessage()]);
+            Log::error('Google Drive OAuth callback failed', [
+                'error' => $exception->getMessage(),
+                'error_class' => $exception::class,
+            ]);
 
             return redirect()
                 ->route('admin.facebook.google-drive-keys.index')
-                ->with('error', 'Unable to connect Google Drive OAuth. Please try again.');
+                ->with('error', 'Unable to connect Google Drive OAuth. '.$exception->getMessage());
         }
     }
 
