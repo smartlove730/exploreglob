@@ -90,6 +90,48 @@ class DriveService
         return $this->normalizeBinaryToInstagramJpegUrl($response->body(), 'url-image');
     }
 
+    public function prepareInstagramEligibleVideo(array $video, DriveApiKey $driveApiKey): string
+    {
+        $fileId = (string) ($video['id'] ?? '');
+        if ($fileId === '') {
+            throw new RuntimeException('Unable to prepare Instagram video: missing Drive file id.');
+        }
+
+        $resourceKey = (string) ($video['resource_key'] ?? '');
+        $driveToken = null;
+
+        if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
+            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+            $driveToken = $driveApiKey->oauth_access_token;
+        }
+
+        $binary = $this->googleDriveService->fetchFileBinary(
+            $fileId,
+            $driveApiKey->api_key,
+            $resourceKey,
+            $driveToken
+        );
+
+        $contentType = strtolower((string) ($binary['content_type'] ?? ''));
+        $normalizedType = trim(strtok($contentType, ';') ?: '');
+
+        $extension = match ($normalizedType) {
+            'video/mp4', 'application/mp4' => 'mp4',
+            'video/quicktime' => 'mov',
+            default => throw new RuntimeException("Unsupported video format for Instagram publishing: {$contentType}"),
+        };
+
+        $videoBinary = (string) ($binary['content'] ?? '');
+        if ($videoBinary === '') {
+            throw new RuntimeException('Unable to prepare Instagram video: empty video payload.');
+        }
+
+        $path = 'automation/instagram/videos/'.Str::uuid()->toString().'-'.$fileId.'.'.$extension;
+        Storage::disk('public')->put($path, $videoBinary);
+
+        return $this->forceHttpsUrl(url(Storage::disk('public')->url($path)));
+    }
+
     private function normalizeInstagramDimensions(\GdImage $source): \GdImage
     {
         $srcW = imagesx($source);
