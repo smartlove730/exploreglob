@@ -96,11 +96,28 @@ class MetaVideoService
             'access_token' => $pageAccessToken,
         ]);
 
+        if (!$response->ok() && $this->isUnknownFieldError($response->body(), 'error_message')) {
+            $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/{$creationId}", [
+                'fields' => 'status_code,status',
+                'access_token' => $pageAccessToken,
+            ]);
+        }
+
         if (!$response->ok()) {
             throw new RuntimeException('Unable to check Instagram video status: '.$response->body());
         }
 
         return $response->json();
+    }
+
+    private function isUnknownFieldError(string $body, string $field): bool
+    {
+        if ($body === '' || $field === '') {
+            return false;
+        }
+
+        return str_contains($body, 'Tried accessing nonexisting field')
+            && str_contains($body, "({$field})");
     }
 
     private function assertPublicHttpsVideoUrl(string $videoUrl): void
