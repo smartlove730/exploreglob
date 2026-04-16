@@ -115,6 +115,7 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])->get('
 
 Route::middleware(['auth'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('oauth.facebook.callback');
 Route::middleware(['auth'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('oauth.google.callback');
+Route::middleware(['auth', 'role:customer,admin'])->get('/auth/google/drive/callback', [GoogleController::class, 'callback'])->name('admin.google-drive.callback');
 
 
 Route::middleware(['auth', 'role:customer,admin'])

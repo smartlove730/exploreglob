@@ -10,11 +10,14 @@
 
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-        <h2 class="h5">Google Drive Folder Media</h2>
+        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <h2 class="h5 mb-0">Google Drive Folder Media</h2>
+            <a href="{{ route('admin.google.connect') }}" class="btn btn-sm btn-outline-primary">Connect Google OAuth</a>
+        </div>
         <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images/videos, preview them, then post one or many with generated captions.</p>
         @if(!$googleAccount)
             <div class="alert alert-warning">
-                Google Business is not connected. <a href="{{ route('admin.google.settings') }}">Connect Google account</a> to enable Google Business posting.
+                Google OAuth is not connected. <a href="{{ route('admin.google.connect') }}">Connect now</a> to fetch Drive media and enable Google Business posting.
             </div>
         @endif
 

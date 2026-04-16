@@ -72,6 +72,10 @@ class GoogleService
         }
 
         if (function_exists('route')) {
+            if (\Illuminate\Support\Facades\Route::has('admin.google-drive.callback')) {
+                return route('admin.google-drive.callback');
+            }
+
             return route('oauth.google.callback');
         }
 
