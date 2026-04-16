@@ -62,7 +62,9 @@ class MetaVideoService
             }
 
             if (in_array($lastStatus, ['ERROR', 'EXPIRED'], true)) {
-                throw new RuntimeException("Instagram video processing failed with status: {$lastStatus}");
+                $errorMessage = trim((string) ($status['error_message'] ?? data_get($status, 'status')));
+                $suffix = $errorMessage !== '' ? " ({$errorMessage})" : '';
+                throw new RuntimeException("Instagram video processing failed with status: {$lastStatus}{$suffix}");
             }
 
             sleep(max(2, $pollDelaySeconds));
@@ -90,7 +92,7 @@ class MetaVideoService
     public function checkInstagramStatus(string $creationId, string $pageAccessToken): array
     {
         $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/{$creationId}", [
-            'fields' => 'status_code',
+            'fields' => 'status_code,status,error_message',
             'access_token' => $pageAccessToken,
         ]);
 
