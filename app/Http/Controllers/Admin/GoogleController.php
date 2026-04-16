@@ -11,6 +11,7 @@ use App\Services\GoogleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class GoogleController extends Controller
 {
@@ -83,25 +84,48 @@ class GoogleController extends Controller
             $oauthDisplayName = (string) ($oauthUserInfo['name'] ?? '');
             $fallbackName = $oauthEmail !== '' ? $oauthEmail : ('Google OAuth '.Auth::id());
             $driveKeyName = $oauthDisplayName !== '' ? "{$oauthDisplayName} ({$fallbackName})" : $fallbackName;
+            $supportsDriveOauthColumns = Schema::hasColumns('drive_api_keys', [
+                'oauth_access_token',
+                'oauth_refresh_token',
+                'oauth_expires_at',
+            ]);
 
-            DriveApiKey::updateOrCreate(
-                ['user_id' => Auth::id(), 'email' => $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email],
-                [
-                    'user_id' => Auth::id(),
-                    'name' => $driveKeyName,
-                    'email' => $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email,
-                    'description' => 'Connected via Google OAuth',
-                    'is_active' => true,
+            $driveApiKeyUpdateData = [
+                'user_id' => Auth::id(),
+                'name' => $driveKeyName,
+                'email' => $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email,
+                'description' => 'Connected via Google OAuth',
+                'is_active' => true,
+            ];
+
+            if ($supportsDriveOauthColumns) {
+                $driveApiKeyUpdateData = array_merge($driveApiKeyUpdateData, [
                     'oauth_access_token' => $accessToken,
                     'oauth_refresh_token' => $refreshToken ?: DriveApiKey::query()
                         ->where('user_id', Auth::id())
                         ->where('email', $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email)
                         ->value('oauth_refresh_token'),
                     'oauth_expires_at' => now()->addSeconds((int) ($tokenData['expires_in'] ?? 3600)),
-                    'oauth_token_last_refreshed_at' => now(),
-                    'oauth_reauthorization_required' => false,
-                    'oauth_reauthorization_reason' => null,
-                ]
+                ]);
+
+                if (Schema::hasColumn('drive_api_keys', 'oauth_token_last_refreshed_at')) {
+                    $driveApiKeyUpdateData['oauth_token_last_refreshed_at'] = now();
+                }
+
+                if (Schema::hasColumn('drive_api_keys', 'oauth_reauthorization_required')) {
+                    $driveApiKeyUpdateData['oauth_reauthorization_required'] = false;
+                }
+
+                if (Schema::hasColumn('drive_api_keys', 'oauth_reauthorization_reason')) {
+                    $driveApiKeyUpdateData['oauth_reauthorization_reason'] = null;
+                }
+            } else {
+                $driveApiKeyUpdateData['description'] = 'Connected via Google OAuth. Please run latest migrations to persist Drive OAuth tokens.';
+            }
+
+            DriveApiKey::updateOrCreate(
+                ['user_id' => Auth::id(), 'email' => $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email],
+                $driveApiKeyUpdateData
             );
 
             $count = $this->googleService->syncLocations($account);

@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PostController extends Controller
@@ -971,6 +972,14 @@ class PostController extends Controller
 
     private function resolvePreferredDriveApiKeyId(): int
     {
+        if (!$this->supportsDriveOauthColumns()) {
+            return (int) DriveApiKey::query()
+                ->ownedBy(Auth::user())
+                ->where('is_active', true)
+                ->orderByDesc('updated_at')
+                ->value('id');
+        }
+
         $oauthDriveKeyId = (int) DriveApiKey::query()
             ->ownedBy(Auth::user())
             ->where('is_active', true)
@@ -991,5 +1000,13 @@ class PostController extends Controller
             ->where('is_active', true)
             ->orderByDesc('updated_at')
             ->value('id');
+    }
+
+    private function supportsDriveOauthColumns(): bool
+    {
+        return Schema::hasColumns('drive_api_keys', [
+            'oauth_access_token',
+            'oauth_refresh_token',
+        ]);
     }
 }
