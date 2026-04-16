@@ -39,7 +39,8 @@ class MetaVideoService
         $igUserId = $this->instagramService->ensureInstagramBusinessAccountId($page);
 
         $createResponse = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$igUserId}/media", [
-            'media_type' => 'VIDEO',
+            // Meta deprecated VIDEO for Instagram feed publishing; REELS is now required.
+            'media_type' => 'REELS',
             'video_url' => $videoUrl,
             'caption' => $caption,
             'access_token' => $page->page_access_token,
