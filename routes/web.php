@@ -103,7 +103,6 @@ use App\Http\Controllers\Admin\FacebookSettingsController;
 use App\Http\Controllers\Admin\FacebookPostController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\FacebookAppController;
-use App\Http\Controllers\Admin\DriveApiKeyController;
 use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\GoogleController;
 use App\Http\Controllers\Admin\AutomationConfigController;
@@ -116,7 +115,6 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])->get('
 
 Route::middleware(['auth'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('oauth.facebook.callback');
 Route::middleware(['auth'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('oauth.google.callback');
-Route::middleware(['auth', 'role:customer,admin'])->get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
 
 
 Route::middleware(['auth', 'role:customer,admin'])
@@ -129,7 +127,6 @@ Route::middleware(['auth', 'role:customer,admin'])
         Route::post('pages/{page}/activate', [FacebookSettingsController::class, 'activatePage'])->name('pages.activate');
 
         Route::resource('apps', FacebookAppController::class)->except(['show']);
-        Route::resource('google-drive-keys', DriveApiKeyController::class)->except(['show']);
         Route::resource('drive-folders', DriveFolderController::class)->except(['show']);
 
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');

@@ -11,16 +11,6 @@
 </div>
 
 <div class="mb-3">
-    <label class="form-label">Default Drive API Key (optional)</label>
-    <select class="form-select" name="drive_api_key_id">
-        <option value="">Select key</option>
-        @foreach($driveApiKeys as $driveApiKey)
-            <option value="{{ $driveApiKey->id }}" {{ (int) old('drive_api_key_id', $isEdit ? $driveFolder->drive_api_key_id : 0) === $driveApiKey->id ? 'selected' : '' }}>{{ $driveApiKey->name }}</option>
-        @endforeach
-    </select>
-</div>
-
-<div class="mb-3">
     <label class="form-label">Description</label>
     <textarea name="description" rows="3" class="form-control">{{ old('description', $isEdit ? $driveFolder->description : '') }}</textarea>
 </div>

@@ -18,7 +18,6 @@
     $facebookSettingsUrl = Route::has('admin.facebook.settings') ? route('admin.facebook.settings') : url('/admin/facebook/settings');
     $facebookPostsUrl = Route::has('admin.posts.index') ? route('admin.posts.index') : url('/admin/posts');
     $facebookAppsUrl = Route::has('admin.facebook.apps.index') ? route('admin.facebook.apps.index') : url('/admin/facebook/apps');
-    $googleDriveKeysUrl = Route::has('admin.facebook.google-drive-keys.index') ? route('admin.facebook.google-drive-keys.index') : url('/admin/facebook/google-drive-keys');
     $googleDriveFoldersUrl = Route::has('admin.facebook.drive-folders.index') ? route('admin.facebook.drive-folders.index') : url('/admin/facebook/drive-folders');
     $googleSettingsUrl = Route::has('admin.google.settings') ? route('admin.google.settings') : url('/admin/google/settings');
 @endphp
@@ -46,7 +45,6 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}">Categories</a></li>
                 @endif
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.apps.*') ? 'active' : '' }}" href="{{ $facebookAppsUrl }}">Facebook Apps</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.google-drive-keys.*') ? 'active' : '' }}" href="{{ $googleDriveKeysUrl }}">Google Drive Keys</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.drive-folders.*') ? 'active' : '' }}" href="{{ $googleDriveFoldersUrl }}">Google Drive Folders</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.settings') ? 'active' : '' }}" href="{{ $facebookSettingsUrl }}">Facebook Settings</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.google.*') ? 'active' : '' }}" href="{{ $googleSettingsUrl }}">Google Business</a></li>

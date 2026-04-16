@@ -12,12 +12,6 @@
     <div class="card-body">
         <h2 class="h5">Google Drive Folder Media</h2>
         <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images/videos, preview them, then post one or many with generated captions.</p>
-        @if($driveApiKeys->isEmpty())
-            <div class="alert alert-warning">
-                No connected Google Drive account found. <a href="{{ route('admin.google.connect') }}">Connect via OAuth</a> (recommended) or <a href="{{ route('admin.facebook.google-drive-keys.create') }}">add manually</a>.
-            </div>
-        @endif
-
         @if(!$googleAccount)
             <div class="alert alert-warning">
                 Google Business is not connected. <a href="{{ route('admin.google.settings') }}">Connect Google account</a> to enable Google Business posting.
@@ -26,7 +20,7 @@
 
         <form id="driveFilterForm" class="row g-3">
             @csrf
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label">Facebook App</label>
                 <select name="app_id" id="drive_app_id" class="form-select" required>
                     <option value="">Select an app</option>
@@ -35,7 +29,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label">Facebook Pages (Active)</label>
                 <select name="page_ids[]" id="drive_page_ids" class="form-select" multiple required>
                     @foreach($pages as $page)
@@ -44,20 +38,11 @@
                 </select>
                 <small class="text-muted">Use Ctrl/Cmd to select multiple pages.</small>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Google Drive Account</label>
-                <select name="drive_api_key_id" id="drive_api_key_id" class="form-select" required>
-                    <option value="">Select Google account</option>
-                    @foreach($driveApiKeys as $driveApiKey)
-                        <option value="{{ $driveApiKey->id }}" {{ $selectedDriveApiKeyId === $driveApiKey->id ? 'selected' : '' }}>{{ $driveApiKey->name }}{{ $driveApiKey->email ? ' ('.$driveApiKey->email.')' : '' }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label">Google Drive Folder URL</label>
                 <div class="input-group">
                     <input type="url" name="folder_url" id="drive_folder_url" class="form-control" placeholder="https://drive.google.com/drive/folders/..." required>
-                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ $driveApiKeys->isEmpty() ? 'disabled' : '' }}>Fetch Media</button>
+                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ !$googleAccount ? 'disabled' : '' }}>Fetch Media</button>
                 </div>
             </div>
             <div class="col-12">
@@ -69,7 +54,6 @@
                             <option
                                 value="{{ $driveFolder->id }}"
                                 data-folder-url="{{ $driveFolder->folder_url }}"
-                                data-drive-key-id="{{ $driveFolder->drive_api_key_id }}"
                             >{{ $driveFolder->name }}</option>
                         @endforeach
                     </select>
@@ -272,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const appIdInput = document.getElementById('drive_app_id');
     const pageIdsInput = document.getElementById('drive_page_ids');
-    const driveApiKeyInput = document.getElementById('drive_api_key_id');
     const folderUrlInput = document.getElementById('drive_folder_url');
     const savedFolderInput = document.getElementById('saved_drive_folder_id');
     const getSelectedPageIds = () => [...(pageIdsInput?.selectedOptions || [])]
@@ -379,11 +362,10 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchBtn?.addEventListener('click', async () => {
         const appId = appIdInput.value;
         const pageIds = getSelectedPageIds();
-        const driveApiKeyId = driveApiKeyInput.value;
         const folderUrl = folderUrlInput.value.trim();
 
-        if (!appId || !pageIds.length || !driveApiKeyId || !folderUrl) {
-            setStatus('App, at least one page, Google account, and folder URL are required.', 'danger');
+        if (!appId || !pageIds.length || !folderUrl) {
+            setStatus('App, at least one page, and folder URL are required.', 'danger');
             return;
         }
 
@@ -398,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ app_id: appId, page_ids: pageIds, drive_api_key_id: driveApiKeyId, folder_url: folderUrl }),
+                body: JSON.stringify({ app_id: appId, page_ids: pageIds, folder_url: folderUrl }),
             });
 
             const result = await response.json();
@@ -430,9 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
             folderUrlInput.value = selected.dataset.folderUrl;
         }
 
-        if (selected.dataset.driveKeyId) {
-            driveApiKeyInput.value = selected.dataset.driveKeyId;
-        }
     });
 
     gridNode?.addEventListener('change', (event) => {
@@ -520,7 +499,6 @@ document.addEventListener('DOMContentLoaded', () => {
             page_ids: pageIds,
             folder_id: state.folderId,
             caption,
-            drive_api_key_id: driveApiKeyInput.value,
             post_mode: postMode,
             platforms,
             images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url, resource_key: img.resource_key || '', mime_type: img.mime_type || '' })),

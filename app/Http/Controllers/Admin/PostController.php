@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\PublishPostJob;
-use App\Models\DriveApiKey;
 use App\Models\DriveFolder;
 use App\Models\DriveImagePost;
 use App\Models\FacebookApp;
@@ -24,7 +23,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PostController extends Controller
@@ -63,10 +61,7 @@ class PostController extends Controller
             ->orderBy('page_name')
             ->get();
 
-        $selectedDriveApiKeyId = (int) old(
-            'drive_api_key_id',
-            $request->integer('drive_api_key_id', $this->resolvePreferredDriveApiKeyId())
-        );
+        $googleAccount = GoogleAccount::query()->where('user_id', Auth::id())->first();
 
         return view('admin.facebook.create-post', [
             'apps' => $apps,
@@ -77,10 +72,8 @@ class PostController extends Controller
                 ->filter()
                 ->values()
                 ->all(),
-            'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
-            'selectedDriveApiKeyId' => $selectedDriveApiKeyId,
-            'driveFolders' => DriveFolder::query()->ownedBy(Auth::user())->with('driveApiKey')->where('is_active', true)->orderBy('name')->get(),
-            'googleAccount' => GoogleAccount::query()->where('user_id', Auth::id())->first(),
+            'driveFolders' => DriveFolder::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'googleAccount' => $googleAccount,
             'googleLocations' => GoogleLocation::query()->where('user_id', Auth::id())->orderByDesc('is_default')->orderBy('name')->get(),
             'defaultGoogleLocationId' => old('google_location_id', optional(GoogleLocation::query()->where('user_id', Auth::id())->where('is_default', true)->first())->id),
         ]);
@@ -279,7 +272,6 @@ class PostController extends Controller
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
             'page_ids' => 'required_without:page_id|array|min:1',
             'page_ids.*' => 'required|integer|exists:facebook_pages,id',
-            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
         ]);
 
         if (empty($data['folder_url']) && empty($data['folder_id'])) {
@@ -297,15 +289,11 @@ class PostController extends Controller
             ], 422);
         }
 
-        $driveApiKey = DriveApiKey::query()->ownedBy(Auth::user())
-            ->whereKey((int) $data['drive_api_key_id'])
-            ->where('is_active', true)
-            ->first();
-
-        if (!$driveApiKey) {
+        $googleAccount = GoogleAccount::query()->where('user_id', Auth::id())->first();
+        if (!$googleAccount) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected Google Drive key is invalid or inactive.',
+                'message' => 'Google account is not connected. Please connect via OAuth first.',
             ], 422);
         }
 
@@ -325,15 +313,12 @@ class PostController extends Controller
         $folderId = $this->googleDriveService->extractFolderId($folderUrl);
         $folderResourceKey = $this->googleDriveService->extractFolderResourceKey($folderUrl);
 
-        $driveToken = null;
-        if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
-            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
-            $driveToken = $driveApiKey->oauth_access_token;
-        }
+        $googleAccount = $this->googleService->ensureValidGoogleAccountToken($googleAccount);
+        $driveToken = $googleAccount->access_token;
 
         $mediaItems = $this->googleDriveService->listPublicFolderMedia(
             $folderId,
-            $driveApiKey->api_key,
+            null,
             $driveToken,
             $folderResourceKey
         )->all();
@@ -377,7 +362,6 @@ class PostController extends Controller
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
             'page_ids' => 'required_without:page_id|array|min:1',
             'page_ids.*' => 'required|integer|exists:facebook_pages,id',
-            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'folder_id' => 'nullable|string|max:255',
             'caption' => 'required|string|max:60000',
             'post_mode' => 'nullable|string|in:separate,combined',
@@ -401,15 +385,11 @@ class PostController extends Controller
 
         $platforms = collect($data['platforms'])->unique()->values()->all();
         $postMode = (string) ($data['post_mode'] ?? 'separate');
-        $driveApiKey = DriveApiKey::query()->ownedBy(Auth::user())
-            ->whereKey((int) $data['drive_api_key_id'])
-            ->where('is_active', true)
-            ->first();
-
-        if (!$driveApiKey) {
+        $googleAccount = GoogleAccount::query()->where('user_id', Auth::id())->first();
+        if (!$googleAccount) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected Google Drive key is invalid or inactive.',
+                'message' => 'Google account is not connected. Please connect via OAuth first.',
             ], 422);
         }
 
@@ -422,7 +402,7 @@ class PostController extends Controller
                     (string) $imageData['url'],
                     (string) ($imageData['resource_key'] ?? ''),
                     (string) ($imageData['mime_type'] ?? ''),
-                    $driveApiKey
+                    $googleAccount
                 );
             } catch (\Throwable $exception) {
                 Log::error('Drive image preparation failed', [
@@ -689,27 +669,19 @@ class PostController extends Controller
         $data = $request->validate([
             'source_url' => 'nullable|url|max:4096',
             'file_id' => 'required|string|max:255',
-            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
             'resource_key' => 'nullable|string|max:255',
         ]);
 
-        $driveApiKey = DriveApiKey::query()->ownedBy(Auth::user())
-            ->whereKey((int) $data['drive_api_key_id'])
-            ->where('is_active', true)
-            ->firstOrFail();
-
-        $driveToken = null;
-        if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
-            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
-            $driveToken = $driveApiKey->oauth_access_token;
-        }
+        $googleAccount = GoogleAccount::query()->where('user_id', Auth::id())->firstOrFail();
+        $googleAccount = $this->googleService->ensureValidGoogleAccountToken($googleAccount);
+        $driveToken = $googleAccount->access_token;
 
         $binary = $this->downloadDriveBinaryFromUrl((string) ($data['source_url'] ?? ''));
 
         if (!$binary) {
             $binary = $this->googleDriveService->fetchImageBinary(
                 (string) $data['file_id'],
-                (string) $driveApiKey->api_key,
+                null,
                 (string) ($data['resource_key'] ?? ''),
                 $driveToken
             );
@@ -897,16 +869,13 @@ class PostController extends Controller
         ];
     }
 
-    private function storeDriveFileLocally(string $fileId, string $sourceUrl, string $resourceKey, string $mimeType, DriveApiKey $driveApiKey): array
+    private function storeDriveFileLocally(string $fileId, string $sourceUrl, string $resourceKey, string $mimeType, GoogleAccount $googleAccount): array
     {
-        $driveToken = null;
-        if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
-            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
-            $driveToken = $driveApiKey->oauth_access_token;
-        }
+        $googleAccount = $this->googleService->ensureValidGoogleAccountToken($googleAccount);
+        $driveToken = $googleAccount->access_token;
 
         $binary = $this->downloadDriveBinaryFromUrl($sourceUrl, $mimeType)
-            ?: $this->googleDriveService->fetchFileBinary($fileId, $driveApiKey->api_key, $resourceKey, $driveToken);
+            ?: $this->googleDriveService->fetchFileBinary($fileId, null, $resourceKey, $driveToken);
         $contentType = strtolower((string) ($binary['content_type'] ?? $mimeType ?: 'image/jpeg'));
         $mediaType = str_starts_with($contentType, 'video/') ? FacebookPost::MEDIA_TYPE_VIDEO : FacebookPost::MEDIA_TYPE_IMAGE;
         $extension = match ($contentType) {
@@ -970,43 +939,4 @@ class PostController extends Controller
         }
     }
 
-    private function resolvePreferredDriveApiKeyId(): int
-    {
-        if (!$this->supportsDriveOauthColumns()) {
-            return (int) DriveApiKey::query()
-                ->ownedBy(Auth::user())
-                ->where('is_active', true)
-                ->orderByDesc('updated_at')
-                ->value('id');
-        }
-
-        $oauthDriveKeyId = (int) DriveApiKey::query()
-            ->ownedBy(Auth::user())
-            ->where('is_active', true)
-            ->where(function ($query) {
-                $query
-                    ->whereNotNull('oauth_access_token')
-                    ->orWhereNotNull('oauth_refresh_token');
-            })
-            ->orderByDesc('updated_at')
-            ->value('id');
-
-        if ($oauthDriveKeyId > 0) {
-            return $oauthDriveKeyId;
-        }
-
-        return (int) DriveApiKey::query()
-            ->ownedBy(Auth::user())
-            ->where('is_active', true)
-            ->orderByDesc('updated_at')
-            ->value('id');
-    }
-
-    private function supportsDriveOauthColumns(): bool
-    {
-        return Schema::hasColumns('drive_api_keys', [
-            'oauth_access_token',
-            'oauth_refresh_token',
-        ]);
-    }
 }
