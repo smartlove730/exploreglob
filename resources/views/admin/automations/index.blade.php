@@ -40,7 +40,11 @@
                 @forelse($configs as $config)
                     <tr>
                         <td>{{ $config->name ?: 'Automation #'.$config->id }}</td>
-                        <td><div>{{ $config->app?->name ?? '-' }}</div><small class="text-muted">{{ $config->page?->page_name ?? '-' }}</small></td>
+                        <td>
+                            <div>{{ $config->app?->name ?? '-' }}</div>
+                            <small class="text-muted d-block">{{ $config->page?->page_name ?? '-' }}</small>
+                            <small class="text-muted d-block">{{ $config->instagram_display_name }}</small>
+                        </td>
                         <td>{{ $config->driveApiKey?->name ?? '-' }}</td>
                         <td class="text-capitalize">{{ $config->platforms }}</td>
                         <td>{{ $config->runs_per_day }}</td>

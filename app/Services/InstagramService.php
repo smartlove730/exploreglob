@@ -40,6 +40,20 @@ class InstagramService
         return $instagramBusinessAccountId;
     }
 
+    public function fetchInstagramUsername(string $igUserId, string $pageAccessToken): ?string
+    {
+        $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/{$igUserId}", [
+            'fields' => 'username',
+            'access_token' => $pageAccessToken,
+        ]);
+
+        if (!$response->ok()) {
+            throw new RuntimeException('Unable to fetch Instagram username: '.$response->body());
+        }
+
+        return data_get($response->json(), 'username');
+    }
+
     public function createMediaContainer(string $igUserId, string $pageAccessToken, string $imageUrl, string $caption, bool $isCarouselItem = false): string
     {
         $payload = [

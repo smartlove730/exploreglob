@@ -13,11 +13,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use App\Services\PlanEnforcementService;
+use App\Services\InstagramService;
+use RuntimeException;
 
 class AutomationConfigController extends Controller
 {
-    public function __construct(private readonly PlanEnforcementService $planEnforcementService)
+    public function __construct(
+        private readonly PlanEnforcementService $planEnforcementService,
+        private readonly InstagramService $instagramService
+    )
     {
     }
 
@@ -28,6 +34,36 @@ class AutomationConfigController extends Controller
             ->with(['app', 'page', 'driveApiKey'])
             ->latest()
             ->paginate(20);
+
+        $instagramUsernamesByPageId = [];
+        foreach ($configs as $config) {
+            $page = $config->page;
+            if (!$page || isset($instagramUsernamesByPageId[$page->id])) {
+                continue;
+            }
+
+            if (!$page->instagram_business_account_id) {
+                $instagramUsernamesByPageId[$page->id] = null;
+                continue;
+            }
+
+            try {
+                $instagramUsernamesByPageId[$page->id] = $this->instagramService->fetchInstagramUsername(
+                    $page->instagram_business_account_id,
+                    $page->page_access_token
+                );
+            } catch (RuntimeException) {
+                $instagramUsernamesByPageId[$page->id] = null;
+            }
+        }
+
+        $configs->getCollection()->transform(function (AutomationConfig $config) use ($instagramUsernamesByPageId) {
+            $pageId = $config->page?->id;
+            $username = $pageId ? ($instagramUsernamesByPageId[$pageId] ?? null) : null;
+            $config->setAttribute('instagram_display_name', $username ? '@'.Str::ltrim($username, '@') : 'Instagram not connected');
+
+            return $config;
+        });
 
         $queueStats = [
             'pending_jobs' => DB::table('jobs')->count(),
