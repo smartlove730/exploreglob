@@ -65,9 +65,9 @@ class GoogleDriveService
     {
         $apiKey = $apiKey ?: config('services.google_drive.api_key');
 
-        if (!$apiKey) {
+        if (!$accessToken && !$apiKey) {
             throw ValidationException::withMessages([
-                'folder_url' => 'Google Drive API key is not configured.',
+                'folder_url' => 'Google Drive access is not configured. Connect Google via OAuth or add an API key.',
             ]);
         }
 

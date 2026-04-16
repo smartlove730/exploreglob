@@ -1,10 +1,10 @@
 @extends('admin.layout')
 
-@section('title', 'Google Drive Keys')
+@section('title', 'Google Drive Accounts')
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Google Drive Keys</h1>
+    <h1 class="h3 mb-0">Google Drive Accounts</h1>
     <div class="d-flex gap-2">
         <a href="{{ route('admin.google.connect') }}" class="btn btn-primary">Connect via OAuth</a>
         <a href="{{ route('admin.facebook.google-drive-keys.create') }}" class="btn btn-outline-secondary">Add Manually</a>

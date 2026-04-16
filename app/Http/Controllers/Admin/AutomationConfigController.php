@@ -56,6 +56,7 @@ class AutomationConfigController extends Controller
             'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
             'pages' => $this->pagesForUser(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $this->resolvePreferredDriveApiKeyId()),
         ]);
     }
 
@@ -106,6 +107,7 @@ class AutomationConfigController extends Controller
             'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
             'pages' => $this->pagesForUser(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $automation->drive_api_key_id),
         ]);
     }
 
@@ -292,5 +294,29 @@ class AutomationConfigController extends Controller
         }
 
         return $usernamesByPageId;
+    }
+
+    private function resolvePreferredDriveApiKeyId(): int
+    {
+        $oauthDriveKeyId = (int) DriveApiKey::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query
+                    ->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->orderByDesc('updated_at')
+            ->value('id');
+
+        if ($oauthDriveKeyId > 0) {
+            return $oauthDriveKeyId;
+        }
+
+        return (int) DriveApiKey::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->orderByDesc('updated_at')
+            ->value('id');
     }
 }

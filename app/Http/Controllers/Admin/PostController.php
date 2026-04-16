@@ -62,6 +62,11 @@ class PostController extends Controller
             ->orderBy('page_name')
             ->get();
 
+        $selectedDriveApiKeyId = (int) old(
+            'drive_api_key_id',
+            $request->integer('drive_api_key_id', $this->resolvePreferredDriveApiKeyId())
+        );
+
         return view('admin.facebook.create-post', [
             'apps' => $apps,
             'selectedAppId' => $selectedAppId,
@@ -72,7 +77,7 @@ class PostController extends Controller
                 ->values()
                 ->all(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
-            'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $request->integer('drive_api_key_id')),
+            'selectedDriveApiKeyId' => $selectedDriveApiKeyId,
             'driveFolders' => DriveFolder::query()->ownedBy(Auth::user())->with('driveApiKey')->where('is_active', true)->orderBy('name')->get(),
             'googleAccount' => GoogleAccount::query()->where('user_id', Auth::id())->first(),
             'googleLocations' => GoogleLocation::query()->where('user_id', Auth::id())->orderByDesc('is_default')->orderBy('name')->get(),
@@ -962,5 +967,29 @@ class PostController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function resolvePreferredDriveApiKeyId(): int
+    {
+        $oauthDriveKeyId = (int) DriveApiKey::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query
+                    ->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->orderByDesc('updated_at')
+            ->value('id');
+
+        if ($oauthDriveKeyId > 0) {
+            return $oauthDriveKeyId;
+        }
+
+        return (int) DriveApiKey::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->orderByDesc('updated_at')
+            ->value('id');
     }
 }

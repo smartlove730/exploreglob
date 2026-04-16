@@ -14,7 +14,7 @@
         <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images/videos, preview them, then post one or many with generated captions.</p>
         @if($driveApiKeys->isEmpty())
             <div class="alert alert-warning">
-                No active Google Drive key found. <a href="{{ route('admin.facebook.google-drive-keys.create') }}">Add a Drive key</a> first.
+                No connected Google Drive account found. <a href="{{ route('admin.google.connect') }}">Connect via OAuth</a> (recommended) or <a href="{{ route('admin.facebook.google-drive-keys.create') }}">add manually</a>.
             </div>
         @endif
 
@@ -45,9 +45,9 @@
                 <small class="text-muted">Use Ctrl/Cmd to select multiple pages.</small>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Google Drive Key</label>
+                <label class="form-label">Google Drive Account</label>
                 <select name="drive_api_key_id" id="drive_api_key_id" class="form-select" required>
-                    <option value="">Select Drive key</option>
+                    <option value="">Select Google account</option>
                     @foreach($driveApiKeys as $driveApiKey)
                         <option value="{{ $driveApiKey->id }}" {{ $selectedDriveApiKeyId === $driveApiKey->id ? 'selected' : '' }}>{{ $driveApiKey->name }}{{ $driveApiKey->email ? ' ('.$driveApiKey->email.')' : '' }}</option>
                     @endforeach
@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const folderUrl = folderUrlInput.value.trim();
 
         if (!appId || !pageIds.length || !driveApiKeyId || !folderUrl) {
-            setStatus('App, at least one page, Drive key, and folder URL are required.', 'danger');
+            setStatus('App, at least one page, Google account, and folder URL are required.', 'danger');
             return;
         }
 

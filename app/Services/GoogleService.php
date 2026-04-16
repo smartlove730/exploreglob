@@ -199,6 +199,15 @@ class GoogleService
         return (array) ($payload['accounts'] ?? []);
     }
 
+    public function fetchOauthUserInfo(string $accessToken): array
+    {
+        $response = $this->client->get('https://openidconnect.googleapis.com/v1/userinfo', [
+            'headers' => ['Authorization' => 'Bearer '.$accessToken],
+        ]);
+
+        return json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+    }
+
     public function fetchLocations(string $accessToken, string $accountName): array
     {
         $response = $this->client->get("https://mybusinessbusinessinformation.googleapis.com/v1/{$accountName}/locations", [

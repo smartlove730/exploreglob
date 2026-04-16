@@ -46,9 +46,16 @@ class GoogleController extends Controller
             $tokenData = $this->googleService->exchangeCodeForToken((string) request('code'));
             $accessToken = (string) ($tokenData['access_token'] ?? '');
             $refreshToken = (string) ($tokenData['refresh_token'] ?? '');
+            $oauthUserInfo = [];
 
             if ($accessToken === '') {
                 return redirect()->route($settingsRoute)->with('error', 'Unable to connect Google account.');
+            }
+
+            try {
+                $oauthUserInfo = $this->googleService->fetchOauthUserInfo($accessToken);
+            } catch (\Throwable) {
+                $oauthUserInfo = [];
             }
 
             $accounts = $this->googleService->fetchAccounts($accessToken);
@@ -72,17 +79,23 @@ class GoogleController extends Controller
                 ]
             );
 
+            $oauthEmail = (string) ($oauthUserInfo['email'] ?? Auth::user()?->email ?? '');
+            $oauthDisplayName = (string) ($oauthUserInfo['name'] ?? '');
+            $fallbackName = $oauthEmail !== '' ? $oauthEmail : ('Google OAuth '.Auth::id());
+            $driveKeyName = $oauthDisplayName !== '' ? "{$oauthDisplayName} ({$fallbackName})" : $fallbackName;
+
             DriveApiKey::updateOrCreate(
-                ['user_id' => Auth::id(), 'name' => 'OAuth ('.Auth::user()->email.')'],
+                ['user_id' => Auth::id(), 'email' => $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email],
                 [
                     'user_id' => Auth::id(),
-                    'email' => Auth::user()->email,
+                    'name' => $driveKeyName,
+                    'email' => $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email,
                     'description' => 'Connected via Google OAuth',
                     'is_active' => true,
                     'oauth_access_token' => $accessToken,
                     'oauth_refresh_token' => $refreshToken ?: DriveApiKey::query()
                         ->where('user_id', Auth::id())
-                        ->where('name', 'OAuth ('.Auth::user()->email.')')
+                        ->where('email', $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email)
                         ->value('oauth_refresh_token'),
                     'oauth_expires_at' => now()->addSeconds((int) ($tokenData['expires_in'] ?? 3600)),
                     'oauth_token_last_refreshed_at' => now(),
