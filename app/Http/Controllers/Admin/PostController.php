@@ -279,7 +279,7 @@ class PostController extends Controller
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
             'page_ids' => 'required_without:page_id|array|min:1',
             'page_ids.*' => 'required|integer|exists:facebook_pages,id',
-            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
+            'drive_api_key_id' => 'nullable|integer|exists:drive_api_keys,id',
         ]);
 
         if (empty($data['folder_url']) && empty($data['folder_id'])) {
@@ -297,15 +297,12 @@ class PostController extends Controller
             ], 422);
         }
 
-        $driveApiKey = DriveApiKey::query()->ownedBy(Auth::user())
-            ->whereKey((int) $data['drive_api_key_id'])
-            ->where('is_active', true)
-            ->first();
+        $driveApiKey = $this->resolveDriveApiKeyFromRequest($data);
 
         if (!$driveApiKey) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected Google Drive key is invalid or inactive.',
+                'message' => 'No active Google Drive connection found. Connect OAuth or select an active Drive account.',
             ], 422);
         }
 
@@ -377,7 +374,7 @@ class PostController extends Controller
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
             'page_ids' => 'required_without:page_id|array|min:1',
             'page_ids.*' => 'required|integer|exists:facebook_pages,id',
-            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
+            'drive_api_key_id' => 'nullable|integer|exists:drive_api_keys,id',
             'folder_id' => 'nullable|string|max:255',
             'caption' => 'required|string|max:60000',
             'post_mode' => 'nullable|string|in:separate,combined',
@@ -401,15 +398,12 @@ class PostController extends Controller
 
         $platforms = collect($data['platforms'])->unique()->values()->all();
         $postMode = (string) ($data['post_mode'] ?? 'separate');
-        $driveApiKey = DriveApiKey::query()->ownedBy(Auth::user())
-            ->whereKey((int) $data['drive_api_key_id'])
-            ->where('is_active', true)
-            ->first();
+        $driveApiKey = $this->resolveDriveApiKeyFromRequest($data);
 
         if (!$driveApiKey) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected Google Drive key is invalid or inactive.',
+                'message' => 'No active Google Drive connection found. Connect OAuth or select an active Drive account.',
             ], 422);
         }
 
@@ -1008,5 +1002,27 @@ class PostController extends Controller
             'oauth_access_token',
             'oauth_refresh_token',
         ]);
+    }
+
+    private function resolveDriveApiKeyFromRequest(array $data): ?DriveApiKey
+    {
+        $selectedDriveApiKeyId = (int) ($data['drive_api_key_id'] ?? 0);
+
+        if ($selectedDriveApiKeyId > 0) {
+            return DriveApiKey::query()->ownedBy(Auth::user())
+                ->whereKey($selectedDriveApiKeyId)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        $preferredDriveApiKeyId = $this->resolvePreferredDriveApiKeyId();
+        if ($preferredDriveApiKeyId <= 0) {
+            return null;
+        }
+
+        return DriveApiKey::query()->ownedBy(Auth::user())
+            ->whereKey($preferredDriveApiKeyId)
+            ->where('is_active', true)
+            ->first();
     }
 }

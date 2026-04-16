@@ -33,7 +33,7 @@
                             <td>{{ $key->email ?: '-' }}</td>
                             <td><small>{{ $key->description ?: '-' }}</small></td>
                             <td><small>{{ $key->oauth_refresh_token ? 'OAuth' : 'Manual API Key' }}</small></td>
-                            <td><small>{{ $key->redirect_url ?: config('services.google.redirect_uri') ?: route('admin.google.callback') }}</small></td>
+                            <td><small>{{ $key->redirect_url ?: config('services.google.redirect_uri') ?: route('admin.google-drive.callback') }}</small></td>
                             <td>
                                 <span class="badge text-bg-{{ $key->is_active ? 'success' : 'secondary' }}">
                                     {{ $key->is_active ? 'Active' : 'Inactive' }}

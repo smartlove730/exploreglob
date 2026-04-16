@@ -4,12 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DriveApiKey;
+use App\Services\GoogleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class DriveApiKeyController extends Controller
 {
+    public function __construct(private readonly GoogleService $googleService)
+    {
+    }
+
     public function index()
     {
         $keys = $this->scopedQuery()->orderByDesc('created_at')->paginate(20);
@@ -60,11 +67,89 @@ class DriveApiKeyController extends Controller
 
     public function callback(Request $request)
     {
-        return view('admin.google-drive-keys.callback', [
-            'code' => $request->query('code'),
-            'scope' => $request->query('scope'),
-            'error' => $request->query('error'),
-        ]);
+        $oauthError = (string) $request->query('error', '');
+        if ($oauthError !== '') {
+            return redirect()
+                ->route('admin.facebook.google-drive-keys.index')
+                ->with('error', 'Google OAuth failed: '.$oauthError);
+        }
+
+        $code = (string) $request->query('code', '');
+        if ($code === '') {
+            return redirect()
+                ->route('admin.facebook.google-drive-keys.index')
+                ->with('error', 'Missing OAuth authorization code from Google callback.');
+        }
+
+        try {
+            $tokenData = $this->googleService->exchangeCodeForToken($code);
+            $accessToken = (string) ($tokenData['access_token'] ?? '');
+            $refreshToken = (string) ($tokenData['refresh_token'] ?? '');
+
+            if ($accessToken === '') {
+                return redirect()
+                    ->route('admin.facebook.google-drive-keys.index')
+                    ->with('error', 'Google OAuth did not return an access token.');
+            }
+
+            $oauthUserInfo = [];
+            try {
+                $oauthUserInfo = $this->googleService->fetchOauthUserInfo($accessToken);
+            } catch (\Throwable) {
+                $oauthUserInfo = [];
+            }
+
+            $oauthEmail = (string) ($oauthUserInfo['email'] ?? Auth::user()?->email ?? '');
+            $oauthDisplayName = (string) ($oauthUserInfo['name'] ?? '');
+            $fallbackName = $oauthEmail !== '' ? $oauthEmail : ('Google OAuth '.Auth::id());
+            $driveKeyName = $oauthDisplayName !== '' ? "{$oauthDisplayName} ({$fallbackName})" : $fallbackName;
+
+            $driveApiKeyUpdateData = [
+                'user_id' => Auth::id(),
+                'name' => $driveKeyName,
+                'email' => $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email,
+                'description' => 'Connected via Google OAuth',
+                'is_active' => true,
+            ];
+
+            if (Schema::hasColumns('drive_api_keys', ['oauth_access_token', 'oauth_refresh_token', 'oauth_expires_at'])) {
+                $driveApiKeyUpdateData = array_merge($driveApiKeyUpdateData, [
+                    'oauth_access_token' => $accessToken,
+                    'oauth_refresh_token' => $refreshToken ?: DriveApiKey::query()
+                        ->where('user_id', Auth::id())
+                        ->where('email', $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email)
+                        ->value('oauth_refresh_token'),
+                    'oauth_expires_at' => now()->addSeconds((int) ($tokenData['expires_in'] ?? 3600)),
+                ]);
+
+                if (Schema::hasColumn('drive_api_keys', 'oauth_token_last_refreshed_at')) {
+                    $driveApiKeyUpdateData['oauth_token_last_refreshed_at'] = now();
+                }
+
+                if (Schema::hasColumn('drive_api_keys', 'oauth_reauthorization_required')) {
+                    $driveApiKeyUpdateData['oauth_reauthorization_required'] = false;
+                }
+
+                if (Schema::hasColumn('drive_api_keys', 'oauth_reauthorization_reason')) {
+                    $driveApiKeyUpdateData['oauth_reauthorization_reason'] = null;
+                }
+            }
+
+            DriveApiKey::updateOrCreate(
+                ['user_id' => Auth::id(), 'email' => $oauthEmail !== '' ? $oauthEmail : Auth::user()?->email],
+                $driveApiKeyUpdateData
+            );
+
+            return redirect()
+                ->route('admin.posts.create')
+                ->with('success', 'Google Drive OAuth connected. You can now fetch media by pasting a folder link.');
+        } catch (\Throwable $exception) {
+            Log::error('Google Drive OAuth callback failed', ['error' => $exception->getMessage()]);
+
+            return redirect()
+                ->route('admin.facebook.google-drive-keys.index')
+                ->with('error', 'Unable to connect Google Drive OAuth. Please try again.');
+        }
     }
 
     private function scopedQuery()
