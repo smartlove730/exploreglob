@@ -120,6 +120,11 @@ class AutomationService
                 $mediaUrl = $this->driveService->prepareInstagramEligibleImage($unusedMedia, $config->driveApiKey);
             }
 
+            if ($mediaType === 'video' && in_array('instagram', $platforms, true)) {
+                // Re-host Drive videos to a stable public URL before handing off to Instagram processing.
+                $mediaUrl = $this->driveService->prepareInstagramEligibleVideo($unusedMedia, $config->driveApiKey);
+            }
+
             if ($mediaType === 'video' && in_array('google_business', $platforms, true)) {
                 $platforms = array_values(array_filter($platforms, fn (string $platform) => $platform !== 'google_business'));
             }
