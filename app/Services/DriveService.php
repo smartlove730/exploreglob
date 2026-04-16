@@ -98,6 +98,8 @@ class DriveService
         }
 
         $resourceKey = (string) ($video['resource_key'] ?? '');
+        $sourceUrl = (string) ($video['download_url'] ?? $video['preview_url'] ?? '');
+        $sourceMimeType = strtolower((string) ($video['mime_type'] ?? ''));
         $driveToken = null;
 
         if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
@@ -105,14 +107,15 @@ class DriveService
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $binary = $this->googleDriveService->fetchFileBinary(
-            $fileId,
-            $driveApiKey->api_key,
-            $resourceKey,
-            $driveToken
-        );
+        $binary = $this->downloadDriveBinaryFromUrl($sourceUrl, $sourceMimeType)
+            ?: $this->googleDriveService->fetchFileBinary(
+                $fileId,
+                $driveApiKey->api_key,
+                $resourceKey,
+                $driveToken
+            );
 
-        $contentType = strtolower((string) ($binary['content_type'] ?? ''));
+        $contentType = strtolower((string) ($binary['content_type'] ?? $sourceMimeType));
         $normalizedType = trim(strtok($contentType, ';') ?: '');
 
         $extension = match ($normalizedType) {
@@ -130,6 +133,47 @@ class DriveService
         Storage::disk('public')->put($path, $videoBinary);
 
         return $this->forceHttpsUrl(url(Storage::disk('public')->url($path)));
+    }
+
+    private function downloadDriveBinaryFromUrl(string $sourceUrl, string $mimeType = ''): ?array
+    {
+        if ($sourceUrl === '') {
+            return null;
+        }
+
+        $host = parse_url($sourceUrl, PHP_URL_HOST);
+        if (!is_string($host) || (!str_contains($host, 'googleusercontent.com') && !str_contains($host, 'google.com'))) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(45)
+                ->retry(2, 250)
+                ->withOptions(['allow_redirects' => true])
+                ->withHeaders(['Accept' => $mimeType !== '' ? $mimeType : 'image/*,video/*'])
+                ->get($sourceUrl);
+
+            if (!$response->successful()) {
+                return null;
+            }
+
+            $contentType = strtolower((string) $response->header('Content-Type', ''));
+            if (!str_starts_with($contentType, 'image/') && !str_starts_with($contentType, 'video/')) {
+                return null;
+            }
+
+            $content = (string) $response->body();
+            if ($content === '') {
+                return null;
+            }
+
+            return [
+                'content' => $content,
+                'content_type' => (string) $response->header('Content-Type', $mimeType !== '' ? $mimeType : 'application/octet-stream'),
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function normalizeInstagramDimensions(\GdImage $source): \GdImage
