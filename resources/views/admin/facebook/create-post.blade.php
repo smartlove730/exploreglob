@@ -545,23 +545,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(result.message || 'Failed to publish media.');
             }
 
-            const postedIds = new Set((result.data.results || []).filter((row) => row.success).map((row) => row.file_id));
+            const successfulRows = (result.data.results || []).filter((row) => row.success);
+            const skippedRows = (result.data.results || []).filter((row) => row.skipped);
+            const postedIds = new Set(successfulRows.map((row) => row.file_id));
+            const postedPlatformsById = new Map(successfulRows.map((row) => [row.file_id, row.platforms || platforms]));
 
             state.images = state.images.map((image) => {
                 if (!postedIds.has(image.id)) {
                     return image;
                 }
 
+                const newlyPostedPlatforms = postedPlatformsById.get(image.id) || platforms;
                 return {
                     ...image,
                     is_posted: true,
-                    posted_platforms: [...new Set([...(image.posted_platforms || []), ...platforms])],
+                    posted_platforms: [...new Set([...(image.posted_platforms || []), ...newlyPostedPlatforms])],
                 };
             });
 
             state.selectedIds.clear();
             renderGrid();
-            setStatus(result.message || 'Media posted successfully.', 'success');
+            if (skippedRows.length > 0) {
+                setStatus((result.message || 'Posting finished.') + ` ${skippedRows.length} media skipped because already published.`, 'warning');
+            } else {
+                setStatus(result.message || 'Media posted successfully.', 'success');
+            }
             modal.hide();
         } catch (error) {
             setModalStatus(error.message || 'Unexpected error while posting images.', 'danger');

@@ -435,6 +435,12 @@ class PostController extends Controller
         }
 
         $results = [];
+        $requestedMetaPlatforms = collect($platforms)
+            ->filter(fn (string $platform) => in_array($platform, ['facebook', 'instagram'], true))
+            ->values()
+            ->all();
+
+        $existingPublishedPlatforms = $this->resolveExistingDrivePublishedPlatforms($pages->pluck('id')->all(), $preparedMedia);
 
         $containsVideo = collect($preparedMedia)->contains(fn (array $item) => ($item['media_type'] ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO);
         if ($containsVideo && $postMode === 'combined') {
@@ -454,17 +460,43 @@ class PostController extends Controller
         }
 
         if ($postMode === 'combined') {
-            $queueImageUrls = collect($preparedMedia)
-                ->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms))
-                ->all();
-            foreach ($queueImageUrls as $queueImageUrl) {
-                if ($queueImageUrl) {
-                    $this->assertPublicHttpsImageUrl($queueImageUrl);
-                }
-            }
-
             $googleLocationId = $this->resolveGoogleLocationId($data);
             foreach ($pages as $page) {
+                $publishableMedia = [];
+                foreach ($preparedMedia as $imageMeta) {
+                    $alreadyPublishedPlatforms = $this->resolvePreviouslyPublishedPlatformsForFile(
+                        $existingPublishedPlatforms,
+                        (int) $page->id,
+                        (string) $imageMeta['file_id']
+                    );
+
+                    if (!empty(array_intersect($requestedMetaPlatforms, $alreadyPublishedPlatforms))) {
+                        $results[] = [
+                            'page_id' => $page->id,
+                            'file_id' => $imageMeta['file_id'],
+                            'success' => false,
+                            'message' => 'Skipped: media is already published on '.implode(', ', $alreadyPublishedPlatforms).'.',
+                            'skipped' => true,
+                        ];
+                        continue;
+                    }
+
+                    $publishableMedia[] = $imageMeta;
+                }
+
+                if (empty($publishableMedia)) {
+                    continue;
+                }
+
+                $queueImageUrls = collect($publishableMedia)
+                    ->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms))
+                    ->all();
+                foreach ($queueImageUrls as $queueImageUrl) {
+                    if ($queueImageUrl) {
+                        $this->assertPublicHttpsImageUrl($queueImageUrl);
+                    }
+                }
+
                 $post = FacebookPost::create([
                     'user_id' => $page->user_id,
                     'page_id' => $page->id,
@@ -476,7 +508,7 @@ class PostController extends Controller
                     'last_error' => null,
                 ]);
 
-                foreach ($preparedMedia as $imageMeta) {
+                foreach ($publishableMedia as $imageMeta) {
                     $post->images()->create(['user_id' => $page->user_id, 'image_path' => $imageMeta['storage_path']]);
 
                     DriveImagePost::create([
@@ -514,9 +546,27 @@ class PostController extends Controller
 
         foreach ($pages as $page) {
             foreach ($preparedMedia as $imageMeta) {
+                $alreadyPublishedPlatforms = $this->resolvePreviouslyPublishedPlatformsForFile(
+                    $existingPublishedPlatforms,
+                    (int) $page->id,
+                    (string) $imageMeta['file_id']
+                );
+                $platformsToPublish = array_values(array_diff($platforms, $alreadyPublishedPlatforms));
+
+                if (empty($platformsToPublish)) {
+                    $results[] = [
+                        'page_id' => $page->id,
+                        'file_id' => $imageMeta['file_id'],
+                        'success' => false,
+                        'message' => 'Skipped: media is already published on selected platform(s).',
+                        'skipped' => true,
+                    ];
+                    continue;
+                }
+
                 $mediaType = $imageMeta['media_type'] ?? FacebookPost::MEDIA_TYPE_IMAGE;
                 $imageUrl = $mediaType === FacebookPost::MEDIA_TYPE_IMAGE
-                    ? $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms)
+                    ? $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platformsToPublish)
                     : null;
                 $videoUrl = $mediaType === FacebookPost::MEDIA_TYPE_VIDEO ? $imageMeta['public_url'] : null;
                 if ($imageUrl) {
@@ -533,7 +583,7 @@ class PostController extends Controller
                         'image_url' => $imageUrl,
                         'video_path' => $mediaType === FacebookPost::MEDIA_TYPE_VIDEO ? $imageMeta['storage_path'] : null,
                         'video_url' => $videoUrl,
-                        'platforms' => $platforms,
+                        'platforms' => $platformsToPublish,
                         'google_location_id' => $googleLocationId,
                         'status' => FacebookPost::STATUS_PENDING,
                         'last_error' => null,
@@ -550,7 +600,7 @@ class PostController extends Controller
                         'drive_folder_id' => $data['folder_id'] ?? null,
                         'image_url' => $imageMeta['public_url'],
                         'caption' => $data['caption'],
-                        'platforms' => $platforms,
+                        'platforms' => $platformsToPublish,
                         'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
                     ]);
 
@@ -561,6 +611,7 @@ class PostController extends Controller
                         'file_id' => $imageMeta['file_id'],
                         'success' => true,
                         'message' => 'Queued for publishing.',
+                        'platforms' => $platformsToPublish,
                     ];
                 } catch (\Throwable $exception) {
                     Log::error('Drive image queue failed', [
@@ -590,6 +641,41 @@ class PostController extends Controller
                 'results' => $results,
             ],
         ], $successCount > 0 ? 200 : 422);
+    }
+
+    private function resolveExistingDrivePublishedPlatforms(array $pageIds, array $preparedMedia): array
+    {
+        if (empty($pageIds) || empty($preparedMedia)) {
+            return [];
+        }
+
+        return DriveImagePost::query()->ownedBy(Auth::user())
+            ->whereIn('page_id', $pageIds)
+            ->whereIn('drive_file_id', collect($preparedMedia)->pluck('file_id')->all())
+            ->whereNotNull('posted_at')
+            ->get()
+            ->groupBy(fn (DriveImagePost $record) => $record->page_id.':'.$record->drive_file_id)
+            ->map(fn ($records) => $records
+                ->flatMap(fn (DriveImagePost $record) => $record->platforms ?? [])
+                ->filter(fn (string $platform) => in_array($platform, ['facebook', 'instagram'], true))
+                ->unique()
+                ->values()
+                ->all())
+            ->all();
+    }
+
+    private function resolvePreviouslyPublishedPlatformsForFile(array $publishedMap, ?int $pageId, string $fileId): array
+    {
+        if ($pageId) {
+            return $publishedMap[$pageId.':'.$fileId] ?? [];
+        }
+
+        return collect($publishedMap)
+            ->filter(fn (array $platforms, string $key) => str_ends_with($key, ':'.$fileId))
+            ->flatMap(fn (array $platforms) => $platforms)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function proxyDriveImage(Request $request)

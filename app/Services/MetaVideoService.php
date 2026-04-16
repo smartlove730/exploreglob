@@ -39,7 +39,8 @@ class MetaVideoService
         $igUserId = $this->instagramService->ensureInstagramBusinessAccountId($page);
 
         $createResponse = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$igUserId}/media", [
-            'media_type' => 'VIDEO',
+            // Meta deprecated VIDEO for Instagram feed publishing; REELS is now required.
+            'media_type' => 'REELS',
             'video_url' => $videoUrl,
             'caption' => $caption,
             'access_token' => $page->page_access_token,
@@ -61,7 +62,9 @@ class MetaVideoService
             }
 
             if (in_array($lastStatus, ['ERROR', 'EXPIRED'], true)) {
-                throw new RuntimeException("Instagram video processing failed with status: {$lastStatus}");
+                $errorMessage = trim((string) ($status['error_message'] ?? data_get($status, 'status')));
+                $suffix = $errorMessage !== '' ? " ({$errorMessage})" : '';
+                throw new RuntimeException("Instagram video processing failed with status: {$lastStatus}{$suffix}");
             }
 
             sleep(max(2, $pollDelaySeconds));
@@ -89,15 +92,32 @@ class MetaVideoService
     public function checkInstagramStatus(string $creationId, string $pageAccessToken): array
     {
         $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/{$creationId}", [
-            'fields' => 'status_code',
+            'fields' => 'status_code,status,error_message',
             'access_token' => $pageAccessToken,
         ]);
+
+        if (!$response->ok() && $this->isUnknownFieldError($response->body(), 'error_message')) {
+            $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/{$creationId}", [
+                'fields' => 'status_code,status',
+                'access_token' => $pageAccessToken,
+            ]);
+        }
 
         if (!$response->ok()) {
             throw new RuntimeException('Unable to check Instagram video status: '.$response->body());
         }
 
         return $response->json();
+    }
+
+    private function isUnknownFieldError(string $body, string $field): bool
+    {
+        if ($body === '' || $field === '') {
+            return false;
+        }
+
+        return str_contains($body, 'Tried accessing nonexisting field')
+            && str_contains($body, "({$field})");
     }
 
     private function assertPublicHttpsVideoUrl(string $videoUrl): void

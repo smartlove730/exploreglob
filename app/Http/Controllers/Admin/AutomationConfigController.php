@@ -9,14 +9,20 @@ use App\Models\DriveApiKey;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Jobs\RunAutomationJob;
+use App\Services\InstagramService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class AutomationConfigController extends Controller
 {
+    public function __construct(private readonly InstagramService $instagramService)
+    {
+    }
+
     public function index()
     {
         $configs = AutomationConfig::query()
@@ -24,6 +30,8 @@ class AutomationConfigController extends Controller
             ->with(['app', 'page', 'driveApiKey'])
             ->latest()
             ->paginate(20);
+
+        $instagramUsernames = $this->resolveInstagramUsernames($configs->getCollection());
 
         $queueStats = [
             'pending_jobs' => DB::table('jobs')->count(),
@@ -39,7 +47,7 @@ class AutomationConfigController extends Controller
             ->limit(25)
             ->get();
 
-        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs'));
+        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs', 'instagramUsernames'));
     }
 
     public function create()
@@ -256,5 +264,33 @@ class AutomationConfigController extends Controller
             ->exists();
 
         abort_unless($active, 422, 'Selected Google Drive API key is inactive.');
+    }
+
+    private function resolveInstagramUsernames($configs): array
+    {
+        $usernamesByPageId = [];
+        $pages = $configs
+            ->pluck('page')
+            ->filter()
+            ->unique('id');
+
+        foreach ($pages as $page) {
+            if (!$page->instagram_business_account_id) {
+                $usernamesByPageId[$page->id] = null;
+                continue;
+            }
+
+            try {
+                $username = $this->instagramService->fetchInstagramUsername(
+                    (string) $page->instagram_business_account_id,
+                    (string) $page->page_access_token
+                );
+                $usernamesByPageId[$page->id] = $username;
+            } catch (Throwable $exception) {
+                $usernamesByPageId[$page->id] = null;
+            }
+        }
+
+        return $usernamesByPageId;
     }
 }
