@@ -23,6 +23,8 @@ class GoogleController extends Controller
     public function index()
     {
         $account = GoogleAccount::query()->where('user_id', Auth::id())->with('locations')->first();
+        $profiles = [];
+
         if (!$account) {
             try {
                 $this->googleService->syncLocationsForUser((int) Auth::id());
@@ -32,9 +34,29 @@ class GoogleController extends Controller
             }
         }
 
+        try {
+            $profiles = $this->googleService->listBusinessProfilesForUser((int) Auth::id());
+        } catch (\Throwable) {
+            $profiles = [];
+        }
+
+        $connectedGmailAccounts = DriveApiKey::query()
+            ->where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->pluck('email')
+            ->filter()
+            ->unique()
+            ->values();
+
         return view('admin.google-business.settings', [
             'account' => $account,
             'locations' => $account?->locations ?? collect(),
+            'profiles' => $profiles,
+            'connectedGmailAccounts' => $connectedGmailAccounts,
         ]);
     }
 

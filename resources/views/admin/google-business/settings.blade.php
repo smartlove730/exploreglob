@@ -30,6 +30,55 @@
     </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <h2 class="h5 mb-3">Connected Gmail & Business Profiles</h2>
+
+        @if(($connectedGmailAccounts ?? collect())->isEmpty())
+            <p class="text-muted mb-3">No connected Gmail account found with OAuth token for this user.</p>
+        @else
+            <p class="mb-2"><strong>Connected Gmail account(s):</strong></p>
+            <ul class="mb-3">
+                @foreach($connectedGmailAccounts as $gmail)
+                    <li>{{ $gmail }}</li>
+                @endforeach
+            </ul>
+        @endif
+
+        @if(empty($profiles ?? []))
+            <p class="text-muted mb-0">No Google Business profiles found for this user.</p>
+        @else
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Business Profile Name</th>
+                            <th>Account Resource</th>
+                            <th>Type</th>
+                            <th>Locations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($profiles as $profile)
+                        @php
+                            $accountData = (array) ($profile['account'] ?? []);
+                            $profileLocations = collect($profile['locations'] ?? []);
+                            $displayName = $accountData['accountName'] ?? $accountData['name'] ?? 'Unnamed';
+                        @endphp
+                        <tr>
+                            <td>{{ $displayName }}</td>
+                            <td><small>{{ $accountData['name'] ?? '-' }}</small></td>
+                            <td>{{ $accountData['type'] ?? '-' }}</td>
+                            <td>{{ $profileLocations->count() }}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+</div>
+
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <h2 class="h5">Business Locations</h2>
