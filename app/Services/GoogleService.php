@@ -270,6 +270,86 @@ class GoogleService
         return $inserted;
     }
 
+    public function ensureGoogleAccountForUser(int $userId): ?GoogleAccount
+    {
+        $googleAccount = GoogleAccount::query()->where('user_id', $userId)->latest('id')->first();
+        if ($googleAccount) {
+            return $this->ensureValidGoogleAccountToken($googleAccount);
+        }
+
+        $driveApiKey = DriveApiKey::query()
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->latest('id')
+            ->first();
+
+        if (!$driveApiKey) {
+            return null;
+        }
+
+        $driveApiKey = $this->ensureValidDriveToken($driveApiKey);
+        if (!$driveApiKey->oauth_access_token) {
+            return null;
+        }
+
+        $accounts = $this->fetchAccounts($driveApiKey->oauth_access_token);
+        $primaryAccount = (string) Arr::get($accounts, '0.name', '');
+        if ($primaryAccount === '') {
+            return null;
+        }
+
+        return GoogleAccount::updateOrCreate(
+            ['user_id' => $userId, 'google_account_id' => $primaryAccount],
+            [
+                'access_token' => $driveApiKey->oauth_access_token,
+                'refresh_token' => $driveApiKey->oauth_refresh_token,
+                'expires_at' => $driveApiKey->oauth_expires_at ?: now()->addHour(),
+                'token_last_refreshed_at' => now(),
+                'reauthorization_required' => false,
+                'reauthorization_reason' => null,
+            ]
+        );
+    }
+
+    public function syncLocationsForUser(int $userId): int
+    {
+        $googleAccount = $this->ensureGoogleAccountForUser($userId);
+        if (!$googleAccount) {
+            throw new RuntimeException('No Google Business account found for this user. Reconnect Google with business.manage scope.');
+        }
+
+        return $this->syncLocations($googleAccount);
+    }
+
+    public function listBusinessProfilesForUser(int $userId): array
+    {
+        $googleAccount = $this->ensureGoogleAccountForUser($userId);
+        if (!$googleAccount) {
+            return [];
+        }
+
+        $googleAccount = $this->ensureValidGoogleAccountToken($googleAccount);
+        $accounts = $this->fetchAccounts($googleAccount->access_token);
+
+        return collect($accounts)->map(function (array $account) use ($googleAccount) {
+            $accountName = (string) Arr::get($account, 'name', '');
+            $locations = [];
+
+            if ($accountName !== '') {
+                $locations = $this->fetchLocations($googleAccount->access_token, $accountName);
+            }
+
+            return [
+                'account' => $account,
+                'locations' => $locations,
+            ];
+        })->values()->all();
+    }
+
     public function uploadLocationMedia(string $accessToken, string $locationId, string $sourceUrl): string
     {
         $response = $this->client->post("https://mybusiness.googleapis.com/v4/{$locationId}/media", [

@@ -8,6 +8,7 @@ use App\Models\DriveApiKey;
 use App\Models\GoogleAccount;
 use App\Models\GoogleLocation;
 use App\Services\GoogleService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +23,14 @@ class GoogleController extends Controller
     public function index()
     {
         $account = GoogleAccount::query()->where('user_id', Auth::id())->with('locations')->first();
+        if (!$account) {
+            try {
+                $this->googleService->syncLocationsForUser((int) Auth::id());
+                $account = GoogleAccount::query()->where('user_id', Auth::id())->with('locations')->first();
+            } catch (\Throwable) {
+                // Keep page load resilient; settings page can still show connect action.
+            }
+        }
 
         return view('admin.google-business.settings', [
             'account' => $account,
@@ -140,28 +149,48 @@ class GoogleController extends Controller
 
     public function syncLocations(): RedirectResponse
     {
-        $account = GoogleAccount::query()->where('user_id', Auth::id())->first();
-        if (!$account) {
-            return back()->with('error', 'Connect Google Business first.');
-        }
-
         try {
-            if ($account->reauthorization_required) {
+            $account = GoogleAccount::query()->where('user_id', Auth::id())->first();
+            if ($account?->reauthorization_required) {
                 return back()->with('error', 'Google needs to be reconnected before syncing locations.');
             }
 
-            $count = $this->googleService->syncLocations($account);
+            $count = $this->googleService->syncLocationsForUser((int) Auth::id());
 
             return back()->with('success', "Synced {$count} location(s).");
         } catch (ReauthorizationRequiredException $exception) {
-            $account->update([
-                'reauthorization_required' => true,
-                'reauthorization_reason' => $exception->getMessage(),
-            ]);
+            if (isset($account) && $account) {
+                $account->update([
+                    'reauthorization_required' => true,
+                    'reauthorization_reason' => $exception->getMessage(),
+                ]);
+            }
 
             return back()->with('error', $exception->getMessage());
         } catch (\Throwable $exception) {
             return back()->with('error', 'Unable to sync Google locations: '.$exception->getMessage());
+        }
+    }
+
+    public function listProfiles(): JsonResponse
+    {
+        try {
+            $profiles = $this->googleService->listBusinessProfilesForUser((int) Auth::id());
+
+            return response()->json([
+                'success' => !empty($profiles),
+                'data' => [
+                    'profiles' => $profiles,
+                ],
+                'message' => empty($profiles)
+                    ? 'No Google Business profiles found for your user.'
+                    : 'Google Business profiles loaded successfully.',
+            ]);
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to fetch Google Business profiles: '.$exception->getMessage(),
+            ], 422);
         }
     }
 

@@ -141,6 +141,7 @@ Route::middleware(['auth', 'role:customer,admin'])
     ->name('admin.google.')
     ->group(function () {
         Route::get('settings', [GoogleController::class, 'index'])->name('settings');
+        Route::get('profiles', [GoogleController::class, 'listProfiles'])->name('profiles');
         Route::get('connect', [GoogleController::class, 'redirect'])->name('connect');
         Route::post('sync-locations', [GoogleController::class, 'syncLocations'])->name('sync-locations');
         Route::post('locations/{location}/default', [GoogleController::class, 'setDefaultLocation'])->name('locations.default');
