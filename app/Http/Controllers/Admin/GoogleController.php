@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exceptions\ReauthorizationRequiredException;
 use App\Http\Controllers\Controller;
-use App\Models\DriveApiKey;
 use App\Models\GoogleAccount;
 use App\Models\GoogleLocation;
 use App\Services\GoogleService;
@@ -25,38 +24,16 @@ class GoogleController extends Controller
         $account = GoogleAccount::query()->where('user_id', Auth::id())->with('locations')->first();
         $profiles = [];
 
-        if (!$account) {
-            try {
-                $this->googleService->syncLocationsForUser((int) Auth::id());
-                $account = GoogleAccount::query()->where('user_id', Auth::id())->with('locations')->first();
-            } catch (\Throwable) {
-                // Keep page load resilient; settings page can still show connect action.
-            }
-        }
-
         try {
             $profiles = $this->googleService->listBusinessProfilesForUser((int) Auth::id());
         } catch (\Throwable) {
             $profiles = [];
         }
 
-        $connectedGmailAccounts = DriveApiKey::query()
-            ->where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->where(function ($query) {
-                $query->whereNotNull('oauth_access_token')
-                    ->orWhereNotNull('oauth_refresh_token');
-            })
-            ->pluck('email')
-            ->filter()
-            ->unique()
-            ->values();
-
         return view('admin.google-business.settings', [
             'account' => $account,
             'locations' => $account?->locations ?? collect(),
             'profiles' => $profiles,
-            'connectedGmailAccounts' => $connectedGmailAccounts,
         ]);
     }
 

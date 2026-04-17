@@ -332,10 +332,20 @@ class GoogleService
             return [];
         }
 
+        $connectedEmail = (string) (DriveApiKey::query()
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->latest('id')
+            ->value('email') ?? '');
+
         $googleAccount = $this->ensureValidGoogleAccountToken($googleAccount);
         $accounts = $this->fetchAccounts($googleAccount->access_token);
 
-        return collect($accounts)->map(function (array $account) use ($googleAccount) {
+        return collect($accounts)->map(function (array $account) use ($googleAccount, $connectedEmail) {
             $accountName = (string) Arr::get($account, 'name', '');
             $locations = [];
 
@@ -344,6 +354,7 @@ class GoogleService
             }
 
             return [
+                'connected_email' => $connectedEmail,
                 'account' => $account,
                 'locations' => $locations,
             ];
