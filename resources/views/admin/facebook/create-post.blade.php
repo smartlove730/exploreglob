@@ -14,7 +14,7 @@
         <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images/videos, preview them, then post one or many with generated captions.</p>
         @if($driveApiKeys->isEmpty())
             <div class="alert alert-warning">
-                No active Google Drive key found. <a href="{{ route('admin.facebook.google-drive-keys.create') }}">Add a Drive key</a> first.
+                No connected Google Drive account found. <a href="{{ route('admin.google-drive.connect') }}">Connect via OAuth</a> (recommended) or <a href="{{ route('admin.facebook.google-drive-keys.create') }}">add manually</a>.
             </div>
         @endif
 
@@ -45,13 +45,14 @@
                 <small class="text-muted">Use Ctrl/Cmd to select multiple pages.</small>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Google Drive Key</label>
-                <select name="drive_api_key_id" id="drive_api_key_id" class="form-select" required>
-                    <option value="">Select Drive key</option>
+                <label class="form-label">Google Drive Account</label>
+                <select name="drive_api_key_id" id="drive_api_key_id" class="form-select">
+                    <option value="">Auto (use connected OAuth account)</option>
                     @foreach($driveApiKeys as $driveApiKey)
                         <option value="{{ $driveApiKey->id }}" {{ $selectedDriveApiKeyId === $driveApiKey->id ? 'selected' : '' }}>{{ $driveApiKey->name }}{{ $driveApiKey->email ? ' ('.$driveApiKey->email.')' : '' }}</option>
                     @endforeach
                 </select>
+                <small class="text-muted">Optional. Leave blank to auto-use your latest active OAuth Drive connection.</small>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Google Drive Folder URL</label>
@@ -382,8 +383,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const driveApiKeyId = driveApiKeyInput.value;
         const folderUrl = folderUrlInput.value.trim();
 
-        if (!appId || !pageIds.length || !driveApiKeyId || !folderUrl) {
-            setStatus('App, at least one page, Drive key, and folder URL are required.', 'danger');
+        if (!appId || !pageIds.length || !folderUrl) {
+            setStatus('App, at least one page, and folder URL are required.', 'danger');
             return;
         }
 
@@ -398,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ app_id: appId, page_ids: pageIds, drive_api_key_id: driveApiKeyId, folder_url: folderUrl }),
+                body: JSON.stringify({ app_id: appId, page_ids: pageIds, drive_api_key_id: driveApiKeyId || null, folder_url: folderUrl }),
             });
 
             const result = await response.json();
@@ -520,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
             page_ids: pageIds,
             folder_id: state.folderId,
             caption,
-            drive_api_key_id: driveApiKeyInput.value,
+            drive_api_key_id: driveApiKeyInput.value || null,
             post_mode: postMode,
             platforms,
             images: state.modalImages.map((img) => ({ id: img.id, url: img.download_url, resource_key: img.resource_key || '', mime_type: img.mime_type || '' })),

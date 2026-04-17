@@ -17,12 +17,12 @@
 </div>
 
 <div class="mb-3">
-    <label class="form-label">Google Drive Key</label>
+    <label class="form-label">Google Drive Account</label>
     <select name="drive_api_key_id" class="form-select" required>
-        <option value="">Select key</option>
+        <option value="">Select account</option>
         @foreach($driveApiKeys as $driveApiKey)
-            <option value="{{ $driveApiKey->id }}" @selected((int) old('drive_api_key_id', $isEdit ? $automation->drive_api_key_id : 0) === $driveApiKey->id)>
-                {{ $driveApiKey->name }}
+            <option value="{{ $driveApiKey->id }}" @selected((int) old('drive_api_key_id', $selectedDriveApiKeyId ?? ($isEdit ? $automation->drive_api_key_id : 0)) === $driveApiKey->id)>
+                {{ $driveApiKey->name }}{{ $driveApiKey->email ? ' ('.$driveApiKey->email.')' : '' }}
             </option>
         @endforeach
     </select>

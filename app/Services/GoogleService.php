@@ -45,18 +45,41 @@ class GoogleService
         return self::OAUTH_URL.'?'.$query;
     }
 
-    public function exchangeCodeForToken(string $code): array
+    public function getDriveOauthRedirectUrl(?string $redirectUri = null): string
+    {
+        $clientId = $this->resolveClientId();
+        $resolvedRedirectUri = $redirectUri ?: $this->resolveRedirectUri();
+
+        $query = http_build_query([
+            'client_id' => $clientId,
+            'redirect_uri' => $resolvedRedirectUri,
+            'response_type' => 'code',
+            'scope' => implode(' ', [
+                'https://www.googleapis.com/auth/drive.readonly',
+                'openid',
+                'email',
+                'profile',
+            ]),
+            'access_type' => 'offline',
+            'prompt' => 'consent',
+            'include_granted_scopes' => 'true',
+        ]);
+
+        return self::OAUTH_URL.'?'.$query;
+    }
+
+    public function exchangeCodeForToken(string $code, ?string $redirectUri = null): array
     {
         $clientId = $this->resolveClientId();
         $clientSecret = $this->resolveClientSecret();
-        $redirectUri = $this->resolveRedirectUri();
+        $resolvedRedirectUri = $redirectUri ?: $this->resolveRedirectUri();
 
         $response = $this->client->post(self::TOKEN_URL, [
             'form_params' => [
                 'code' => $code,
                 'client_id' => $clientId,
                 'client_secret' => $clientSecret,
-                'redirect_uri' => $redirectUri,
+                'redirect_uri' => $resolvedRedirectUri,
                 'grant_type' => 'authorization_code',
             ],
         ]);
@@ -197,6 +220,15 @@ class GoogleService
         $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
         return (array) ($payload['accounts'] ?? []);
+    }
+
+    public function fetchOauthUserInfo(string $accessToken): array
+    {
+        $response = $this->client->get('https://openidconnect.googleapis.com/v1/userinfo', [
+            'headers' => ['Authorization' => 'Bearer '.$accessToken],
+        ]);
+
+        return json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
     }
 
     public function fetchLocations(string $accessToken, string $accountName): array

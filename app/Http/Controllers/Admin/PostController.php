@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PostController extends Controller
@@ -62,6 +63,11 @@ class PostController extends Controller
             ->orderBy('page_name')
             ->get();
 
+        $selectedDriveApiKeyId = (int) old(
+            'drive_api_key_id',
+            $request->integer('drive_api_key_id', $this->resolvePreferredDriveApiKeyId())
+        );
+
         return view('admin.facebook.create-post', [
             'apps' => $apps,
             'selectedAppId' => $selectedAppId,
@@ -72,7 +78,7 @@ class PostController extends Controller
                 ->values()
                 ->all(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
-            'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $request->integer('drive_api_key_id')),
+            'selectedDriveApiKeyId' => $selectedDriveApiKeyId,
             'driveFolders' => DriveFolder::query()->ownedBy(Auth::user())->with('driveApiKey')->where('is_active', true)->orderBy('name')->get(),
             'googleAccount' => GoogleAccount::query()->where('user_id', Auth::id())->first(),
             'googleLocations' => GoogleLocation::query()->where('user_id', Auth::id())->orderByDesc('is_default')->orderBy('name')->get(),
@@ -273,7 +279,7 @@ class PostController extends Controller
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
             'page_ids' => 'required_without:page_id|array|min:1',
             'page_ids.*' => 'required|integer|exists:facebook_pages,id',
-            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
+            'drive_api_key_id' => 'nullable|integer|exists:drive_api_keys,id',
         ]);
 
         if (empty($data['folder_url']) && empty($data['folder_id'])) {
@@ -291,15 +297,12 @@ class PostController extends Controller
             ], 422);
         }
 
-        $driveApiKey = DriveApiKey::query()->ownedBy(Auth::user())
-            ->whereKey((int) $data['drive_api_key_id'])
-            ->where('is_active', true)
-            ->first();
+        $driveApiKey = $this->resolveDriveApiKeyFromRequest($data);
 
         if (!$driveApiKey) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected Google Drive key is invalid or inactive.',
+                'message' => 'No active Google Drive connection found. Connect OAuth or select an active Drive account.',
             ], 422);
         }
 
@@ -371,7 +374,7 @@ class PostController extends Controller
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
             'page_ids' => 'required_without:page_id|array|min:1',
             'page_ids.*' => 'required|integer|exists:facebook_pages,id',
-            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
+            'drive_api_key_id' => 'nullable|integer|exists:drive_api_keys,id',
             'folder_id' => 'nullable|string|max:255',
             'caption' => 'required|string|max:60000',
             'post_mode' => 'nullable|string|in:separate,combined',
@@ -395,15 +398,12 @@ class PostController extends Controller
 
         $platforms = collect($data['platforms'])->unique()->values()->all();
         $postMode = (string) ($data['post_mode'] ?? 'separate');
-        $driveApiKey = DriveApiKey::query()->ownedBy(Auth::user())
-            ->whereKey((int) $data['drive_api_key_id'])
-            ->where('is_active', true)
-            ->first();
+        $driveApiKey = $this->resolveDriveApiKeyFromRequest($data);
 
         if (!$driveApiKey) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected Google Drive key is invalid or inactive.',
+                'message' => 'No active Google Drive connection found. Connect OAuth or select an active Drive account.',
             ], 422);
         }
 
@@ -962,5 +962,67 @@ class PostController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function resolvePreferredDriveApiKeyId(): int
+    {
+        if (!$this->supportsDriveOauthColumns()) {
+            return (int) DriveApiKey::query()
+                ->ownedBy(Auth::user())
+                ->where('is_active', true)
+                ->orderByDesc('updated_at')
+                ->value('id');
+        }
+
+        $oauthDriveKeyId = (int) DriveApiKey::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query
+                    ->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->orderByDesc('updated_at')
+            ->value('id');
+
+        if ($oauthDriveKeyId > 0) {
+            return $oauthDriveKeyId;
+        }
+
+        return (int) DriveApiKey::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->orderByDesc('updated_at')
+            ->value('id');
+    }
+
+    private function supportsDriveOauthColumns(): bool
+    {
+        return Schema::hasColumns('drive_api_keys', [
+            'oauth_access_token',
+            'oauth_refresh_token',
+        ]);
+    }
+
+    private function resolveDriveApiKeyFromRequest(array $data): ?DriveApiKey
+    {
+        $selectedDriveApiKeyId = (int) ($data['drive_api_key_id'] ?? 0);
+
+        if ($selectedDriveApiKeyId > 0) {
+            return DriveApiKey::query()->ownedBy(Auth::user())
+                ->whereKey($selectedDriveApiKeyId)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        $preferredDriveApiKeyId = $this->resolvePreferredDriveApiKeyId();
+        if ($preferredDriveApiKeyId <= 0) {
+            return null;
+        }
+
+        return DriveApiKey::query()->ownedBy(Auth::user())
+            ->whereKey($preferredDriveApiKeyId)
+            ->where('is_active', true)
+            ->first();
     }
 }

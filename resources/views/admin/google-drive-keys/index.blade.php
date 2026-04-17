@@ -1,12 +1,12 @@
 @extends('admin.layout')
 
-@section('title', 'Google Drive Keys')
+@section('title', 'Google Drive Accounts')
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Google Drive Keys</h1>
+    <h1 class="h3 mb-0">Google Drive Accounts</h1>
     <div class="d-flex gap-2">
-        <a href="{{ route('admin.google.connect') }}" class="btn btn-primary">Connect via OAuth</a>
+        <a href="{{ route('admin.google-drive.connect') }}" class="btn btn-primary">Connect via OAuth</a>
         <a href="{{ route('admin.facebook.google-drive-keys.create') }}" class="btn btn-outline-secondary">Add Manually</a>
     </div>
 </div>
@@ -33,7 +33,7 @@
                             <td>{{ $key->email ?: '-' }}</td>
                             <td><small>{{ $key->description ?: '-' }}</small></td>
                             <td><small>{{ $key->oauth_refresh_token ? 'OAuth' : 'Manual API Key' }}</small></td>
-                            <td><small>{{ $key->redirect_url ?: config('services.google.redirect_uri') ?: route('admin.google.callback') }}</small></td>
+                            <td><small>{{ $key->redirect_url ?: config('services.google.redirect_uri') ?: route('admin.google-drive.callback') }}</small></td>
                             <td>
                                 <span class="badge text-bg-{{ $key->is_active ? 'success' : 'secondary' }}">
                                     {{ $key->is_active ? 'Active' : 'Inactive' }}
