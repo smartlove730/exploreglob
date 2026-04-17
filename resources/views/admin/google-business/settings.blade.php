@@ -20,10 +20,14 @@
             @endif
             <p class="mb-2 text-muted">Account: {{ $account->google_account_id }}</p>
             <p class="mb-3 text-muted">Token expires: {{ optional($account->expires_at)->format('M d, Y H:i') }}</p>
-            <form method="POST" action="{{ route('admin.google.sync-locations') }}">
-                @csrf
-                <button class="btn btn-outline-secondary">Sync Locations</button>
-            </form>
+            <button
+                class="btn btn-outline-secondary"
+                data-bs-toggle="modal"
+                data-bs-target="#syncBusinessModal"
+                {{ ($connectedDriveAccounts ?? collect())->isEmpty() ? 'disabled' : '' }}
+            >
+                Sync Businesses
+            </button>
         @else
             <p class="mb-0"><span class="badge text-bg-danger">Not Connected</span></p>
         @endif
@@ -34,10 +38,14 @@
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="h5 mb-0">Connected Businesses</h2>
-            <form method="POST" action="{{ route('admin.google.sync-locations') }}">
-                @csrf
-                <button class="btn btn-sm btn-outline-secondary">Sync Businesses</button>
-            </form>
+            <button
+                class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="modal"
+                data-bs-target="#syncBusinessModal"
+                {{ ($connectedDriveAccounts ?? collect())->isEmpty() ? 'disabled' : '' }}
+            >
+                Sync Businesses
+            </button>
         </div>
 
         @if(empty($profiles ?? []))
@@ -116,6 +124,35 @@
                 </table>
             </div>
         @endif
+    </div>
+</div>
+
+<div class="modal fade" id="syncBusinessModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ route('admin.google.sync-locations') }}">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Sync Businesses</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-2">Select one connected Google account to fetch businesses for that account only.</p>
+                    <select name="drive_api_key_id" class="form-select" required>
+                        <option value="">Select connected account</option>
+                        @foreach(($connectedDriveAccounts ?? collect()) as $driveAccount)
+                            <option value="{{ $driveAccount->id }}">
+                                {{ $driveAccount->email ?: $driveAccount->name ?: ('Account #'.$driveAccount->id) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Fetch Businesses</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 @endsection

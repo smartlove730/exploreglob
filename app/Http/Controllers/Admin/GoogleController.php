@@ -23,15 +23,18 @@ class GoogleController extends Controller
     public function index()
     {
         $account = GoogleAccount::query()->where('user_id', Auth::id())->with('locations')->first();
-        $connectedEmail = (string) (DriveApiKey::query()
+        $connectedDriveAccounts = DriveApiKey::query()
             ->where('user_id', Auth::id())
             ->where('is_active', true)
             ->where(function ($query) {
                 $query->whereNotNull('oauth_access_token')
                     ->orWhereNotNull('oauth_refresh_token');
             })
+            ->select(['id', 'name', 'email'])
             ->latest('id')
-            ->value('email') ?? '');
+            ->get();
+
+        $connectedEmail = (string) ($connectedDriveAccounts->first()?->email ?? '');
 
         $profiles = GoogleAccount::query()
             ->where('user_id', Auth::id())
@@ -61,6 +64,7 @@ class GoogleController extends Controller
             'account' => $account,
             'locations' => $account?->locations ?? collect(),
             'profiles' => $profiles,
+            'connectedDriveAccounts' => $connectedDriveAccounts,
         ]);
     }
 
@@ -175,13 +179,17 @@ class GoogleController extends Controller
 
     public function syncLocations(): RedirectResponse
     {
+        $data = request()->validate([
+            'drive_api_key_id' => 'nullable|integer|exists:drive_api_keys,id',
+        ]);
+
         try {
             $account = GoogleAccount::query()->where('user_id', Auth::id())->first();
             if ($account?->reauthorization_required) {
                 return back()->with('error', 'Google needs to be reconnected before syncing locations.');
             }
 
-            $count = $this->googleService->syncLocationsForUser((int) Auth::id());
+            $count = $this->googleService->syncLocationsForUser((int) Auth::id(), (int) ($data['drive_api_key_id'] ?? 0) ?: null);
 
             return back()->with('success', "Synced {$count} location(s).");
         } catch (ReauthorizationRequiredException $exception) {

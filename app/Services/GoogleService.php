@@ -270,11 +270,13 @@ class GoogleService
         return $inserted;
     }
 
-    public function ensureGoogleAccountForUser(int $userId): ?GoogleAccount
+    public function ensureGoogleAccountForUser(int $userId, ?int $driveApiKeyId = null): ?GoogleAccount
     {
-        $googleAccount = GoogleAccount::query()->where('user_id', $userId)->latest('id')->first();
-        if ($googleAccount) {
-            return $this->ensureValidGoogleAccountToken($googleAccount);
+        if ($driveApiKeyId === null) {
+            $googleAccount = GoogleAccount::query()->where('user_id', $userId)->latest('id')->first();
+            if ($googleAccount) {
+                return $this->ensureValidGoogleAccountToken($googleAccount);
+            }
         }
 
         $driveApiKey = DriveApiKey::query()
@@ -284,10 +286,15 @@ class GoogleService
                 $query->whereNotNull('oauth_access_token')
                     ->orWhereNotNull('oauth_refresh_token');
             })
+            ->when($driveApiKeyId !== null, fn ($query) => $query->whereKey($driveApiKeyId))
             ->latest('id')
             ->first();
 
         if (!$driveApiKey) {
+            if ($driveApiKeyId !== null) {
+                throw new RuntimeException('Selected Google account is invalid, inactive, or missing OAuth token.');
+            }
+
             return null;
         }
 
@@ -324,9 +331,9 @@ class GoogleService
         );
     }
 
-    public function syncLocationsForUser(int $userId): int
+    public function syncLocationsForUser(int $userId, ?int $driveApiKeyId = null): int
     {
-        $googleAccount = $this->ensureGoogleAccountForUser($userId);
+        $googleAccount = $this->ensureGoogleAccountForUser($userId, $driveApiKeyId);
         if (!$googleAccount) {
             throw new RuntimeException('No Google Business account found for this user. Reconnect Google with business.manage scope.');
         }
