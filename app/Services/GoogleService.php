@@ -246,7 +246,17 @@ class GoogleService
     public function syncLocations(GoogleAccount $googleAccount): int
     {
         $googleAccount = $this->ensureValidGoogleAccountToken($googleAccount);
-        $locations = $this->fetchLocations($googleAccount->access_token, $googleAccount->google_account_id);
+        try {
+            $locations = $this->fetchLocations($googleAccount->access_token, $googleAccount->google_account_id);
+        } catch (\Throwable $exception) {
+            if ($this->isQuotaExceededError($exception)) {
+                return GoogleLocation::query()
+                    ->where('google_account_id', $googleAccount->id)
+                    ->count();
+            }
+
+            throw $exception;
+        }
 
         GoogleLocation::query()->where('google_account_id', $googleAccount->id)->delete();
 
@@ -307,6 +317,15 @@ class GoogleService
             $accounts = $this->fetchAccounts($driveApiKey->oauth_access_token);
         } catch (\Throwable $exception) {
             if ($this->isQuotaExceededError($exception)) {
+                $fallbackAccount = GoogleAccount::query()
+                    ->where('user_id', $userId)
+                    ->latest('id')
+                    ->first();
+
+                if ($fallbackAccount) {
+                    return $this->ensureValidGoogleAccountToken($fallbackAccount);
+                }
+
                 throw new RuntimeException('Google quota limit reached (429). Please wait about 1 minute and try again.');
             }
 

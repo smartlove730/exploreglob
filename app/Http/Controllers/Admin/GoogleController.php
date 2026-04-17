@@ -203,7 +203,12 @@ class GoogleController extends Controller
             return back()->with('error', $exception->getMessage());
         } catch (\Throwable $exception) {
             if ($this->isGoogleQuotaError($exception)) {
-                return back()->with('error', 'Google quota limit reached (429). Please wait about 1 minute and try syncing again.');
+                $cachedCount = GoogleLocation::query()->where('user_id', Auth::id())->count();
+                if ($cachedCount > 0) {
+                    return back()->with('success', "Google quota is currently limited. Loaded {$cachedCount} cached location(s) from your last successful sync.");
+                }
+
+                return back()->with('error', 'Google quota limit reached (429). No cached businesses available yet. Please wait about 1 minute and try again.');
             }
 
             return back()->with('error', 'Unable to sync Google locations: '.$exception->getMessage());
