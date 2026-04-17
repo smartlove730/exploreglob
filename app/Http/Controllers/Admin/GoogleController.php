@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exceptions\ReauthorizationRequiredException;
 use App\Http\Controllers\Controller;
+use App\Models\DriveApiKey;
 use App\Models\GoogleAccount;
 use App\Models\GoogleLocation;
 use App\Services\GoogleService;
@@ -22,13 +23,39 @@ class GoogleController extends Controller
     public function index()
     {
         $account = GoogleAccount::query()->where('user_id', Auth::id())->with('locations')->first();
-        $profiles = [];
+        $connectedEmail = (string) (DriveApiKey::query()
+            ->where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->latest('id')
+            ->value('email') ?? '');
 
-        try {
-            $profiles = $this->googleService->listBusinessProfilesForUser((int) Auth::id());
-        } catch (\Throwable) {
-            $profiles = [];
-        }
+        $profiles = GoogleAccount::query()
+            ->where('user_id', Auth::id())
+            ->with('locations')
+            ->get()
+            ->map(function (GoogleAccount $googleAccount) use ($connectedEmail) {
+                return [
+                    'connected_email' => $connectedEmail,
+                    'account' => [
+                        'name' => $googleAccount->google_account_id,
+                        'accountName' => $googleAccount->google_account_id,
+                        'type' => 'ACCOUNT',
+                    ],
+                    'locations' => $googleAccount->locations
+                        ->map(fn (GoogleLocation $location) => [
+                            'name' => $location->location_id,
+                            'title' => $location->name,
+                        ])
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->values()
+            ->all();
 
         return view('admin.google-business.settings', [
             'account' => $account,
@@ -167,6 +194,10 @@ class GoogleController extends Controller
 
             return back()->with('error', $exception->getMessage());
         } catch (\Throwable $exception) {
+            if ($this->isGoogleQuotaError($exception)) {
+                return back()->with('error', 'Google quota limit reached (429). Please wait about 1 minute and try syncing again.');
+            }
+
             return back()->with('error', 'Unable to sync Google locations: '.$exception->getMessage());
         }
     }
@@ -204,5 +235,14 @@ class GoogleController extends Controller
         $location->update(['is_default' => true]);
 
         return back()->with('success', 'Default Google Business location updated.');
+    }
+
+    private function isGoogleQuotaError(\Throwable $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, '429')
+            || str_contains($message, 'quota exceeded')
+            || str_contains($message, 'too many requests');
     }
 }

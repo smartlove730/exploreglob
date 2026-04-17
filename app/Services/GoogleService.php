@@ -296,7 +296,16 @@ class GoogleService
             return null;
         }
 
-        $accounts = $this->fetchAccounts($driveApiKey->oauth_access_token);
+        try {
+            $accounts = $this->fetchAccounts($driveApiKey->oauth_access_token);
+        } catch (\Throwable $exception) {
+            if ($this->isQuotaExceededError($exception)) {
+                throw new RuntimeException('Google quota limit reached (429). Please wait about 1 minute and try again.');
+            }
+
+            throw $exception;
+        }
+
         $primaryAccount = (string) Arr::get($accounts, '0.name', '');
         if ($primaryAccount === '') {
             return null;
@@ -411,5 +420,14 @@ class GoogleService
         $message = $exception->getMessage();
 
         return str_contains(strtolower($message), 'invalid_grant');
+    }
+
+    private function isQuotaExceededError(\Throwable $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, '429')
+            || str_contains($message, 'quota exceeded')
+            || str_contains($message, 'too many requests');
     }
 }
