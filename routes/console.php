@@ -65,6 +65,10 @@ Schedule::job(new RunAutomationJob())
     ->everyThirtyMinutes()
     ->withoutOverlapping();
 
+Schedule::command('automations:cleanup-stale')
+    ->everyTenMinutes()
+    ->withoutOverlapping();
+
 // Dispatch due scheduled social posts every minute.
 Schedule::job(new DispatchDueScheduledPostsJob())
     ->everyMinute()

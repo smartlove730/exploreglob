@@ -8,6 +8,7 @@ use App\Models\AutomationPostLog;
 use App\Models\DriveImagePost;
 use App\Models\FacebookPage;
 use App\Models\FacebookPost;
+use App\Models\PostedMedia;
 use App\Models\PostImage;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -18,6 +19,8 @@ use Throwable;
 
 class AutomationService
 {
+    private const STALE_IN_PROGRESS_MINUTES = 20;
+
     public function __construct(
         private readonly DriveService $driveService,
         private readonly AiCaptionService $aiCaptionService,
@@ -82,18 +85,39 @@ class AutomationService
         });
     }
 
+    public function markStaleInProgressLogsAsFailed(): int
+    {
+        $staleCutoff = now()->subMinutes(self::STALE_IN_PROGRESS_MINUTES);
+
+        return AutomationPostLog::query()
+            ->where('status', 'in_progress')
+            ->whereNull('completed_at')
+            ->where(function ($query) use ($staleCutoff) {
+                $query->whereNotNull('started_at')->where('started_at', '<', $staleCutoff)
+                    ->orWhere(function ($subQuery) use ($staleCutoff) {
+                        $subQuery->whereNull('started_at')->where('updated_at', '<', $staleCutoff);
+                    });
+            })
+            ->update([
+                'status' => 'failed',
+                'message' => 'Automation timed out before completion.',
+                'completed_at' => now(),
+            ]);
+    }
+
     private function runSingleAutomation(AutomationConfig $config, bool $forceRun = false, ?int $automationLogId = null): void
     {
-        $this->markLogInProgress($automationLogId);
+        Cache::lock("automation:config:{$config->id}", 1200)->block(3, function () use ($config, $forceRun, $automationLogId): void {
+            $this->markLogInProgress($automationLogId);
 
-        $blockReason = $this->getRunBlockReason($config, $forceRun);
-        if ($blockReason !== null) {
-            $this->logSkipped($config, $blockReason, $automationLogId);
+            $blockReason = $this->getRunBlockReason($config, $forceRun);
+            if ($blockReason !== null) {
+                $this->logSkipped($config, $blockReason, $automationLogId);
 
-            return;
-        }
+                return;
+            }
 
-        try {
+            try {
             if (!$config->driveApiKey || !$config->driveApiKey->is_active) {
                 $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), 'No active Google Drive key selected.', $automationLogId);
 
@@ -105,7 +129,7 @@ class AutomationService
             $mediaItems = collect($drivePayload['media'] ?? []);
             $platforms = $this->normalizePlatforms($config->platforms);
 
-            $unusedMedia = $this->resolveUnusedImage($config, $mediaItems);
+            $unusedMedia = $this->resolveUnusedImage($config, $mediaItems, $platforms);
 
             if (!$unusedMedia) {
                 $this->logSkipped($config, 'No unused media available in Drive folder.', $automationLogId);
@@ -127,6 +151,16 @@ class AutomationService
 
             if ($mediaType === 'video' && in_array('google_business', $platforms, true)) {
                 $platforms = array_values(array_filter($platforms, fn (string $platform) => $platform !== 'google_business'));
+            }
+
+            $driveFileId = (string) ($unusedMedia['id'] ?? '');
+            $platformReservations = $this->reserveMediaPlatforms($config, $driveFileId, $platforms);
+            $platforms = $platformReservations['platforms_to_publish'];
+
+            if (empty($platforms)) {
+                $this->logSkipped($config, 'No unposted platforms available for selected media.', $automationLogId);
+
+                return;
             }
 
             $caption = $this->aiCaptionService->generateCaption($config->prompt, $mediaUrl);
@@ -203,14 +237,20 @@ class AutomationService
 
                 $config->forceFill(['last_run_at' => now()])->save();
             });
-        } catch (Throwable $exception) {
+                $this->markMediaPlatformsPosted($config, $driveFileId, $platforms, $result);
+            } catch (Throwable $exception) {
+                if (isset($driveFileId) && isset($platforms) && !empty($driveFileId) && !empty($platforms)) {
+                    $this->markMediaPlatformsFailed($config, $driveFileId, $platforms, $exception->getMessage());
+                }
+
             Log::error('Automation failed', [
                 'automation_config_id' => $config->id,
                 'error' => $exception->getMessage(),
             ]);
 
             $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), $exception->getMessage(), $automationLogId);
-        }
+            }
+        });
     }
 
     private function resolveImagePathForHistory(string $imageUrl): string
@@ -256,18 +296,112 @@ class AutomationService
         return null;
     }
 
-    private function resolveUnusedImage(AutomationConfig $config, Collection $images): ?array
+    private function resolveUnusedImage(AutomationConfig $config, Collection $images, array $platforms): ?array
     {
-        $usedIds = AutomationPostLog::query()
-            ->where('automation_config_id', $config->id)
-            ->whereNotNull('drive_file_id')
-            ->pluck('drive_file_id')
-            ->all();
-
         return $images
-            ->filter(fn ($image) => !in_array((string) ($image['id'] ?? ''), $usedIds, true))
-            ->values()
-            ->first();
+            ->first(function ($image) use ($config, $platforms) {
+                $driveFileId = (string) ($image['id'] ?? '');
+
+                if ($driveFileId === '') {
+                    return false;
+                }
+
+                return PostedMedia::query()
+                    ->where('automation_config_id', $config->id)
+                    ->where('page_id', $config->page_id)
+                    ->where('drive_file_id', $driveFileId)
+                    ->whereIn('platform', $platforms)
+                    ->where('status', PostedMedia::STATUS_POSTED)
+                    ->count() < count($platforms);
+            });
+    }
+
+    private function reserveMediaPlatforms(AutomationConfig $config, string $driveFileId, array $platforms): array
+    {
+        if ($driveFileId === '' || empty($platforms)) {
+            return ['platforms_to_publish' => []];
+        }
+
+        $platformsToPublish = [];
+        $now = now();
+        $staleThreshold = $now->copy()->subMinutes(20);
+
+        DB::transaction(function () use ($config, $driveFileId, $platforms, $now, $staleThreshold, &$platformsToPublish): void {
+            $existingRecords = PostedMedia::query()
+                ->where('automation_config_id', $config->id)
+                ->where('page_id', $config->page_id)
+                ->where('drive_file_id', $driveFileId)
+                ->whereIn('platform', $platforms)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('platform');
+
+            foreach ($platforms as $platform) {
+                /** @var PostedMedia|null $existing */
+                $existing = $existingRecords->get($platform);
+
+                if ($existing && $existing->status === PostedMedia::STATUS_POSTED) {
+                    continue;
+                }
+
+                if ($existing && $existing->status === PostedMedia::STATUS_PROCESSING && $existing->updated_at && $existing->updated_at->greaterThan($staleThreshold)) {
+                    continue;
+                }
+
+                PostedMedia::query()->updateOrCreate(
+                    [
+                        'automation_config_id' => $config->id,
+                        'user_id' => $config->user_id,
+                        'page_id' => $config->page_id,
+                        'drive_file_id' => $driveFileId,
+                        'platform' => $platform,
+                    ],
+                    [
+                        'status' => PostedMedia::STATUS_PROCESSING,
+                        'reserved_at' => $now,
+                        'posted_at' => null,
+                        'last_error' => null,
+                    ]
+                );
+
+                $platformsToPublish[] = $platform;
+            }
+        });
+
+        return ['platforms_to_publish' => array_values(array_unique($platformsToPublish))];
+    }
+
+    private function markMediaPlatformsPosted(AutomationConfig $config, string $driveFileId, array $platforms, array $result): void
+    {
+        if ($driveFileId === '' || empty($platforms)) {
+            return;
+        }
+
+        PostedMedia::query()
+            ->where('automation_config_id', $config->id)
+            ->where('page_id', $config->page_id)
+            ->where('drive_file_id', $driveFileId)
+            ->whereIn('platform', $platforms)
+            ->update([
+                'status' => PostedMedia::STATUS_POSTED,
+                'posted_at' => now(),
+                'last_error' => null,
+                'response_json' => $result['response_json'] ?? null,
+            ]);
+    }
+
+    private function markMediaPlatformsFailed(AutomationConfig $config, string $driveFileId, array $platforms, string $error): void
+    {
+        PostedMedia::query()
+            ->where('automation_config_id', $config->id)
+            ->where('page_id', $config->page_id)
+            ->where('drive_file_id', $driveFileId)
+            ->whereIn('platform', $platforms)
+            ->where('status', PostedMedia::STATUS_PROCESSING)
+            ->update([
+                'status' => PostedMedia::STATUS_FAILED,
+                'last_error' => mb_strimwidth($error, 0, 1000, '...'),
+            ]);
     }
 
     private function normalizePlatforms(string $platform): array
