@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\DeletePostJob;
 use App\Jobs\PublishPostJob;
 use App\Models\DriveApiKey;
 use App\Models\DriveFolder;
@@ -41,6 +42,7 @@ class PostController extends Controller
     public function index()
     {
         $posts = FacebookPost::query()->ownedBy(Auth::user())
+            ->whereNull('deleted_at')
             ->with(['page.facebookAccount.app', 'images'])
             ->latest()
             ->paginate(20);
@@ -241,33 +243,86 @@ class PostController extends Controller
         return redirect()->route('admin.posts.index')->with('success', 'Post updated and queued for publishing.');
     }
 
-    public function destroy(int $id): RedirectResponse
+    public function destroy(Request $request, int $id): RedirectResponse|JsonResponse
     {
-        $post = FacebookPost::query()->ownedBy(Auth::user())->with(['images', 'page.facebookAccount'])->findOrFail($id);
+        $post = FacebookPost::query()->ownedBy(Auth::user())->whereNull('deleted_at')->with(['images', 'page.facebookAccount'])->findOrFail($id);
 
-        if ($post->status === FacebookPost::STATUS_PUBLISHED) {
-            try {
-                $this->metaPostService->deleteFacebookPost($post->page, $post->facebook_post_id);
-            } catch (\Throwable $exception) {
-                Log::warning('Failed deleting Facebook post during local delete', ['post_id' => $post->id, 'error' => $exception->getMessage()]);
-            }
-
-            try {
-                $this->metaPostService->deleteInstagramMedia($post->page, $post->instagram_media_id);
-            } catch (\Throwable $exception) {
-                Log::warning('Failed deleting Instagram media during local delete', ['post_id' => $post->id, 'error' => $exception->getMessage()]);
-            }
+        if ($post->deletion_status === FacebookPost::DELETION_STATUS_PENDING) {
+            return $this->deleteAlreadyQueuedResponse($request);
         }
 
-        foreach ($post->images as $image) {
-            if (Storage::disk('public')->exists($image->image_path)) {
-                Storage::disk('public')->delete($image->image_path);
-            }
+        $post->forceFill([
+            'deletion_status' => FacebookPost::DELETION_STATUS_PENDING,
+            'last_error' => null,
+        ])->save();
+
+        DeletePostJob::dispatch($post->id);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Post deletion queued.',
+                'post_id' => $post->id,
+            ]);
         }
 
-        $post->delete();
+        return redirect()->route('admin.posts.index')->with('success', 'Post deletion queued. Refresh shortly to see updated status.');
+    }
 
-        return redirect()->route('admin.posts.index')->with('success', 'Post deleted successfully.');
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'post_ids' => ['required', 'array', 'min:1'],
+            'post_ids.*' => ['required', 'integer'],
+        ]);
+
+        $posts = FacebookPost::query()
+            ->ownedBy(Auth::user())
+            ->whereNull('deleted_at')
+            ->whereIn('id', $data['post_ids'])
+            ->get();
+
+        $accepted = [];
+        $skipped = [];
+
+        foreach ($posts as $post) {
+            if ($post->deletion_status === FacebookPost::DELETION_STATUS_PENDING) {
+                $skipped[] = [
+                    'post_id' => $post->id,
+                    'reason' => 'already_pending',
+                ];
+                continue;
+            }
+
+            $post->forceFill([
+                'deletion_status' => FacebookPost::DELETION_STATUS_PENDING,
+                'last_error' => null,
+            ])->save();
+
+            DeletePostJob::dispatch($post->id);
+
+            $accepted[] = $post->id;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($accepted).' post deletion job(s) queued.',
+            'accepted' => $accepted,
+            'skipped' => $skipped,
+            'not_found' => array_values(array_diff($data['post_ids'], $posts->pluck('id')->all())),
+        ]);
+    }
+
+    private function deleteAlreadyQueuedResponse(Request $request): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Deletion is already queued for this post.',
+            ], 409);
+        }
+
+        return redirect()->route('admin.posts.index')->with('error', 'Deletion is already queued for this post.');
     }
 
     public function fetchDriveImages(Request $request): JsonResponse

@@ -5,7 +5,10 @@
 @section('content')
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <h1 class="h3 mb-0">Post History</h1>
-    <a class="btn btn-primary" href="{{ route('admin.posts.create') }}">Create Post</a>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled>Delete Selected</button>
+        <a class="btn btn-primary" href="{{ route('admin.posts.create') }}">Create Post</a>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -14,6 +17,9 @@
             <table class="table align-middle">
                 <thead>
                     <tr>
+                        <th>
+                            <input type="checkbox" id="selectAllPosts" aria-label="Select all posts">
+                        </th>
                         <th>App</th>
                         <th>Page</th>
                         <th>Message</th>
@@ -26,7 +32,10 @@
                 </thead>
                 <tbody>
                     @forelse($posts as $post)
-                        <tr>
+                        <tr id="post-row-{{ $post->id }}" data-post-id="{{ $post->id }}">
+                            <td>
+                                <input type="checkbox" class="post-checkbox" value="{{ $post->id }}" aria-label="Select post {{ $post->id }}">
+                            </td>
                             <td>{{ $post->page?->facebookAccount?->app?->name ?? '-' }}</td>
                             <td>{{ $post->page?->page_name }}</td>
                             <td>{{ \Illuminate\Support\Str::limit($post->message, 100) }}</td>
@@ -48,11 +57,13 @@
                                     Edit
                                 </button>
 
-                                <form method="POST" action="{{ route('admin.posts.destroy', $post->id) }}" onsubmit="return confirm('Delete this post permanently?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="btn btn-sm btn-outline-danger">Delete</button>
-                                </form>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger delete-post-btn"
+                                    data-post-id="{{ $post->id }}"
+                                >
+                                    Delete
+                                </button>
                             </td>
                         </tr>
 
@@ -124,7 +135,7 @@
                             </div>
                         </div>
                     @empty
-                        <tr><td colspan="8" class="text-center text-muted">No posts yet.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted">No posts yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -138,6 +149,64 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const csrfToken = document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content');
+    const selectAll = document.getElementById('selectAllPosts');
+    const checkboxes = Array.from(document.querySelectorAll('.post-checkbox'));
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+
+    const getSelectedIds = () => checkboxes.filter((checkbox) => checkbox.checked).map((checkbox) => Number(checkbox.value));
+
+    const refreshBulkState = () => {
+        const selectedCount = getSelectedIds().length;
+        bulkDeleteBtn.disabled = selectedCount === 0;
+        bulkDeleteBtn.textContent = selectedCount > 0 ? `Delete Selected (${selectedCount})` : 'Delete Selected';
+    };
+
+    const markRowDeleting = (postId) => {
+        const row = document.getElementById(`post-row-${postId}`);
+        if (!row) return;
+
+        row.classList.add('table-warning');
+        const actionCell = row.querySelector('td:last-child');
+        if (actionCell) {
+            actionCell.innerHTML = '<span class=\"badge text-bg-warning\">Deleting...</span>';
+        }
+    };
+
+    const removeRow = (postId) => {
+        const row = document.getElementById(`post-row-${postId}`);
+        if (row) {
+            row.remove();
+        }
+    };
+
+    const notify = (message, isError = false) => {
+        if (isError) {
+            window.alert(message);
+            return;
+        }
+        window.alert(message);
+    };
+
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            checkboxes.forEach((checkbox) => {
+                checkbox.checked = selectAll.checked;
+            });
+            refreshBulkState();
+        });
+    }
+
+    checkboxes.forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
+            const selectedCount = getSelectedIds().length;
+            if (selectAll) {
+                selectAll.checked = selectedCount > 0 && selectedCount === checkboxes.length;
+            }
+            refreshBulkState();
+        });
+    });
+
     document.querySelectorAll('.edit-post-form').forEach(form => {
         form.addEventListener('submit', (event) => {
             if (form.dataset.status !== 'published') return;
@@ -151,6 +220,89 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    document.querySelectorAll('.delete-post-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const postId = Number(button.dataset.postId);
+            if (!postId) return;
+
+            if (!window.confirm('Delete this post from Facebook/Instagram and queue local deletion?')) {
+                return;
+            }
+
+            markRowDeleting(postId);
+
+            try {
+                const response = await fetch(`{{ url('/admin/posts') }}/${postId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                const payload = await response.json();
+
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.message || 'Unable to queue deletion.');
+                }
+
+                removeRow(postId);
+                refreshBulkState();
+                notify(payload.message || 'Deletion queued.');
+            } catch (error) {
+                notify(error.message || 'Deletion failed.', true);
+                window.location.reload();
+            }
+        });
+    });
+
+    bulkDeleteBtn?.addEventListener('click', async () => {
+        const selectedIds = getSelectedIds();
+        if (!selectedIds.length) return;
+
+        if (!window.confirm(`Delete ${selectedIds.length} selected post(s)?`)) {
+            return;
+        }
+
+        selectedIds.forEach((id) => markRowDeleting(id));
+
+        try {
+            const response = await fetch(`{{ route('admin.posts.bulk-destroy') }}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ post_ids: selectedIds }),
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.message || 'Bulk deletion failed.');
+            }
+
+            (payload.accepted || []).forEach((id) => removeRow(Number(id)));
+            refreshBulkState();
+
+            if ((payload.skipped || []).length > 0 || (payload.not_found || []).length > 0) {
+                notify(`${payload.message} Some posts were skipped/not found.`, true);
+                return;
+            }
+
+            notify(payload.message || 'Bulk deletion queued.');
+        } catch (error) {
+            notify(error.message || 'Bulk deletion failed.', true);
+            window.location.reload();
+        }
+    });
+
+    refreshBulkState();
 });
 </script>
 @endpush
