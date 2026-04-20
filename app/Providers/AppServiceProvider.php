@@ -19,7 +19,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $deleteJobPath = app_path('Jobs/DeletePostJob.php');
+
+        if (!class_exists(\App\Jobs\DeletePostJob::class, false) && is_file($deleteJobPath)) {
+            require_once $deleteJobPath;
+        }
     }
 
     /**
