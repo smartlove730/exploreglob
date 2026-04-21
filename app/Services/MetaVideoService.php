@@ -21,43 +21,40 @@ class MetaVideoService
     {
         $this->assertPublicHttpsVideoUrl($videoUrl);
 
+        $uploadableVideo = $this->resolveUploadableVideo($videoUrl, $videoPath);
+        if ($uploadableVideo) {
+            try {
+                $uploadResponse = Http::attach(
+                    'source',
+                    $uploadableVideo['stream'],
+                    $uploadableVideo['filename'],
+                    ['Content-Type' => 'video/mp4']
+                )->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/videos", [
+                    'description' => $caption,
+                    'access_token' => $page->page_access_token,
+                ]);
+            } finally {
+                fclose($uploadableVideo['stream']);
+                if (!empty($uploadableVideo['cleanup_path']) && is_string($uploadableVideo['cleanup_path'])) {
+                    @unlink($uploadableVideo['cleanup_path']);
+                }
+            }
+
+            if ($uploadResponse->ok()) {
+                return $uploadResponse->json();
+            }
+
+            throw new RuntimeException('Unable to post Facebook video via source upload: '.$uploadResponse->body());
+        }
+
         $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/videos", [
             'file_url' => $videoUrl,
             'description' => $caption,
             'access_token' => $page->page_access_token,
         ]);
 
-        if (!$response->ok() && $this->shouldRetryFacebookVideoAsUpload($response->body())) {
-            $uploadableVideo = $this->resolveUploadableVideo($videoUrl, $videoPath);
-
-            if ($uploadableVideo) {
-                try {
-                    $uploadResponse = Http::attach(
-                        'source',
-                        $uploadableVideo['stream'],
-                        $uploadableVideo['filename'],
-                        ['Content-Type' => 'video/mp4']
-                    )->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/videos", [
-                        'description' => $caption,
-                        'access_token' => $page->page_access_token,
-                    ]);
-                } finally {
-                    fclose($uploadableVideo['stream']);
-                    if (!empty($uploadableVideo['cleanup_path']) && is_string($uploadableVideo['cleanup_path'])) {
-                        @unlink($uploadableVideo['cleanup_path']);
-                    }
-                }
-
-                if ($uploadResponse->ok()) {
-                    return $uploadResponse->json();
-                }
-
-                throw new RuntimeException('Unable to post Facebook video via source upload fallback: '.$uploadResponse->body());
-            }
-        }
-
         if (!$response->ok()) {
-            throw new RuntimeException('Unable to post Facebook video: '.$response->body());
+            throw new RuntimeException('Unable to post Facebook video by URL: '.$response->body());
         }
 
         return $response->json();
@@ -201,17 +198,6 @@ class MetaVideoService
         }
 
         return false;
-    }
-
-    private function shouldRetryFacebookVideoAsUpload(string $responseBody): bool
-    {
-        if ($responseBody === '') {
-            return false;
-        }
-
-        return str_contains($responseBody, '"code":389')
-            || str_contains($responseBody, '"error_subcode":1363057')
-            || str_contains(strtolower($responseBody), 'unable to fetch video file from url');
     }
 
     private function resolveUploadableVideo(string $videoUrl, ?string $videoPath): ?array

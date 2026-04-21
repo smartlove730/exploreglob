@@ -114,19 +114,7 @@ class FacebookGraphService
 
     public function publishToPage(FacebookPage $page, string $message, ?string $imageUrl = null, ?string $localImagePath = null): array
     {
-        $endpoint = $imageUrl ? 'photos' : 'feed';
-        $payload = [
-            'access_token' => $page->page_access_token,
-            'message' => $message,
-        ];
-
         if ($imageUrl) {
-            $payload['url'] = $imageUrl;
-        }
-
-        $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/{$endpoint}", $payload);
-
-        if (!$response->ok() && $imageUrl && $this->shouldRetryImageAsUpload($response->body())) {
             $uploadableImage = $this->resolveUploadableImage($imageUrl, $localImagePath);
 
             if ($uploadableImage) {
@@ -152,6 +140,18 @@ class FacebookGraphService
                 }
             }
         }
+
+        $endpoint = $imageUrl ? 'photos' : 'feed';
+        $payload = [
+            'access_token' => $page->page_access_token,
+            'message' => $message,
+        ];
+
+        if ($imageUrl) {
+            $payload['url'] = $imageUrl;
+        }
+
+        $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/{$endpoint}", $payload);
 
         if (!$response->ok()) {
             $this->throwRefreshException($response->json(), 'Facebook posting API call failed.');
@@ -247,18 +247,6 @@ class FacebookGraphService
         }
 
         throw new RuntimeException($fallback.' '.$message);
-    }
-
-    private function shouldRetryImageAsUpload(string $responseBody): bool
-    {
-        if ($responseBody === '') {
-            return false;
-        }
-
-        $normalized = strtolower($responseBody);
-
-        return str_contains($normalized, 'unable to fetch')
-            || str_contains($normalized, '"code":324');
     }
 
     private function resolveUploadableImage(string $imageUrl, ?string $localImagePath): ?array
