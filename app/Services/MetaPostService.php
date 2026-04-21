@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\FacebookPage;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -161,5 +162,89 @@ class MetaPostService
         return Http::delete("https://graph.facebook.com/{$this->apiVersion}/{$instagramMediaId}", [
             'access_token' => $accessToken,
         ]);
+    }
+
+    public function fetchFacebookPagePosts(FacebookPage $page, int $limit = 25): Collection
+    {
+        $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/posts", [
+            'fields' => 'id,message,created_time,full_picture,permalink_url',
+            'limit' => $limit,
+            'access_token' => $page->page_access_token,
+        ]);
+
+        if (!$response->ok()) {
+            throw new RuntimeException('Unable to fetch Facebook posts: '.$response->body());
+        }
+
+        return collect($response->json('data', []))
+            ->map(fn (array $post) => [
+                'platform' => 'facebook',
+                'external_post_id' => (string) ($post['id'] ?? ''),
+                'page_id' => $page->id,
+                'page_name' => $page->page_name,
+                'content' => (string) ($post['message'] ?? ''),
+                'media_preview_url' => $post['full_picture'] ?? null,
+                'permalink' => $post['permalink_url'] ?? null,
+                'created_time' => $post['created_time'] ?? null,
+            ])
+            ->filter(fn (array $post) => $post['external_post_id'] !== '')
+            ->values();
+    }
+
+    public function fetchInstagramPosts(FacebookPage $page, int $limit = 25): Collection
+    {
+        $igUserId = $this->resolveInstagramBusinessAccountId($page);
+        if (!$igUserId) {
+            return collect();
+        }
+
+        $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/{$igUserId}/media", [
+            'fields' => 'id,caption,media_type,media_url,thumbnail_url,timestamp,permalink',
+            'limit' => $limit,
+            'access_token' => $page->page_access_token,
+        ]);
+
+        if (!$response->ok()) {
+            throw new RuntimeException('Unable to fetch Instagram posts: '.$response->body());
+        }
+
+        return collect($response->json('data', []))
+            ->map(fn (array $post) => [
+                'platform' => 'instagram',
+                'external_post_id' => (string) ($post['id'] ?? ''),
+                'page_id' => $page->id,
+                'page_name' => $page->page_name,
+                'content' => (string) ($post['caption'] ?? ''),
+                'media_preview_url' => $post['thumbnail_url'] ?? $post['media_url'] ?? null,
+                'permalink' => $post['permalink'] ?? null,
+                'created_time' => $post['timestamp'] ?? null,
+            ])
+            ->filter(fn (array $post) => $post['external_post_id'] !== '')
+            ->values();
+    }
+
+    private function resolveInstagramBusinessAccountId(FacebookPage $page): ?string
+    {
+        if ($page->instagram_business_account_id) {
+            return (string) $page->instagram_business_account_id;
+        }
+
+        $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}", [
+            'fields' => 'instagram_business_account{id}',
+            'access_token' => $page->page_access_token,
+        ]);
+
+        if (!$response->ok()) {
+            return null;
+        }
+
+        $igUserId = (string) data_get($response->json(), 'instagram_business_account.id', '');
+        if ($igUserId === '') {
+            return null;
+        }
+
+        $page->forceFill(['instagram_business_account_id' => $igUserId])->save();
+
+        return $igUserId;
     }
 }

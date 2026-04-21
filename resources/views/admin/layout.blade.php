@@ -17,6 +17,7 @@
     $isAdmin = auth()->user()?->isAdmin();
     $facebookSettingsUrl = Route::has('admin.facebook.settings') ? route('admin.facebook.settings') : url('/admin/facebook/settings');
     $facebookPostsUrl = Route::has('admin.posts.index') ? route('admin.posts.index') : url('/admin/posts');
+    $facebookManagePostsUrl = Route::has('admin.facebook.manage-posts.index') ? route('admin.facebook.manage-posts.index') : url('/admin/facebook/manage-posts');
     $facebookAppsUrl = Route::has('admin.facebook.apps.index') ? route('admin.facebook.apps.index') : url('/admin/facebook/apps');
     $googleDriveKeysUrl = Route::has('admin.facebook.google-drive-keys.index') ? route('admin.facebook.google-drive-keys.index') : url('/admin/facebook/google-drive-keys');
     $googleDriveFoldersUrl = Route::has('admin.facebook.drive-folders.index') ? route('admin.facebook.drive-folders.index') : url('/admin/facebook/drive-folders');
@@ -51,6 +52,7 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.settings') ? 'active' : '' }}" href="{{ $facebookSettingsUrl }}">Facebook Settings</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.google.*') ? 'active' : '' }}" href="{{ $googleSettingsUrl }}">Google Business</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.manage-posts.*') ? 'active' : '' }}" href="{{ $facebookManagePostsUrl }}">Manage Social Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.automations.*') ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.billing.*') ? 'active' : '' }}" href="{{ route('app.billing.plans') }}">Subscription</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.settings.*') ? 'active' : '' }}" href="{{ route('app.settings.index') }}">Settings</a></li>
