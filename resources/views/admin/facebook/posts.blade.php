@@ -13,8 +13,77 @@
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
+        <form method="GET" action="{{ route('admin.posts.index') }}" class="border rounded p-3 mb-3 bg-light-subtle">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h6 mb-0">Advanced Filters</h2>
+                <div class="d-flex gap-2">
+                    <a href="{{ route('admin.posts.index') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+                    <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                </div>
+            </div>
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="search">Search</label>
+                    <input type="text" id="search" name="search" class="form-control form-control-sm" placeholder="ID or message" value="{{ $filters['search'] }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="app_id">App</label>
+                    <select id="app_id" name="app_id" class="form-select form-select-sm">
+                        <option value="">All apps</option>
+                        @foreach($apps as $app)
+                            <option value="{{ $app->id }}" {{ (int) $filters['app_id'] === (int) $app->id ? 'selected' : '' }}>{{ $app->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="page_id">Page</label>
+                    <select id="page_id" name="page_id" class="form-select form-select-sm">
+                        <option value="">All pages</option>
+                        @foreach($pages as $page)
+                            <option value="{{ $page->id }}" data-app-id="{{ $page->facebook_app_id }}" {{ (int) $filters['page_id'] === (int) $page->id ? 'selected' : '' }}>{{ $page->page_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="status">Status</label>
+                    <select id="status" name="status" class="form-select form-select-sm">
+                        <option value="">All statuses</option>
+                        @foreach($statusOptions as $status)
+                            <option value="{{ $status }}" {{ $filters['status'] === $status ? 'selected' : '' }}>{{ ucfirst($status) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="media_type">Media</label>
+                    <select id="media_type" name="media_type" class="form-select form-select-sm">
+                        <option value="">All media types</option>
+                        @foreach($mediaTypeOptions as $mediaType)
+                            <option value="{{ $mediaType }}" {{ $filters['media_type'] === $mediaType ? 'selected' : '' }}>{{ ucfirst($mediaType) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="platform">Platform</label>
+                    <select id="platform" name="platform" class="form-select form-select-sm">
+                        <option value="">All platforms</option>
+                        @foreach($platformOptions as $platform)
+                            <option value="{{ $platform }}" {{ $filters['platform'] === $platform ? 'selected' : '' }}>{{ str($platform)->replace('_', ' ')->title() }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="posted_from">Posted from</label>
+                    <input type="date" id="posted_from" name="posted_from" class="form-control form-control-sm" value="{{ $filters['posted_from'] }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="posted_to">Posted to</label>
+                    <input type="date" id="posted_to" name="posted_to" class="form-control form-control-sm" value="{{ $filters['posted_to'] }}">
+                </div>
+            </div>
+        </form>
+
         <div class="table-responsive">
-            <table class="table align-middle">
+            <table class="table align-middle table-hover" id="postHistoryTable">
                 <thead>
                     <tr>
                         <th>
@@ -141,7 +210,12 @@
             </table>
         </div>
 
-        {{ $posts->links() }}
+        <div class="d-flex justify-content-between flex-wrap gap-2 align-items-center">
+            <small class="text-muted">
+                Showing {{ $posts->firstItem() ?? 0 }} to {{ $posts->lastItem() ?? 0 }} of {{ $posts->total() }} posts
+            </small>
+            {{ $posts->links() }}
+        </div>
     </div>
 </div>
 @endsection
@@ -153,6 +227,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectAll = document.getElementById('selectAllPosts');
     const checkboxes = Array.from(document.querySelectorAll('.post-checkbox'));
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const appFilter = document.getElementById('app_id');
+    const pageFilter = document.getElementById('page_id');
 
     const getSelectedIds = () => checkboxes.filter((checkbox) => checkbox.checked).map((checkbox) => Number(checkbox.value));
 
@@ -206,6 +282,33 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshBulkState();
         });
     });
+
+    const syncPageOptionsByApp = () => {
+        if (!appFilter || !pageFilter) return;
+
+        const selectedAppId = Number(appFilter.value || 0);
+        const options = Array.from(pageFilter.options);
+
+        options.forEach((option, index) => {
+            if (index === 0) {
+                option.hidden = false;
+                return;
+            }
+
+            const optionAppId = Number(option.dataset.appId || 0);
+            option.hidden = selectedAppId > 0 && optionAppId !== selectedAppId;
+        });
+
+        if (selectedAppId > 0) {
+            const selectedOption = pageFilter.options[pageFilter.selectedIndex];
+            if (selectedOption && selectedOption.hidden) {
+                pageFilter.value = '';
+            }
+        }
+    };
+
+    appFilter?.addEventListener('change', syncPageOptionsByApp);
+    syncPageOptionsByApp();
 
     document.querySelectorAll('.edit-post-form').forEach(form => {
         form.addEventListener('submit', (event) => {
@@ -288,6 +391,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             (payload.accepted || []).forEach((id) => removeRow(Number(id)));
+            checkboxes.forEach((checkbox) => {
+                if (selectedIds.includes(Number(checkbox.value))) {
+                    checkbox.checked = false;
+                }
+            });
+            if (selectAll) {
+                selectAll.checked = false;
+            }
             refreshBulkState();
 
             if ((payload.skipped || []).length > 0 || (payload.not_found || []).length > 0) {
