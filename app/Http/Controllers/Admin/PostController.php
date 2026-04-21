@@ -38,15 +38,76 @@ class PostController extends Controller
     {
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $posts = FacebookPost::query()->ownedBy(Auth::user())
+        $filters = [
+            'search' => trim((string) $request->query('search', '')),
+            'app_id' => (int) $request->query('app_id', 0),
+            'page_id' => (int) $request->query('page_id', 0),
+            'status' => (string) $request->query('status', ''),
+            'media_type' => (string) $request->query('media_type', ''),
+            'platform' => (string) $request->query('platform', ''),
+            'posted_from' => (string) $request->query('posted_from', ''),
+            'posted_to' => (string) $request->query('posted_to', ''),
+        ];
+
+        $posts = FacebookPost::query()
+            ->ownedBy(Auth::user())
             ->whereNull('deleted_at')
             ->with(['page.facebookAccount.app', 'images'])
+            ->when($filters['search'] !== '', function ($query) use ($filters) {
+                $query->where(function ($innerQuery) use ($filters) {
+                    $innerQuery
+                        ->where('message', 'like', '%'.$filters['search'].'%')
+                        ->orWhere('id', $filters['search']);
+                });
+            })
+            ->when($filters['app_id'] > 0, fn ($query) => $query->whereHas('page', fn ($pageQuery) => $pageQuery->where('facebook_app_id', $filters['app_id'])))
+            ->when($filters['page_id'] > 0, fn ($query) => $query->where('page_id', $filters['page_id']))
+            ->when($filters['status'] !== '', fn ($query) => $query->where('status', $filters['status']))
+            ->when($filters['media_type'] !== '', fn ($query) => $query->where('media_type', $filters['media_type']))
+            ->when($filters['platform'] !== '', fn ($query) => $query->whereJsonContains('platforms', $filters['platform']))
+            ->when($filters['posted_from'] !== '', fn ($query) => $query->whereDate('posted_at', '>=', $filters['posted_from']))
+            ->when($filters['posted_to'] !== '', fn ($query) => $query->whereDate('posted_at', '<=', $filters['posted_to']))
             ->latest()
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
-        return view('admin.facebook.posts', compact('posts'));
+        $statusOptions = [
+            FacebookPost::STATUS_PENDING,
+            FacebookPost::STATUS_PROCESSING,
+            FacebookPost::STATUS_PUBLISHED,
+            FacebookPost::STATUS_FAILED,
+        ];
+
+        $mediaTypeOptions = [
+            FacebookPost::MEDIA_TYPE_IMAGE,
+            FacebookPost::MEDIA_TYPE_VIDEO,
+        ];
+
+        $platformOptions = ['facebook', 'instagram', 'google_business'];
+
+        $apps = FacebookApp::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $pages = FacebookPage::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->orderBy('page_name')
+            ->get(['id', 'page_name', 'facebook_app_id']);
+
+        return view('admin.facebook.posts', compact(
+            'posts',
+            'filters',
+            'statusOptions',
+            'mediaTypeOptions',
+            'platformOptions',
+            'apps',
+            'pages',
+        ));
     }
 
     public function create(Request $request)
