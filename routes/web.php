@@ -158,6 +158,7 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
         Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
+        Route::post('posts/bulk-delete', [PostController::class, 'bulkDestroy'])->name('bulk-destroy');
     });
 
 Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])

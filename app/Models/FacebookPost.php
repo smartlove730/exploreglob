@@ -22,6 +22,10 @@ class FacebookPost extends Model
     public const STATUS_POSTED = 'published';
     public const STATUS_FAILED = 'failed';
 
+    public const DELETION_STATUS_PENDING = 'pending';
+    public const DELETION_STATUS_SUCCESS = 'success';
+    public const DELETION_STATUS_FAILED = 'failed';
+
     protected $fillable = [
         'user_id',
         'page_id',
@@ -41,6 +45,8 @@ class FacebookPost extends Model
         'last_error',
         'response_json',
         'attempts',
+        'deletion_status',
+        'deleted_at',
     ];
 
     protected $casts = [
@@ -48,6 +54,7 @@ class FacebookPost extends Model
         'scheduled_at' => 'datetime',
         'posted_at' => 'datetime',
         'response_json' => 'array',
+        'deleted_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
