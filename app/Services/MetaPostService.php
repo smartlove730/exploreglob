@@ -17,13 +17,13 @@ class MetaPostService
     ) {
     }
 
-    public function publish(FacebookPage $page, string $message, ?string $imageUrl, array $platforms, ?int $googleLocationId = null): array
+    public function publish(FacebookPage $page, string $message, ?string $imageUrl, array $platforms, ?int $googleLocationId = null, ?string $localImagePath = null): array
     {
         $responses = [];
 
         foreach ($platforms as $platform) {
             if ($platform === 'facebook') {
-                $responses['facebook'] = $this->facebookGraphService->publishToPage($page, $message, $imageUrl);
+                $responses['facebook'] = $this->facebookGraphService->publishToPage($page, $message, $imageUrl, $localImagePath);
                 continue;
             }
 

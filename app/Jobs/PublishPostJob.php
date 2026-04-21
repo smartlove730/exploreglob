@@ -76,7 +76,8 @@ class PublishPostJob implements ShouldQueue
                     (string) $post->message,
                     $post->image_url,
                     $pendingPlatforms,
-                    $post->google_location_id
+                    $post->google_location_id,
+                    $post->images()->orderBy('id')->value('image_path')
                 );
 
                 $responses = array_merge($responses, (array) ($publishResult['response_json'] ?? []));
