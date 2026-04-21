@@ -24,7 +24,7 @@ class FacebookGraphServiceTest extends TestCase
         parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
 
         $this->assertSame(
-            'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish',
+            'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,instagram_manage_contents',
             $query['scope'] ?? null
         );
         $this->assertSame('rerequest', $query['auth_type'] ?? null);

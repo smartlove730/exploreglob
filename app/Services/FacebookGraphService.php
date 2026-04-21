@@ -20,6 +20,7 @@ class FacebookGraphService
         'pages_manage_posts',
         'instagram_basic',
         'instagram_content_publish',
+        'instagram_manage_contents',
     ];
 
     public function __construct(private readonly InstagramService $instagramService)
