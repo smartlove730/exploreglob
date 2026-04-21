@@ -27,5 +27,6 @@ class FacebookGraphServiceTest extends TestCase
             'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish',
             $query['scope'] ?? null
         );
+        $this->assertSame('rerequest', $query['auth_type'] ?? null);
     }
 }

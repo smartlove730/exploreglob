@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\FacebookPage;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -132,12 +133,33 @@ class MetaPostService
             return;
         }
 
-        $response = Http::delete("https://graph.facebook.com/{$this->apiVersion}/{$instagramMediaId}", [
-            'access_token' => $page->page_access_token,
-        ]);
+        $response = $this->performInstagramDeleteRequest($instagramMediaId, $page->page_access_token);
 
-        if (!$response->ok()) {
-            throw new RuntimeException('Unable to delete Instagram media: '.$response->body());
+        if ($response->ok()) {
+            return;
         }
+
+        $errorCode = (int) data_get($response->json(), 'error.code', 0);
+        $isPermissionIssue = $errorCode === 10;
+        $fallbackToken = (string) optional($page->facebookAccount)->long_lived_user_token;
+
+        if ($isPermissionIssue && $fallbackToken !== '' && $fallbackToken !== $page->page_access_token) {
+            $fallbackResponse = $this->performInstagramDeleteRequest($instagramMediaId, $fallbackToken);
+
+            if ($fallbackResponse->ok()) {
+                return;
+            }
+
+            throw new RuntimeException('Unable to delete Instagram media: '.$fallbackResponse->body());
+        }
+
+        throw new RuntimeException('Unable to delete Instagram media: '.$response->body());
+    }
+
+    private function performInstagramDeleteRequest(string $instagramMediaId, string $accessToken): Response
+    {
+        return Http::delete("https://graph.facebook.com/{$this->apiVersion}/{$instagramMediaId}", [
+            'access_token' => $accessToken,
+        ]);
     }
 }

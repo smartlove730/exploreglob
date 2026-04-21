@@ -32,6 +32,7 @@ class FacebookGraphService
             'client_id' => $app->app_id,
             'redirect_uri' => $app->redirect_uri,
             'scope' => implode(',', self::OAUTH_SCOPES),
+            'auth_type' => 'rerequest',
         ]);
 
         return "https://www.facebook.com/{$this->apiVersion}/dialog/oauth?{$query}";
