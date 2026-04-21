@@ -14,6 +14,14 @@ use Throwable;
 class FacebookGraphService
 {
     private string $apiVersion = 'v19.0';
+    private const OAUTH_SCOPES = [
+        'pages_show_list',
+        'pages_read_engagement',
+        'pages_manage_posts',
+        'instagram_basic',
+        'instagram_content_publish',
+        'instagram_manage_contents',
+    ];
 
     public function __construct(private readonly InstagramService $instagramService)
     {
@@ -24,7 +32,8 @@ class FacebookGraphService
         $query = http_build_query([
             'client_id' => $app->app_id,
             'redirect_uri' => $app->redirect_uri,
-            'scope' => 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish',
+            'scope' => implode(',', self::OAUTH_SCOPES),
+            'auth_type' => 'rerequest',
         ]);
 
         return "https://www.facebook.com/{$this->apiVersion}/dialog/oauth?{$query}";
