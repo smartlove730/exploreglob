@@ -203,6 +203,68 @@ class AutomationConfigController extends Controller
         return back()->with('success', 'Execution queued to run immediately.');
     }
 
+    public function bulkExecuteNow(Request $request): RedirectResponse
+    {
+        $executionIds = collect($request->validate([
+            'execution_ids' => ['required', 'array', 'min:1'],
+            'execution_ids.*' => ['required', 'integer', 'distinct'],
+        ])['execution_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $executions = AutomationPostLog::query()
+            ->ownedBy(Auth::user())
+            ->whereIn('id', $executionIds)
+            ->where('status', 'scheduled')
+            ->get();
+
+        if ($executions->isEmpty()) {
+            return back()->with('error', 'No scheduled executions were selected.');
+        }
+
+        foreach ($executions as $execution) {
+            $execution->update([
+                'status' => 'scheduled',
+                'message' => 'Execution promoted to run immediately.',
+                'scheduled_for' => now(),
+                'started_at' => null,
+                'completed_at' => null,
+            ]);
+
+            RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id);
+        }
+
+        return back()->with('success', $executions->count().' execution(s) queued to run immediately.');
+    }
+
+    public function bulkCancelExecutions(Request $request): RedirectResponse
+    {
+        $executionIds = collect($request->validate([
+            'execution_ids' => ['required', 'array', 'min:1'],
+            'execution_ids.*' => ['required', 'integer', 'distinct'],
+        ])['execution_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $affected = AutomationPostLog::query()
+            ->ownedBy(Auth::user())
+            ->whereIn('id', $executionIds)
+            ->whereIn('status', ['scheduled', 'in_progress'])
+            ->update([
+                'status' => 'cancelled',
+                'message' => 'Execution cancelled by user.',
+                'completed_at' => now(),
+            ]);
+
+        if ($affected === 0) {
+            return back()->with('error', 'No scheduled or in-progress executions were selected.');
+        }
+
+        return back()->with('success', $affected.' execution(s) deleted successfully.');
+    }
+
     private function authorizeAutomation(AutomationConfig $automation): void
     {
         if (!Auth::user()?->isAdmin() && $automation->user_id !== Auth::id()) {

@@ -80,11 +80,27 @@
 
 <div class="card border-0 shadow-sm mt-3">
     <div class="card-body">
-        <h2 class="h5">Scheduled / In-Progress Automations</h2>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h2 class="h5 mb-0">Scheduled / In-Progress Automations</h2>
+            <div class="d-flex gap-2">
+                <form id="bulk-run-now-form" action="{{ route('admin.automations.executions.bulk-run-now') }}" method="POST" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-success" data-bulk-action disabled>Execute Selected Immediately</button>
+                </form>
+                <form id="bulk-delete-form" action="{{ route('admin.automations.executions.bulk-destroy') }}" method="POST" class="d-inline" onsubmit="return confirm('Delete selected executions?')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-sm btn-outline-danger" data-bulk-action disabled>Delete Selected</button>
+                </form>
+            </div>
+        </div>
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
                     <tr>
+                        <th style="width: 36px;">
+                            <input type="checkbox" id="executions-select-all" aria-label="Select all executions">
+                        </th>
                         <th>Automation</th>
                         <th>Page</th>
                         <th>Execution Time</th>
@@ -98,6 +114,15 @@
                 <tbody>
                     @forelse($inProgressLogs as $log)
                         <tr>
+                            <td>
+                                <input
+                                    type="checkbox"
+                                    class="execution-checkbox"
+                                    value="{{ $log->id }}"
+                                    data-status="{{ $log->status }}"
+                                    aria-label="Select execution {{ $log->id }}"
+                                >
+                            </td>
                             <td>{{ $log->automationConfig?->name ?: 'Automation #'.$log->automation_config_id }}</td>
                             <td>{{ $log->page?->page_name ?? '-' }}</td>
                             <td>{{ $log->scheduled_for?->toDateTimeString() ?? $log->created_at?->toDateTimeString() }}</td>
@@ -127,7 +152,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-muted">No scheduled or in-progress automations.</td>
+                            <td colspan="9" class="text-center text-muted">No scheduled or in-progress automations.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -136,3 +161,58 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    (function () {
+        const selectAll = document.getElementById('executions-select-all');
+        const checkboxes = Array.from(document.querySelectorAll('.execution-checkbox'));
+        const bulkActionButtons = Array.from(document.querySelectorAll('[data-bulk-action]'));
+        const bulkRunForm = document.getElementById('bulk-run-now-form');
+        const bulkDeleteForm = document.getElementById('bulk-delete-form');
+
+        if (!selectAll || checkboxes.length === 0 || !bulkRunForm || !bulkDeleteForm) {
+            return;
+        }
+
+        const syncBulkSelectionInputs = () => {
+            bulkRunForm.querySelectorAll('input[name="execution_ids[]"]').forEach((node) => node.remove());
+            bulkDeleteForm.querySelectorAll('input[name="execution_ids[]"]').forEach((node) => node.remove());
+
+            const selected = checkboxes.filter((checkbox) => checkbox.checked);
+
+            selected.forEach((checkbox) => {
+                const runInput = document.createElement('input');
+                runInput.type = 'hidden';
+                runInput.name = 'execution_ids[]';
+                runInput.value = checkbox.value;
+                bulkRunForm.appendChild(runInput);
+
+                const deleteInput = document.createElement('input');
+                deleteInput.type = 'hidden';
+                deleteInput.name = 'execution_ids[]';
+                deleteInput.value = checkbox.value;
+                bulkDeleteForm.appendChild(deleteInput);
+            });
+
+            bulkActionButtons.forEach((button) => {
+                button.disabled = selected.length === 0;
+            });
+
+            selectAll.checked = selected.length === checkboxes.length;
+            selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+        };
+
+        selectAll.addEventListener('change', () => {
+            checkboxes.forEach((checkbox) => {
+                checkbox.checked = selectAll.checked;
+            });
+            syncBulkSelectionInputs();
+        });
+
+        checkboxes.forEach((checkbox) => {
+            checkbox.addEventListener('change', syncBulkSelectionInputs);
+        });
+    })();
+</script>
+@endpush

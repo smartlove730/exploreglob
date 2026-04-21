@@ -184,6 +184,8 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
         Route::post('automations/{automation}/toggle', [AutomationConfigController::class, 'toggle'])->name('toggle');
         Route::delete('automations/executions/{execution}', [AutomationConfigController::class, 'cancelExecution'])->name('executions.destroy');
         Route::post('automations/executions/{execution}/run-now', [AutomationConfigController::class, 'executeNow'])->name('executions.run-now');
+        Route::post('automations/executions/bulk-run-now', [AutomationConfigController::class, 'bulkExecuteNow'])->name('executions.bulk-run-now');
+        Route::delete('automations/executions/bulk-delete', [AutomationConfigController::class, 'bulkCancelExecutions'])->name('executions.bulk-destroy');
     });
 
 Route::middleware(['auth', 'admin'])
