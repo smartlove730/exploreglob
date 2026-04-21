@@ -10,7 +10,7 @@
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <div class="row g-2 align-items-end mb-3">
-            <div class="col-md-8">
+            <div class="col-lg-6">
                 <label class="form-label">Pages / Accounts</label>
                 <select class="form-select" id="pageSelector" multiple>
                     @foreach($pages as $page)
@@ -19,9 +19,37 @@
                 </select>
                 <small class="text-muted">Use Ctrl/Cmd to select multiple pages.</small>
             </div>
-            <div class="col-md-4 d-flex gap-2">
-                <button class="btn btn-primary" id="fetchPostsBtn">Fetch Posts</button>
+            <div class="col-lg-6 d-flex gap-2">
+                <button class="btn btn-outline-primary" id="syncPostsBtn">Sync Posts</button>
+                <button class="btn btn-primary" id="loadPostsBtn">Load Posts</button>
                 <button class="btn btn-outline-danger" id="bulkDeleteBtn" disabled>Bulk Delete</button>
+            </div>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-md-3">
+                <label class="form-label small">Platform</label>
+                <select id="platformFilter" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="instagram">Instagram</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Search Content / ID</label>
+                <input type="text" id="searchFilter" class="form-control form-control-sm" placeholder="Keyword">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">External Post ID</label>
+                <input type="text" id="postIdFilter" class="form-control form-control-sm" placeholder="e.g. 123_456">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Created From</label>
+                <input type="date" id="createdFromFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Created To</label>
+                <input type="date" id="createdToFilter" class="form-control form-control-sm">
             </div>
         </div>
 
@@ -42,7 +70,7 @@
                     </tr>
                 </thead>
                 <tbody id="postsTableBody">
-                    <tr><td colspan="8" class="text-center text-muted">Select one or more pages and click "Fetch Posts".</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted">Sync and load posts to start managing them.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -51,21 +79,25 @@
 @endsection
 
 @push('scripts')
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" />
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     const pageSelector = document.getElementById('pageSelector');
-    const fetchPostsBtn = document.getElementById('fetchPostsBtn');
+    const syncPostsBtn = document.getElementById('syncPostsBtn');
+    const loadPostsBtn = document.getElementById('loadPostsBtn');
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
     const tableBody = document.getElementById('postsTableBody');
     const alerts = document.getElementById('alerts');
     const selectAllPosts = document.getElementById('selectAllPosts');
     const statusPollMap = new Map();
+    let dataTable = null;
 
     const getSelectedPageIds = () => [...pageSelector.selectedOptions].map(opt => Number(opt.value));
-    const decodePayload = (encoded) => JSON.parse(decodeURIComponent(escape(window.atob(encoded))));
-    const encodePayload = (payload) => window.btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    const getSelectedRows = () => [...document.querySelectorAll('.post-checkbox:checked')].map(chk => decodePayload(chk.dataset.payload));
+    const selectedPostIds = () => [...document.querySelectorAll('.post-checkbox:checked')].map(chk => Number(chk.value));
 
     const showAlert = (message, type = 'info') => {
         alerts.innerHTML = `<div class="alert alert-${type} py-2 mb-2">${message}</div>`;
@@ -80,20 +112,48 @@ document.addEventListener('DOMContentLoaded', () => {
         return '<span class="badge text-bg-light text-dark">-</span>';
     };
 
-    const renderPosts = (posts) => {
-        if (!posts.length) {
-            tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No posts found.</td></tr>';
+    const refreshBulkButton = () => {
+        const selected = selectedPostIds().length;
+        bulkDeleteBtn.disabled = selected === 0;
+        bulkDeleteBtn.textContent = selected ? `Bulk Delete (${selected})` : 'Bulk Delete';
+    };
+
+    const initializeDataTable = () => {
+        if (!window.jQuery || !window.jQuery.fn.DataTable) {
             return;
         }
 
-        tableBody.innerHTML = posts.map((post, index) => {
-            const encoded = encodePayload(post);
-            return `
-            <tr id="row-${index}">
-                <td><input type="checkbox" class="post-checkbox" data-payload="${encoded}"></td>
+        if (dataTable) {
+            dataTable.destroy();
+            dataTable = null;
+        }
+
+        dataTable = window.jQuery('#postsTable').DataTable({
+            order: [[5, 'desc']],
+            pageLength: 25,
+            columnDefs: [
+                { orderable: false, targets: [0, 6, 7] },
+            ],
+        });
+    };
+
+    const renderPosts = (posts) => {
+        if (!posts.length) {
+            if (dataTable) {
+                dataTable.destroy();
+                dataTable = null;
+            }
+
+            tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No posts found in database.</td></tr>';
+            return;
+        }
+
+        tableBody.innerHTML = posts.map((post) => `
+            <tr data-post-id="${post.id}">
+                <td><input type="checkbox" class="post-checkbox" value="${post.id}"></td>
                 <td class="small">${post.external_post_id}</td>
                 <td><span class="badge text-bg-info text-capitalize">${post.platform}</span></td>
-                <td>${post.page_name}</td>
+                <td>${post.page_name || '-'}</td>
                 <td>
                     ${post.content ? `<div>${post.content.substring(0, 120)}</div>` : '<span class="text-muted">No text</span>'}
                     ${post.media_preview_url ? `<div class="mt-1"><img src="${post.media_preview_url}" alt="preview" style="max-width:70px; max-height:70px; border-radius:6px;"></div>` : ''}
@@ -101,19 +161,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${post.created_time || '-'}</td>
                 <td class="deletion-status">${statusLabel('none')}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-danger single-delete-btn" data-payload="${encoded}">Delete</button>
+                    <button class="btn btn-sm btn-outline-danger single-delete-btn" data-post-id="${post.id}">Delete</button>
                 </td>
             </tr>
-        `;
-        }).join('');
+        `).join('');
 
-        bindRowHandlers();
+        document.querySelectorAll('.post-checkbox').forEach(chk => chk.addEventListener('change', refreshBulkButton));
+        document.querySelectorAll('.single-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const postId = Number(btn.dataset.postId || 0);
+                if (!postId) return;
+                if (!window.confirm('Schedule deletion for this post?')) return;
+
+                await queueDelete([postId]);
+            });
+        });
+
+        initializeDataTable();
+        refreshBulkButton();
     };
 
-    const refreshBulkButton = () => {
-        const selected = document.querySelectorAll('.post-checkbox:checked').length;
-        bulkDeleteBtn.disabled = selected === 0;
-        bulkDeleteBtn.textContent = selected ? `Bulk Delete (${selected})` : 'Bulk Delete';
+    const loadPosts = async () => {
+        const pageIds = getSelectedPageIds();
+
+        const response = await fetch(`{{ route('admin.facebook.manage-posts.list') }}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({
+                page_ids: pageIds,
+                platform: document.getElementById('platformFilter').value || null,
+                search: document.getElementById('searchFilter').value || null,
+                external_post_id: document.getElementById('postIdFilter').value || null,
+                created_from: document.getElementById('createdFromFilter').value || null,
+                created_to: document.getElementById('createdToFilter').value || null,
+            }),
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.message || 'Unable to load posts from database.');
+        }
+
+        renderPosts(payload.posts || []);
+        showAlert(`Loaded ${(payload.posts || []).length} posts from database.`, 'success');
     };
 
     const startPollingStatuses = (jobIds = []) => {
@@ -129,16 +224,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`{{ route('admin.facebook.manage-posts.statuses') }}?ids=${activeIds.join(',')}`);
             const payload = await response.json();
             (payload.jobs || []).forEach(job => {
-                const rowBtn = document.querySelector(`.single-delete-btn[data-job-id="${job.id}"]`);
-                const row = rowBtn?.closest('tr');
-                if (!row) return;
+                const row = document.querySelector(`tr[data-post-id="${job.synced_social_post_id}"]`);
+                if (!row) {
+                    statusPollMap.delete(job.id);
+                    return;
+                }
 
                 const statusCell = row.querySelector('.deletion-status');
                 statusCell.innerHTML = statusLabel(job.status);
 
-                if (job.status === 'completed' || job.status === 'failed') {
+                if (job.status === 'completed') {
+                    if (dataTable) {
+                        dataTable.row(row).remove().draw(false);
+                    } else {
+                        row.remove();
+                    }
                     statusPollMap.delete(job.id);
-                    if (job.status === 'failed' && job.error_message) {
+                }
+
+                if (job.status === 'failed') {
+                    statusPollMap.delete(job.id);
+                    if (job.error_message) {
                         statusCell.innerHTML += `<div class="small text-danger">${job.error_message}</div>`;
                     }
                 }
@@ -152,9 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tick();
     };
 
-    const queueDelete = async (posts) => {
-        if (!posts.length) return;
-
+    const queueDelete = async (postIds) => {
         const response = await fetch(`{{ route('admin.facebook.manage-posts.delete') }}`, {
             method: 'POST',
             headers: {
@@ -163,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
             },
-            body: JSON.stringify({ posts }),
+            body: JSON.stringify({ post_ids: postIds }),
         });
 
         const payload = await response.json();
@@ -171,58 +275,32 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error(payload.message || 'Unable to schedule deletions.');
         }
 
-        const jobs = payload.jobs || [];
+        (payload.jobs || []).forEach(job => {
+            const row = document.querySelector(`tr[data-post-id="${job.synced_social_post_id}"]`);
+            if (!row) return;
 
-        jobs.forEach(job => {
-            const rowBtn = [...document.querySelectorAll('.single-delete-btn')].find(btn => {
-                const rowPayload = decodePayload(btn.dataset.payload);
-                return rowPayload.external_post_id === job.external_post_id
-                    && rowPayload.platform === job.platform;
-            });
-
-            if (!rowBtn) return;
-
-            rowBtn.dataset.jobId = String(job.id);
-            rowBtn.disabled = true;
-            rowBtn.textContent = 'Scheduled';
-            rowBtn.closest('tr').querySelector('.deletion-status').innerHTML = statusLabel(job.status);
+            row.querySelector('.deletion-status').innerHTML = statusLabel(job.status);
+            const btn = row.querySelector('.single-delete-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Scheduled';
+            }
         });
 
-        startPollingStatuses(jobs.map(job => job.id));
+        startPollingStatuses((payload.jobs || []).map(job => job.id));
         showAlert(payload.message || 'Deletion scheduled.', 'success');
     };
 
-    const bindRowHandlers = () => {
-        document.querySelectorAll('.post-checkbox').forEach(chk => {
-            chk.addEventListener('change', refreshBulkButton);
-        });
-
-        document.querySelectorAll('.single-delete-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const post = decodePayload(btn.dataset.payload);
-                if (!window.confirm(`Schedule deletion for ${post.external_post_id}?`)) return;
-
-                try {
-                    await queueDelete([post]);
-                } catch (error) {
-                    showAlert(error.message || 'Deletion scheduling failed.', 'danger');
-                }
-            });
-        });
-    };
-
-    fetchPostsBtn.addEventListener('click', async () => {
+    syncPostsBtn.addEventListener('click', async () => {
         const pageIds = getSelectedPageIds();
         if (!pageIds.length) {
             showAlert('Please select at least one page/account.', 'warning');
             return;
         }
 
-        fetchPostsBtn.disabled = true;
-        tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Loading posts...</td></tr>';
-
+        syncPostsBtn.disabled = true;
         try {
-            const response = await fetch(`{{ route('admin.facebook.manage-posts.fetch') }}`, {
+            const response = await fetch(`{{ route('admin.facebook.manage-posts.sync') }}`, {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': csrfToken,
@@ -235,35 +313,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const payload = await response.json();
             if (!response.ok || !payload.success) {
-                throw new Error(payload.message || 'Unable to fetch posts.');
+                throw new Error(payload.message || 'Sync failed.');
             }
-
-            renderPosts(payload.posts || []);
-            refreshBulkButton();
 
             if ((payload.errors || []).length) {
-                showAlert(`Posts loaded with warnings: ${(payload.errors || []).join(' | ')}`, 'warning');
+                showAlert(`${payload.message} Warnings: ${(payload.errors || []).join(' | ')}`, 'warning');
             } else {
-                showAlert(`Fetched ${(payload.posts || []).length} post(s).`, 'success');
+                showAlert(payload.message, 'success');
             }
+
+            await loadPosts();
         } catch (error) {
-            tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Failed to load posts.</td></tr>';
-            showAlert(error.message || 'Failed to fetch posts.', 'danger');
+            showAlert(error.message || 'Unable to sync posts.', 'danger');
         } finally {
-            fetchPostsBtn.disabled = false;
+            syncPostsBtn.disabled = false;
+        }
+    });
+
+    loadPostsBtn.addEventListener('click', async () => {
+        loadPostsBtn.disabled = true;
+        try {
+            await loadPosts();
+        } catch (error) {
+            showAlert(error.message || 'Unable to load posts.', 'danger');
+        } finally {
+            loadPostsBtn.disabled = false;
         }
     });
 
     bulkDeleteBtn.addEventListener('click', async () => {
-        const selected = getSelectedRows();
-        if (!selected.length) return;
-
-        if (!window.confirm(`Schedule deletion for ${selected.length} selected post(s)?`)) {
-            return;
-        }
+        const ids = selectedPostIds();
+        if (!ids.length) return;
+        if (!window.confirm(`Schedule deletion for ${ids.length} selected post(s)?`)) return;
 
         try {
-            await queueDelete(selected);
+            await queueDelete(ids);
         } catch (error) {
             showAlert(error.message || 'Bulk deletion scheduling failed.', 'danger');
         }

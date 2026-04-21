@@ -30,7 +30,7 @@ class ProcessSocialPostDeletionJob implements ShouldQueue
 
     public function handle(MetaPostService $metaPostService): void
     {
-        $job = SocialPostDeletionJob::query()->with('page.facebookAccount')->find($this->deletionJobId);
+        $job = SocialPostDeletionJob::query()->with(['page.facebookAccount', 'syncedPost'])->find($this->deletionJobId);
 
         if (!$job || !$job->page) {
             return;
@@ -61,6 +61,7 @@ class ProcessSocialPostDeletionJob implements ShouldQueue
                     'processed_at' => now(),
                     'error_message' => null,
                 ])->save();
+                $job->syncedPost?->delete();
 
                 return;
             }
@@ -73,6 +74,8 @@ class ProcessSocialPostDeletionJob implements ShouldQueue
             'processed_at' => now(),
             'error_message' => null,
         ])->save();
+
+        $job->syncedPost?->delete();
     }
 
     public function failed(Throwable $exception): void

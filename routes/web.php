@@ -136,7 +136,8 @@ Route::middleware(['auth', 'role:customer,admin'])
 
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
         Route::get('manage-posts', [SocialPostManagerController::class, 'index'])->name('manage-posts.index');
-        Route::post('manage-posts/fetch', [SocialPostManagerController::class, 'fetchPosts'])->name('manage-posts.fetch');
+        Route::post('manage-posts/sync', [SocialPostManagerController::class, 'syncPosts'])->name('manage-posts.sync');
+        Route::post('manage-posts/list', [SocialPostManagerController::class, 'listPosts'])->name('manage-posts.list');
         Route::post('manage-posts/delete', [SocialPostManagerController::class, 'deletePosts'])->name('manage-posts.delete');
         Route::get('manage-posts/statuses', [SocialPostManagerController::class, 'statuses'])->name('manage-posts.statuses');
     });

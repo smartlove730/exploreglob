@@ -18,6 +18,7 @@ class SocialPostDeletionJob extends Model
     protected $fillable = [
         'user_id',
         'facebook_page_id',
+        'synced_social_post_id',
         'platform',
         'external_post_id',
         'post_created_at',
@@ -42,5 +43,10 @@ class SocialPostDeletionJob extends Model
     public function page(): BelongsTo
     {
         return $this->belongsTo(FacebookPage::class, 'facebook_page_id');
+    }
+
+    public function syncedPost(): BelongsTo
+    {
+        return $this->belongsTo(SyncedSocialPost::class, 'synced_social_post_id');
     }
 }
