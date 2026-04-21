@@ -13,15 +13,15 @@ return new class extends Migration {
             $table->foreignId('facebook_page_id')->constrained('facebook_pages')->cascadeOnDelete();
             $table->string('platform', 20);
             $table->string('external_post_id');
-            $table->timestamp('post_created_at')->nullable();
+            $table->dateTime('post_created_at')->nullable();
             $table->text('content_preview')->nullable();
             $table->text('media_preview_url')->nullable();
             $table->string('status', 20)->default('pending');
             $table->text('error_message')->nullable();
             $table->unsignedInteger('attempts_count')->default(0);
             $table->json('meta')->nullable();
-            $table->timestamp('scheduled_for');
-            $table->timestamp('processed_at')->nullable();
+            $table->dateTime('scheduled_for');
+            $table->dateTime('processed_at')->nullable();
             $table->timestamps();
 
             $table->index(['status', 'scheduled_for'], 'social_post_deletion_status_sched_idx');
