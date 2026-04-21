@@ -142,7 +142,7 @@ class PublishPostJob implements ShouldQueue
             }
 
             if ($platform === 'facebook') {
-                $responses['facebook'] = $metaVideoService->postToFacebookVideo($post->page, $post->video_url, $post->message);
+                $responses['facebook'] = $metaVideoService->postToFacebookVideo($post->page, $post->video_url, $post->message, $post->video_path);
                 $post->facebook_post_id = $post->facebook_post_id ?: (data_get($responses, 'facebook.id') ?: data_get($responses, 'facebook.post_id'));
                 continue;
             }

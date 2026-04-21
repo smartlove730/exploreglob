@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\FacebookPage;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -15,7 +16,7 @@ class MetaVideoService
     {
     }
 
-    public function postToFacebookVideo(FacebookPage $page, string $videoUrl, string $caption): array
+    public function postToFacebookVideo(FacebookPage $page, string $videoUrl, string $caption, ?string $videoPath = null): array
     {
         $this->assertPublicHttpsVideoUrl($videoUrl);
 
@@ -24,6 +25,30 @@ class MetaVideoService
             'description' => $caption,
             'access_token' => $page->page_access_token,
         ]);
+
+        if (!$response->ok() && $this->shouldRetryFacebookVideoAsUpload($response->body())) {
+            $localVideo = $this->resolveLocalVideoUpload($videoPath);
+
+            if ($localVideo) {
+                try {
+                    $uploadResponse = Http::attach(
+                        'source',
+                        $localVideo['stream'],
+                        $localVideo['filename'],
+                        ['Content-Type' => 'video/mp4']
+                    )->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/videos", [
+                        'description' => $caption,
+                        'access_token' => $page->page_access_token,
+                    ]);
+                } finally {
+                    fclose($localVideo['stream']);
+                }
+
+                if ($uploadResponse->ok()) {
+                    return $uploadResponse->json();
+                }
+            }
+        }
 
         if (!$response->ok()) {
             throw new RuntimeException('Unable to post Facebook video: '.$response->body());
@@ -170,5 +195,38 @@ class MetaVideoService
         }
 
         return false;
+    }
+
+    private function shouldRetryFacebookVideoAsUpload(string $responseBody): bool
+    {
+        if ($responseBody === '') {
+            return false;
+        }
+
+        return str_contains($responseBody, '"code":389')
+            || str_contains($responseBody, '"error_subcode":1363057')
+            || str_contains(strtolower($responseBody), 'unable to fetch video file from url');
+    }
+
+    private function resolveLocalVideoUpload(?string $videoPath): ?array
+    {
+        if (!$videoPath) {
+            return null;
+        }
+
+        if (!Storage::disk('public')->exists($videoPath)) {
+            return null;
+        }
+
+        $absolutePath = Storage::disk('public')->path($videoPath);
+        $stream = @fopen($absolutePath, 'r');
+        if (!is_resource($stream)) {
+            return null;
+        }
+
+        return [
+            'stream' => $stream,
+            'filename' => basename($absolutePath),
+        ];
     }
 }
