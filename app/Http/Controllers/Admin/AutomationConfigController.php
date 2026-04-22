@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AutomationConfig;
+use App\Models\AutomationFailedMedia;
 use App\Models\AutomationPostLog;
 use App\Models\DriveApiKey;
 use App\Models\FacebookApp;
@@ -47,7 +48,14 @@ class AutomationConfigController extends Controller
             ->limit(25)
             ->get();
 
-        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs', 'instagramUsernames'));
+        $failedMediaItems = AutomationFailedMedia::query()
+            ->ownedBy(Auth::user())
+            ->with(['automationConfig', 'page'])
+            ->latest('last_failed_at')
+            ->limit(100)
+            ->get();
+
+        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs', 'instagramUsernames', 'failedMediaItems'));
     }
 
     public function create()

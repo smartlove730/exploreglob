@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\RunAutomationJob;
 use App\Models\AutomationConfig;
+use App\Models\AutomationFailedMedia;
 use App\Models\AutomationPostLog;
 use App\Models\DriveImagePost;
 use App\Models\FacebookPage;
@@ -129,55 +130,58 @@ class AutomationService
             $mediaItems = collect($drivePayload['media'] ?? []);
             $platforms = $this->normalizePlatforms($config->platforms);
 
-            $unusedMedia = $this->resolveUnusedImage($config, $mediaItems, $platforms);
+            $mediaCandidates = $this->resolveUnusedMediaCandidates($config, $mediaItems, $platforms);
 
-            if (!$unusedMedia) {
+            if ($mediaCandidates->isEmpty()) {
                 $this->logSkipped($config, 'No unused media available in Drive folder.', $automationLogId);
 
                 return;
             }
 
-            $mediaType = (string) ($unusedMedia['type'] ?? 'image');
-            $mediaUrl = (string) ($unusedMedia['download_url'] ?? $unusedMedia['preview_url'] ?? '');
-
-            if ($mediaType === 'image' && in_array('instagram', $platforms, true)) {
-                $mediaUrl = $this->driveService->prepareInstagramEligibleImage($unusedMedia, $config->driveApiKey);
-            }
-
-            if ($mediaType === 'video' && in_array('instagram', $platforms, true)) {
-                // Re-host Drive videos to a stable public URL before handing off to Instagram processing.
-                $mediaUrl = $this->driveService->prepareInstagramEligibleVideo($unusedMedia, $config->driveApiKey);
-            }
-
-            if ($mediaType === 'video' && in_array('google_business', $platforms, true)) {
-                $platforms = array_values(array_filter($platforms, fn (string $platform) => $platform !== 'google_business'));
-            }
-
-            $driveFileId = (string) ($unusedMedia['id'] ?? '');
-            $platformReservations = $this->reserveMediaPlatforms($config, $driveFileId, $platforms);
-            $platforms = $platformReservations['platforms_to_publish'];
-
-            if (empty($platforms)) {
-                $this->logSkipped($config, 'No unposted platforms available for selected media.', $automationLogId);
-
-                return;
-            }
-
-            $caption = $this->aiCaptionService->generateCaption($config->prompt, $mediaUrl);
-
             /** @var FacebookPage|null $page */
             $page = $config->page;
             if (!$page || !$page->is_active) {
-                $this->logFailed($config, $unusedMedia, $platforms, 'Selected page is missing or inactive.', $automationLogId);
+                $this->logFailed($config, null, $platforms, 'Selected page is missing or inactive.', $automationLogId);
 
                 return;
             }
 
-            $result = $mediaType === 'video'
-                ? $this->publishVideoAutomation($page, $caption, $mediaUrl, $platforms)
-                : $this->metaPostService->publish($page, $caption, $mediaUrl, $platforms);
+            $posted = false;
+            $lastError = null;
 
-            DB::transaction(function () use ($config, $unusedMedia, $platforms, $result, $caption, $mediaUrl, $folderId, $automationLogId, $mediaType) {
+            foreach ($mediaCandidates as $unusedMedia) {
+                $attemptPlatforms = $platforms;
+                $driveFileId = (string) ($unusedMedia['id'] ?? '');
+                $mediaType = (string) ($unusedMedia['type'] ?? 'image');
+                $mediaUrl = (string) ($unusedMedia['download_url'] ?? $unusedMedia['preview_url'] ?? '');
+
+                try {
+                    if ($mediaType === 'image' && in_array('instagram', $attemptPlatforms, true)) {
+                        $mediaUrl = $this->driveService->prepareInstagramEligibleImage($unusedMedia, $config->driveApiKey);
+                    }
+
+                    if ($mediaType === 'video' && in_array('instagram', $attemptPlatforms, true)) {
+                        // Re-host Drive videos to a stable public URL before handing off to Instagram processing.
+                        $mediaUrl = $this->driveService->prepareInstagramEligibleVideo($unusedMedia, $config->driveApiKey);
+                    }
+
+                    if ($mediaType === 'video' && in_array('google_business', $attemptPlatforms, true)) {
+                        $attemptPlatforms = array_values(array_filter($attemptPlatforms, fn (string $platform) => $platform !== 'google_business'));
+                    }
+
+                    $platformReservations = $this->reserveMediaPlatforms($config, $driveFileId, $attemptPlatforms);
+                    $attemptPlatforms = $platformReservations['platforms_to_publish'];
+
+                    if (empty($attemptPlatforms)) {
+                        continue;
+                    }
+
+                    $caption = $this->aiCaptionService->generateCaption($config->prompt, $mediaUrl);
+                    $result = $mediaType === 'video'
+                        ? $this->publishVideoAutomation($page, $caption, $mediaUrl, $attemptPlatforms)
+                        : $this->metaPostService->publish($page, $caption, $mediaUrl, $attemptPlatforms);
+
+                    DB::transaction(function () use ($config, $unusedMedia, $attemptPlatforms, $result, $caption, $mediaUrl, $folderId, $automationLogId, $mediaType) {
                 $facebookPost = FacebookPost::create([
                     'user_id' => $config->user_id,
                     'page_id' => $config->page_id,
@@ -185,7 +189,7 @@ class AutomationService
                     'media_type' => $mediaType,
                     'image_url' => $mediaType === 'image' ? $mediaUrl : null,
                     'video_url' => $mediaType === 'video' ? $mediaUrl : null,
-                    'platforms' => $platforms,
+                    'platforms' => $attemptPlatforms,
                     'status' => FacebookPost::STATUS_PUBLISHED,
                     'posted_at' => now(),
                     'facebook_post_id' => $result['facebook_post_id'] ?? null,
@@ -208,7 +212,7 @@ class AutomationService
                     'drive_folder_id' => $folderId,
                     'image_url' => $mediaUrl,
                     'caption' => $caption,
-                    'platforms' => $platforms,
+                    'platforms' => $attemptPlatforms,
                     'facebook_post_id' => $result['facebook_post_id'] ?? null,
                     'instagram_media_id' => $result['instagram_media_id'] ?? null,
                     'response_json' => $result['response_json'] ?? null,
@@ -223,7 +227,7 @@ class AutomationService
                     'drive_file_name' => (string) ($unusedMedia['name'] ?? null),
                     'image_url' => $mediaUrl,
                     'caption' => $caption,
-                    'platforms' => $platforms,
+                    'platforms' => $attemptPlatforms,
                     'facebook_post_id' => $result['facebook_post_id'] ?? null,
                     'instagram_media_id' => $result['instagram_media_id'] ?? null,
                     'status' => 'success',
@@ -236,8 +240,37 @@ class AutomationService
                 ], $automationLogId);
 
                 $config->forceFill(['last_run_at' => now()])->save();
-            });
-                $this->markMediaPlatformsPosted($config, $driveFileId, $platforms, $result);
+                    });
+
+                    $this->markMediaPlatformsPosted($config, $driveFileId, $attemptPlatforms, $result);
+                    $posted = true;
+
+                    break;
+                } catch (Throwable $mediaException) {
+                    if (!empty($driveFileId) && !empty($attemptPlatforms)) {
+                        $this->markMediaPlatformsFailed($config, $driveFileId, $attemptPlatforms, $mediaException->getMessage());
+                    }
+
+                    $lastError = $mediaException->getMessage();
+                    $this->recordFailedMedia($config, $unusedMedia, $folderId, $attemptPlatforms, $mediaException->getMessage());
+
+                    Log::warning('Automation media skipped due to failure', [
+                        'automation_config_id' => $config->id,
+                        'drive_file_id' => $driveFileId,
+                        'error' => $mediaException->getMessage(),
+                    ]);
+                }
+            }
+
+            if (!$posted) {
+                $this->logFailed(
+                    $config,
+                    null,
+                    $this->normalizePlatforms($config->platforms),
+                    $lastError ?: 'All eligible media failed. Skipped until new media is available.',
+                    $automationLogId
+                );
+            }
             } catch (Throwable $exception) {
                 if (isset($driveFileId) && isset($platforms) && !empty($driveFileId) && !empty($platforms)) {
                     $this->markMediaPlatformsFailed($config, $driveFileId, $platforms, $exception->getMessage());
@@ -296,13 +329,26 @@ class AutomationService
         return null;
     }
 
-    private function resolveUnusedImage(AutomationConfig $config, Collection $images, array $platforms): ?array
+    private function resolveUnusedMediaCandidates(AutomationConfig $config, Collection $images, array $platforms): Collection
     {
+        $failedFileIds = AutomationFailedMedia::query()
+            ->where('automation_config_id', $config->id)
+            ->where('page_id', $config->page_id)
+            ->pluck('drive_file_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         return $images
-            ->first(function ($image) use ($config, $platforms) {
+            ->filter(function ($image) use ($config, $platforms, $failedFileIds) {
                 $driveFileId = (string) ($image['id'] ?? '');
 
                 if ($driveFileId === '') {
+                    return false;
+                }
+
+                if (in_array($driveFileId, $failedFileIds, true)) {
                     return false;
                 }
 
@@ -313,7 +359,48 @@ class AutomationService
                     ->whereIn('platform', $platforms)
                     ->where('status', PostedMedia::STATUS_POSTED)
                     ->count() < count($platforms);
-            });
+            })
+            ->values();
+    }
+
+    private function recordFailedMedia(AutomationConfig $config, array $media, string $folderId, array $platforms, string $error): void
+    {
+        $driveFileId = (string) ($media['id'] ?? '');
+        if ($driveFileId === '') {
+            return;
+        }
+
+        $existing = AutomationFailedMedia::query()
+            ->where('automation_config_id', $config->id)
+            ->where('page_id', $config->page_id)
+            ->where('drive_file_id', $driveFileId)
+            ->first();
+
+        $payload = [
+            'user_id' => $config->user_id,
+            'automation_config_id' => $config->id,
+            'page_id' => $config->page_id,
+            'drive_folder_id' => $folderId !== '' ? $folderId : null,
+            'drive_file_id' => $driveFileId,
+            'drive_file_name' => (string) ($media['name'] ?? ''),
+            'media_type' => (string) ($media['type'] ?? 'image'),
+            'source_url' => (string) ($media['download_url'] ?? $media['preview_url'] ?? ''),
+            'platforms' => array_values($platforms),
+            'failure_reason' => mb_strimwidth($error, 0, 65500, '...'),
+            'last_failed_at' => now(),
+        ];
+
+        if ($existing) {
+            $existing->update($payload + [
+                'fail_count' => $existing->fail_count + 1,
+            ]);
+
+            return;
+        }
+
+        AutomationFailedMedia::query()->create($payload + [
+            'fail_count' => 1,
+        ]);
     }
 
     private function reserveMediaPlatforms(AutomationConfig $config, string $driveFileId, array $platforms): array
