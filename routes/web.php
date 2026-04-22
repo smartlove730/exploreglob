@@ -109,6 +109,7 @@ use App\Http\Controllers\Admin\GoogleController;
 use App\Http\Controllers\Admin\AutomationConfigController;
 use App\Http\Controllers\Admin\ScheduledPostController;
 use App\Http\Controllers\Admin\SaasManagementController;
+use App\Http\Controllers\Admin\SocialPostManagerController;
 use App\Http\Controllers\AutomationController;
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
@@ -134,6 +135,11 @@ Route::middleware(['auth', 'role:customer,admin'])
         Route::resource('drive-folders', DriveFolderController::class)->except(['show']);
 
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
+        Route::get('manage-posts', [SocialPostManagerController::class, 'index'])->name('manage-posts.index');
+        Route::post('manage-posts/sync', [SocialPostManagerController::class, 'syncPosts'])->name('manage-posts.sync');
+        Route::post('manage-posts/list', [SocialPostManagerController::class, 'listPosts'])->name('manage-posts.list');
+        Route::post('manage-posts/delete', [SocialPostManagerController::class, 'deletePosts'])->name('manage-posts.delete');
+        Route::get('manage-posts/statuses', [SocialPostManagerController::class, 'statuses'])->name('manage-posts.statuses');
     });
 
 Route::middleware(['auth', 'role:customer,admin'])
