@@ -7,6 +7,8 @@ use Illuminate\Validation\ValidationException;
 
 class GoogleDriveService
 {
+    private const MAX_FILE_BINARY_BYTES = 40 * 1024 * 1024; // 40 MB
+
     public function extractFolderId(string $folderUrl): string
     {
         $folderUrl = trim($folderUrl);
@@ -201,7 +203,25 @@ class GoogleDriveService
             $query['resourceKey'] = $resourceKey;
         }
 
-        $request = Http::timeout(30)->withHeaders(['Accept' => 'image/*,video/*']);
+        $sizeBytes = $this->fetchFileSizeBytes($fileId, $apiKey, $resourceKey, $accessToken);
+        if ($sizeBytes !== null && $sizeBytes > self::MAX_FILE_BINARY_BYTES) {
+            throw ValidationException::withMessages([
+                'file_id' => 'Google Drive file is too large to process on this server.',
+            ]);
+        }
+
+        $request = Http::timeout(30)
+            ->withOptions([
+                'on_headers' => static function ($response): void {
+                    $contentLength = (int) $response->getHeaderLine('Content-Length');
+                    if ($contentLength > 0 && $contentLength > self::MAX_FILE_BINARY_BYTES) {
+                        throw ValidationException::withMessages([
+                            'file_id' => 'Google Drive file is too large to process on this server.',
+                        ]);
+                    }
+                },
+            ])
+            ->withHeaders(['Accept' => 'image/*,video/*']);
 
         if ($accessToken) {
             $request = $request->withToken($accessToken);
@@ -219,6 +239,39 @@ class GoogleDriveService
             'content' => $response->body(),
             'content_type' => $response->header('Content-Type', 'image/jpeg'),
         ];
+    }
+
+    private function fetchFileSizeBytes(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): ?int
+    {
+        $query = [
+            'fields' => 'size',
+            'supportsAllDrives' => 'true',
+        ];
+
+        if (!$accessToken && $apiKey) {
+            $query['key'] = $apiKey;
+        }
+
+        if ($resourceKey !== '') {
+            $query['resourceKey'] = $resourceKey;
+        }
+
+        $request = Http::timeout(15);
+        if ($accessToken) {
+            $request = $request->withToken($accessToken);
+        }
+
+        $response = $request->get("https://www.googleapis.com/drive/v3/files/{$fileId}", $query);
+        if (!$response->successful()) {
+            return null;
+        }
+
+        $size = $response->json('size');
+        if ($size === null || $size === '') {
+            return null;
+        }
+
+        return (int) $size;
     }
 
     private function isSupportedMediaMimeType(string $mimeType): bool

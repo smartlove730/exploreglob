@@ -9,6 +9,7 @@ use App\Models\DriveApiKey;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Jobs\RunAutomationJob;
+use App\Services\AutomationService;
 use App\Services\InstagramService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,13 @@ class AutomationConfigController extends Controller
             ->limit(25)
             ->get();
 
-        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs', 'instagramUsernames'));
+        $noPostableContentWarning = AutomationPostLog::query()
+            ->ownedBy(Auth::user())
+            ->where('message', 'like', AutomationService::NO_POSTABLE_MEDIA_MESSAGE.'%')
+            ->where('created_at', '>=', now()->subDay())
+            ->exists();
+
+        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs', 'instagramUsernames', 'noPostableContentWarning'));
     }
 
     public function create()
@@ -223,16 +230,20 @@ class AutomationConfigController extends Controller
             return back()->with('error', 'No scheduled executions were selected.');
         }
 
+        $nextRunAt = now();
         foreach ($executions as $execution) {
+            $nextRunAt = $nextRunAt->copy()->addMinutes(random_int(1, 2));
+
             $execution->update([
                 'status' => 'scheduled',
                 'message' => 'Execution promoted to run immediately.',
-                'scheduled_for' => now(),
+                'scheduled_for' => $nextRunAt,
                 'started_at' => null,
                 'completed_at' => null,
             ]);
 
-            RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id);
+            RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id)
+                ->delay($nextRunAt);
         }
 
         return back()->with('success', $executions->count().' execution(s) queued to run immediately.');

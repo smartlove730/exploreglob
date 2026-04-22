@@ -54,6 +54,7 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.manage-posts.*') ? 'active' : '' }}" href="{{ $facebookManagePostsUrl }}">Manage Social Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.automations.*') ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.automations.failed-posts.*') ? 'active' : '' }}" href="{{ route('admin.automations.failed-posts.index') }}">Failed Automation Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.billing.*') ? 'active' : '' }}" href="{{ route('app.billing.plans') }}">Subscription</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.settings.*') ? 'active' : '' }}" href="{{ route('app.settings.index') }}">Settings</a></li>
                 @if($isAdmin)

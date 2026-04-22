@@ -6,6 +6,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <h1 class="h3 mb-0">Post History</h1>
     <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-warning d-none" id="bulkRetryBtn">Retry Failed</button>
         <button type="button" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled>Delete Selected</button>
         <a class="btn btn-primary" href="{{ route('admin.posts.create') }}">Create Post</a>
     </div>
@@ -103,7 +104,7 @@
                     @forelse($posts as $post)
                         <tr id="post-row-{{ $post->id }}" data-post-id="{{ $post->id }}">
                             <td>
-                                <input type="checkbox" class="post-checkbox" value="{{ $post->id }}" aria-label="Select post {{ $post->id }}">
+                                <input type="checkbox" class="post-checkbox" data-status="{{ $post->status }}" value="{{ $post->id }}" aria-label="Select post {{ $post->id }}">
                             </td>
                             <td>{{ $post->page?->facebookAccount?->app?->name ?? '-' }}</td>
                             <td>{{ $post->page?->page_name }}</td>
@@ -117,6 +118,18 @@
                             <td><span class="badge text-bg-{{ $post->status === 'published' ? 'success' : 'secondary' }}">{{ ucfirst($post->status) }}</span></td>
                             <td>{{ optional($post->posted_at)->format('M d, Y H:i') ?? '-' }}</td>
                             <td class="d-flex gap-1">
+                                @if($post->status !== 'published')
+                                    <form method="POST" action="{{ route('admin.posts.execute-now', $post->id) }}" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Execute Immediately</button>
+                                    </form>
+                                @endif
+                                @if($post->status === 'failed')
+                                    <form method="POST" action="{{ route('admin.posts.retry', $post->id) }}" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-warning">Retry Post</button>
+                                    </form>
+                                @endif
                                 <button
                                     type="button"
                                     class="btn btn-sm btn-outline-primary"
@@ -227,15 +240,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectAll = document.getElementById('selectAllPosts');
     const checkboxes = Array.from(document.querySelectorAll('.post-checkbox'));
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const bulkRetryBtn = document.getElementById('bulkRetryBtn');
     const appFilter = document.getElementById('app_id');
     const pageFilter = document.getElementById('page_id');
 
     const getSelectedIds = () => checkboxes.filter((checkbox) => checkbox.checked).map((checkbox) => Number(checkbox.value));
+    const getSelectedFailedIds = () => checkboxes
+        .filter((checkbox) => checkbox.checked && checkbox.dataset.status === 'failed')
+        .map((checkbox) => Number(checkbox.value));
 
     const refreshBulkState = () => {
         const selectedCount = getSelectedIds().length;
+        const selectedFailedCount = getSelectedFailedIds().length;
         bulkDeleteBtn.disabled = selectedCount === 0;
         bulkDeleteBtn.textContent = selectedCount > 0 ? `Delete Selected (${selectedCount})` : 'Delete Selected';
+
+        if (!bulkRetryBtn) return;
+
+        const hasFailedSelection = selectedFailedCount > 0;
+        bulkRetryBtn.classList.toggle('d-none', !hasFailedSelection);
+        bulkRetryBtn.disabled = !hasFailedSelection;
+        bulkRetryBtn.textContent = hasFailedSelection ? `Retry Failed (${selectedFailedCount})` : 'Retry Failed';
     };
 
     const markRowDeleting = (postId) => {
@@ -410,6 +435,39 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             notify(error.message || 'Bulk deletion failed.', true);
             window.location.reload();
+        }
+    });
+
+    bulkRetryBtn?.addEventListener('click', async () => {
+        const selectedFailedIds = getSelectedFailedIds();
+        if (!selectedFailedIds.length) return;
+
+        if (!window.confirm(`Retry ${selectedFailedIds.length} failed post(s)? They will be scheduled with a 2-5 minute gap.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`{{ route('admin.posts.bulk-retry') }}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ post_ids: selectedFailedIds }),
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.message || 'Bulk retry failed.');
+            }
+
+            notify(payload.message || 'Retry jobs queued.');
+            window.location.reload();
+        } catch (error) {
+            notify(error.message || 'Bulk retry failed.', true);
         }
     });
 

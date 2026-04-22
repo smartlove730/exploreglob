@@ -150,6 +150,8 @@ class PostController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        @set_time_limit(120);
+
         $data = $this->validatePostRequest($request);
         $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? []);
         if ($pages->isEmpty()) {
@@ -170,6 +172,14 @@ class PostController extends Controller
         }
 
         $createdCount = 0;
+        $nextPublishAt = now();
+        $cachedEligibleImageUrl = null;
+        if ($mediaType === FacebookPost::MEDIA_TYPE_IMAGE && !empty($data['image_url'])) {
+            $cachedEligibleImageUrl = $this->ensureInstagramEligibleImage((string) $data['image_url'], $data['platforms']);
+            if ($cachedEligibleImageUrl) {
+                $this->assertPublicHttpsImageUrl($cachedEligibleImageUrl);
+            }
+        }
         foreach ($pages as $page) {
             $post = FacebookPost::create([
                 'user_id' => $page->user_id,
@@ -192,14 +202,18 @@ class PostController extends Controller
                     'image_url' => null,
                 ]);
 
-                PublishPostJob::dispatch($post->id);
+                $nextPublishAt = $this->nextPostDispatchAt($nextPublishAt, 5, 10);
+                $post->update(['scheduled_at' => $nextPublishAt]);
+                PublishPostJob::dispatch($post->id)->delay($nextPublishAt);
                 $createdCount++;
                 continue;
             }
 
             $this->syncImages($post, $request, []);
-            $publishImageUrl = $this->resolvePublishImageUrl($post);
-            $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
+            $publishImageUrl = $cachedEligibleImageUrl ?: $this->resolvePublishImageUrl($post);
+            if (!$cachedEligibleImageUrl) {
+                $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
+            }
 
             if (in_array('instagram', $data['platforms'], true) && !$publishImageUrl) {
                 throw ValidationException::withMessages(['images' => 'Instagram requires at least one image URL or upload.']);
@@ -212,7 +226,9 @@ class PostController extends Controller
                 'last_error' => null,
             ]);
 
-            PublishPostJob::dispatch($post->id);
+            $nextPublishAt = $this->nextPostDispatchAt($nextPublishAt, 5, 10);
+            $post->update(['scheduled_at' => $nextPublishAt]);
+            PublishPostJob::dispatch($post->id)->delay($nextPublishAt);
             $createdCount++;
         }
 
@@ -569,6 +585,8 @@ class PostController extends Controller
 
     public function postDriveImages(Request $request): JsonResponse
     {
+        @set_time_limit(180);
+
         $data = $request->validate([
             'app_id' => 'required|integer|exists:facebook_apps,id',
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
@@ -635,6 +653,8 @@ class PostController extends Controller
         }
 
         $results = [];
+        $nextPublishAt = now();
+        $instagramEligibleCache = [];
         $requestedMetaPlatforms = collect($platforms)
             ->filter(fn (string $platform) => in_array($platform, ['facebook', 'instagram'], true))
             ->values()
@@ -689,7 +709,12 @@ class PostController extends Controller
                 }
 
                 $queueImageUrls = collect($publishableMedia)
-                    ->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms))
+                    ->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImageCached(
+                        $instagramEligibleCache,
+                        (string) $imageMeta['file_id'].'|'.implode(',', $platforms),
+                        $imageMeta['public_url'],
+                        $platforms
+                    ))
                     ->all();
                 foreach ($queueImageUrls as $queueImageUrl) {
                     if ($queueImageUrl) {
@@ -730,7 +755,9 @@ class PostController extends Controller
                     ];
                 }
 
-                PublishPostJob::dispatch($post->id);
+                $nextPublishAt = $this->nextPostDispatchAt($nextPublishAt, 5, 10);
+                $post->update(['scheduled_at' => $nextPublishAt]);
+                PublishPostJob::dispatch($post->id)->delay($nextPublishAt);
             }
 
             $successCount = count($results);
@@ -766,7 +793,12 @@ class PostController extends Controller
 
                 $mediaType = $imageMeta['media_type'] ?? FacebookPost::MEDIA_TYPE_IMAGE;
                 $imageUrl = $mediaType === FacebookPost::MEDIA_TYPE_IMAGE
-                    ? $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platformsToPublish)
+                    ? $this->ensureInstagramEligibleImageCached(
+                        $instagramEligibleCache,
+                        (string) $imageMeta['file_id'].'|'.implode(',', $platformsToPublish),
+                        $imageMeta['public_url'],
+                        $platformsToPublish
+                    )
                     : null;
                 $videoUrl = $mediaType === FacebookPost::MEDIA_TYPE_VIDEO ? $imageMeta['public_url'] : null;
                 if ($imageUrl) {
@@ -804,7 +836,9 @@ class PostController extends Controller
                         'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
                     ]);
 
-                    PublishPostJob::dispatch($post->id);
+                    $nextPublishAt = $this->nextPostDispatchAt($nextPublishAt, 5, 10);
+                    $post->update(['scheduled_at' => $nextPublishAt]);
+                    PublishPostJob::dispatch($post->id)->delay($nextPublishAt);
 
                     $results[] = [
                         'page_id' => $page->id,
@@ -843,6 +877,104 @@ class PostController extends Controller
         ], $successCount > 0 ? 200 : 422);
     }
 
+    public function executeNow(int $id): RedirectResponse
+    {
+        $post = FacebookPost::query()
+            ->ownedBy(Auth::user())
+            ->whereNull('deleted_at')
+            ->findOrFail($id);
+
+        if ($post->status === FacebookPost::STATUS_PUBLISHED) {
+            return back()->with('error', 'Post is already published.');
+        }
+
+        $post->update([
+            'status' => FacebookPost::STATUS_PENDING,
+            'last_error' => null,
+            'scheduled_at' => now(),
+        ]);
+
+        PublishPostJob::dispatch($post->id);
+
+        return back()->with('success', 'Post queued to execute immediately.');
+    }
+
+    public function retry(int $id): RedirectResponse
+    {
+        $post = FacebookPost::query()
+            ->ownedBy(Auth::user())
+            ->whereNull('deleted_at')
+            ->findOrFail($id);
+
+        if ($post->status !== FacebookPost::STATUS_FAILED) {
+            return back()->with('error', 'Only failed posts can be retried.');
+        }
+
+        $post->update([
+            'status' => FacebookPost::STATUS_PENDING,
+            'last_error' => null,
+            'scheduled_at' => now(),
+        ]);
+
+        PublishPostJob::dispatch($post->id);
+
+        return back()->with('success', 'Retry queued for failed post.');
+    }
+
+    public function bulkRetry(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'post_ids' => ['required', 'array', 'min:1'],
+            'post_ids.*' => ['required', 'integer'],
+        ]);
+
+        $posts = FacebookPost::query()
+            ->ownedBy(Auth::user())
+            ->whereNull('deleted_at')
+            ->whereIn('id', $data['post_ids'])
+            ->get()
+            ->keyBy('id');
+
+        $accepted = [];
+        $skipped = [];
+        $notFound = array_values(array_diff($data['post_ids'], $posts->keys()->all()));
+        $nextDispatchAt = now();
+
+        foreach ($data['post_ids'] as $postId) {
+            /** @var FacebookPost|null $post */
+            $post = $posts->get($postId);
+            if (!$post) {
+                continue;
+            }
+
+            if ($post->status !== FacebookPost::STATUS_FAILED) {
+                $skipped[] = [
+                    'post_id' => $post->id,
+                    'reason' => 'not_failed',
+                ];
+                continue;
+            }
+
+            $nextDispatchAt = $this->nextPostDispatchAt($nextDispatchAt, 2, 5);
+            $post->update([
+                'status' => FacebookPost::STATUS_PENDING,
+                'last_error' => null,
+                'scheduled_at' => $nextDispatchAt,
+            ]);
+
+            PublishPostJob::dispatch($post->id)->delay($nextDispatchAt);
+            $accepted[] = $post->id;
+        }
+
+        return response()->json([
+            'success' => !empty($accepted),
+            'message' => count($accepted).' failed post retry job(s) queued.',
+            'accepted' => $accepted,
+            'skipped' => $skipped,
+            'not_found' => $notFound,
+        ], !empty($accepted) ? 200 : 422);
+    }
+
     private function resolveExistingDrivePublishedPlatforms(array $pageIds, array $preparedMedia): array
     {
         if (empty($pageIds) || empty($preparedMedia)) {
@@ -862,6 +994,11 @@ class PostController extends Controller
                 ->values()
                 ->all())
             ->all();
+    }
+
+    private function nextPostDispatchAt(\Illuminate\Support\Carbon $cursor, int $minGapMinutes, int $maxGapMinutes): \Illuminate\Support\Carbon
+    {
+        return $cursor->copy()->addMinutes(random_int($minGapMinutes, $maxGapMinutes));
     }
 
     private function resolvePreviouslyPublishedPlatformsForFile(array $publishedMap, ?int $pageId, string $fileId): array
@@ -1041,6 +1178,21 @@ class PostController extends Controller
         }
     }
 
+    private function ensureInstagramEligibleImageCached(array &$cache, string $cacheKey, ?string $imageUrl, array $platforms): ?string
+    {
+        if ($cacheKey !== '' && array_key_exists($cacheKey, $cache)) {
+            return $cache[$cacheKey];
+        }
+
+        $resolved = $this->ensureInstagramEligibleImage($imageUrl, $platforms);
+
+        if ($cacheKey !== '') {
+            $cache[$cacheKey] = $resolved;
+        }
+
+        return $resolved;
+    }
+
     private function assertPublicHttpsImageUrl(string $imageUrl): void
     {
         $host = parse_url($imageUrl, PHP_URL_HOST);
@@ -1100,7 +1252,7 @@ class PostController extends Controller
         }
 
         $binary = $this->downloadDriveBinaryFromUrl($sourceUrl, $mimeType)
-            ?: $this->googleDriveService->fetchFileBinary($fileId, $driveApiKey->api_key, $resourceKey, $driveToken);
+            ?: $this->fetchDriveBinaryWithCompressionFallback($fileId, $resourceKey, $mimeType, $driveApiKey, $driveToken);
         $contentType = strtolower((string) ($binary['content_type'] ?? $mimeType ?: 'image/jpeg'));
         $mediaType = str_starts_with($contentType, 'video/') ? FacebookPost::MEDIA_TYPE_VIDEO : FacebookPost::MEDIA_TYPE_IMAGE;
         $extension = match ($contentType) {
@@ -1162,6 +1314,50 @@ class PostController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function fetchDriveBinaryWithCompressionFallback(
+        string $fileId,
+        string $resourceKey,
+        string $mimeType,
+        DriveApiKey $driveApiKey,
+        ?string $driveToken
+    ): array {
+        try {
+            return $this->googleDriveService->fetchFileBinary($fileId, $driveApiKey->api_key, $resourceKey, $driveToken);
+        } catch (\Throwable $exception) {
+            $isOversized = str_contains(strtolower($exception->getMessage()), 'too large');
+            $isImage = $mimeType === '' || str_starts_with(strtolower($mimeType), 'image/');
+
+            if (!$isOversized || !$isImage) {
+                throw $exception;
+            }
+
+            $previewUrl = $this->googleDriveService->buildPreviewUrl($fileId, $resourceKey);
+            $compressedUrl = $this->driveService->prepareInstagramEligibleFromUrl($previewUrl);
+            $compressedPath = $this->extractPublicStoragePathFromUrl($compressedUrl);
+
+            if ($compressedPath === null || !Storage::disk('public')->exists($compressedPath)) {
+                throw $exception;
+            }
+
+            return [
+                'content' => Storage::disk('public')->get($compressedPath),
+                'content_type' => 'image/jpeg',
+            ];
+        }
+    }
+
+    private function extractPublicStoragePathFromUrl(string $url): ?string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        $storagePrefix = '/storage/';
+
+        if ($path === '' || !str_contains($path, $storagePrefix)) {
+            return null;
+        }
+
+        return ltrim(substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix)), '/');
     }
 
     private function resolvePreferredDriveApiKeyId(): int

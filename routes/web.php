@@ -107,6 +107,7 @@ use App\Http\Controllers\Admin\DriveApiKeyController;
 use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\GoogleController;
 use App\Http\Controllers\Admin\AutomationConfigController;
+use App\Http\Controllers\Admin\AutomationFailedPostController;
 use App\Http\Controllers\Admin\ScheduledPostController;
 use App\Http\Controllers\Admin\SaasManagementController;
 use App\Http\Controllers\Admin\SocialPostManagerController;
@@ -162,9 +163,12 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
         Route::post('posts/drive/images', [PostController::class, 'fetchDriveImages'])->name('drive.images');
         Route::get('posts/drive/image-proxy', [PostController::class, 'proxyDriveImage'])->name('drive.image-proxy');
         Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
+        Route::post('posts/{id}/execute-now', [PostController::class, 'executeNow'])->name('execute-now');
+        Route::post('posts/{id}/retry', [PostController::class, 'retry'])->name('retry');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
         Route::post('posts/bulk-delete', [PostController::class, 'bulkDestroy'])->name('bulk-destroy');
+        Route::post('posts/bulk-retry', [PostController::class, 'bulkRetry'])->name('bulk-retry');
     });
 
 Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
@@ -182,6 +186,7 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
     ->name('admin.automations.')
     ->group(function () {
         Route::get('automations', [AutomationConfigController::class, 'index'])->name('index');
+        Route::get('automations/failed-posts', [AutomationFailedPostController::class, 'index'])->name('failed-posts.index');
         Route::get('automations/create', [AutomationConfigController::class, 'create'])->name('create');
         Route::post('automations', [AutomationConfigController::class, 'store'])->name('store');
         Route::get('automations/{automation}/edit', [AutomationConfigController::class, 'edit'])->name('edit');
@@ -192,6 +197,7 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
         Route::post('automations/executions/{execution}/run-now', [AutomationConfigController::class, 'executeNow'])->name('executions.run-now');
         Route::post('automations/executions/bulk-run-now', [AutomationConfigController::class, 'bulkExecuteNow'])->name('executions.bulk-run-now');
         Route::delete('automations/executions/bulk-delete', [AutomationConfigController::class, 'bulkCancelExecutions'])->name('executions.bulk-destroy');
+        Route::post('automations/executions/bulk-delete', [AutomationConfigController::class, 'bulkCancelExecutions'])->name('executions.bulk-destroy.post');
     });
 
 Route::middleware(['auth', 'admin'])
