@@ -10,6 +10,9 @@ use RuntimeException;
 
 class DriveService
 {
+    private const MAX_IMAGE_DOWNLOAD_BYTES = 20 * 1024 * 1024; // 20 MB
+    private const MAX_MEDIA_DOWNLOAD_BYTES = 40 * 1024 * 1024; // 40 MB
+
     public function __construct(
         private readonly GoogleDriveService $googleDriveService,
         private readonly GoogleService $googleService,
@@ -79,7 +82,7 @@ class DriveService
         }
 
         $response = Http::timeout(45)
-            ->withOptions(['allow_redirects' => true])
+            ->withOptions($this->downloadGuardOptions(self::MAX_IMAGE_DOWNLOAD_BYTES))
             ->withHeaders(['Accept' => 'image/*'])
             ->get($sourceUrl);
 
@@ -149,7 +152,7 @@ class DriveService
         try {
             $response = Http::timeout(45)
                 ->retry(2, 250)
-                ->withOptions(['allow_redirects' => true])
+                ->withOptions($this->downloadGuardOptions(self::MAX_MEDIA_DOWNLOAD_BYTES))
                 ->withHeaders(['Accept' => $mimeType !== '' ? $mimeType : 'image/*,video/*'])
                 ->get($sourceUrl);
 
@@ -174,6 +177,19 @@ class DriveService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function downloadGuardOptions(int $maxBytes): array
+    {
+        return [
+            'allow_redirects' => true,
+            'on_headers' => static function ($response) use ($maxBytes): void {
+                $contentLength = (int) $response->getHeaderLine('Content-Length');
+                if ($contentLength > 0 && $contentLength > $maxBytes) {
+                    throw new RuntimeException("Remote media is too large ({$contentLength} bytes).");
+                }
+            },
+        ];
     }
 
     private function normalizeInstagramDimensions(\GdImage $source): \GdImage
