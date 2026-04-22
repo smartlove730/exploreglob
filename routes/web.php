@@ -164,9 +164,11 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
         Route::get('posts/drive/image-proxy', [PostController::class, 'proxyDriveImage'])->name('drive.image-proxy');
         Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
         Route::post('posts/{id}/execute-now', [PostController::class, 'executeNow'])->name('execute-now');
+        Route::post('posts/{id}/retry', [PostController::class, 'retry'])->name('retry');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
         Route::post('posts/bulk-delete', [PostController::class, 'bulkDestroy'])->name('bulk-destroy');
+        Route::post('posts/bulk-retry', [PostController::class, 'bulkRetry'])->name('bulk-retry');
     });
 
 Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])

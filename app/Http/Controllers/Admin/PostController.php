@@ -899,6 +899,82 @@ class PostController extends Controller
         return back()->with('success', 'Post queued to execute immediately.');
     }
 
+    public function retry(int $id): RedirectResponse
+    {
+        $post = FacebookPost::query()
+            ->ownedBy(Auth::user())
+            ->whereNull('deleted_at')
+            ->findOrFail($id);
+
+        if ($post->status !== FacebookPost::STATUS_FAILED) {
+            return back()->with('error', 'Only failed posts can be retried.');
+        }
+
+        $post->update([
+            'status' => FacebookPost::STATUS_PENDING,
+            'last_error' => null,
+            'scheduled_at' => now(),
+        ]);
+
+        PublishPostJob::dispatch($post->id);
+
+        return back()->with('success', 'Retry queued for failed post.');
+    }
+
+    public function bulkRetry(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'post_ids' => ['required', 'array', 'min:1'],
+            'post_ids.*' => ['required', 'integer'],
+        ]);
+
+        $posts = FacebookPost::query()
+            ->ownedBy(Auth::user())
+            ->whereNull('deleted_at')
+            ->whereIn('id', $data['post_ids'])
+            ->get()
+            ->keyBy('id');
+
+        $accepted = [];
+        $skipped = [];
+        $notFound = array_values(array_diff($data['post_ids'], $posts->keys()->all()));
+        $nextDispatchAt = now();
+
+        foreach ($data['post_ids'] as $postId) {
+            /** @var FacebookPost|null $post */
+            $post = $posts->get($postId);
+            if (!$post) {
+                continue;
+            }
+
+            if ($post->status !== FacebookPost::STATUS_FAILED) {
+                $skipped[] = [
+                    'post_id' => $post->id,
+                    'reason' => 'not_failed',
+                ];
+                continue;
+            }
+
+            $nextDispatchAt = $this->nextPostDispatchAt($nextDispatchAt, 2, 5);
+            $post->update([
+                'status' => FacebookPost::STATUS_PENDING,
+                'last_error' => null,
+                'scheduled_at' => $nextDispatchAt,
+            ]);
+
+            PublishPostJob::dispatch($post->id)->delay($nextDispatchAt);
+            $accepted[] = $post->id;
+        }
+
+        return response()->json([
+            'success' => !empty($accepted),
+            'message' => count($accepted).' failed post retry job(s) queued.',
+            'accepted' => $accepted,
+            'skipped' => $skipped,
+            'not_found' => $notFound,
+        ], !empty($accepted) ? 200 : 422);
+    }
+
     private function resolveExistingDrivePublishedPlatforms(array $pageIds, array $preparedMedia): array
     {
         if (empty($pageIds) || empty($preparedMedia)) {
