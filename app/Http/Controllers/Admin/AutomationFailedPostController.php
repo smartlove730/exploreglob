@@ -14,7 +14,8 @@ class AutomationFailedPostController extends Controller
             ->where('status', AutomationProcessedMedia::STATUS_FAILED)
             ->whereHas('automation', fn ($query) => $query->where('user_id', Auth::id()))
             ->with('automation:id,name')
-            ->latest('updated_at')
+            ->orderByDesc('failed_at')
+            ->orderByDesc('updated_at')
             ->paginate(50);
 
         return view('admin.automations.failed-posts', compact('failedPosts'));

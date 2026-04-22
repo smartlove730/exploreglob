@@ -19,6 +19,13 @@ class AutomationProcessedMedia extends Model
         'file_id',
         'folder_id',
         'status',
+        'platform',
+        'last_error',
+        'failed_at',
+    ];
+
+    protected $casts = [
+        'failed_at' => 'datetime',
     ];
 
     public function automation(): BelongsTo

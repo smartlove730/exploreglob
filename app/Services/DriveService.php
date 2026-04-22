@@ -62,12 +62,22 @@ class DriveService
             $driveToken = $driveApiKey->oauth_access_token;
         }
 
-        $binary = $this->googleDriveService->fetchImageBinary(
-            $fileId,
-            $driveApiKey->api_key,
-            $resourceKey,
-            $driveToken
-        );
+        try {
+            $binary = $this->googleDriveService->fetchImageBinary(
+                $fileId,
+                $driveApiKey->api_key,
+                $resourceKey,
+                $driveToken
+            );
+        } catch (\Throwable $exception) {
+            $isOversized = str_contains(strtolower($exception->getMessage()), 'too large');
+            $fallbackUrl = (string) ($image['preview_url'] ?? $image['thumbnail_url'] ?? '');
+            if (!$isOversized || $fallbackUrl === '') {
+                throw $exception;
+            }
+
+            return $this->prepareInstagramEligibleFromUrl($fallbackUrl);
+        }
 
         return $this->normalizeBinaryToInstagramJpegUrl(
             (string) ($binary['content'] ?? ''),

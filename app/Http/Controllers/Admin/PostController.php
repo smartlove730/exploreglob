@@ -1139,7 +1139,7 @@ class PostController extends Controller
         }
 
         $binary = $this->downloadDriveBinaryFromUrl($sourceUrl, $mimeType)
-            ?: $this->googleDriveService->fetchFileBinary($fileId, $driveApiKey->api_key, $resourceKey, $driveToken);
+            ?: $this->fetchDriveBinaryWithCompressionFallback($fileId, $resourceKey, $mimeType, $driveApiKey, $driveToken);
         $contentType = strtolower((string) ($binary['content_type'] ?? $mimeType ?: 'image/jpeg'));
         $mediaType = str_starts_with($contentType, 'video/') ? FacebookPost::MEDIA_TYPE_VIDEO : FacebookPost::MEDIA_TYPE_IMAGE;
         $extension = match ($contentType) {
@@ -1201,6 +1201,50 @@ class PostController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function fetchDriveBinaryWithCompressionFallback(
+        string $fileId,
+        string $resourceKey,
+        string $mimeType,
+        DriveApiKey $driveApiKey,
+        ?string $driveToken
+    ): array {
+        try {
+            return $this->googleDriveService->fetchFileBinary($fileId, $driveApiKey->api_key, $resourceKey, $driveToken);
+        } catch (\Throwable $exception) {
+            $isOversized = str_contains(strtolower($exception->getMessage()), 'too large');
+            $isImage = $mimeType === '' || str_starts_with(strtolower($mimeType), 'image/');
+
+            if (!$isOversized || !$isImage) {
+                throw $exception;
+            }
+
+            $previewUrl = $this->googleDriveService->buildPreviewUrl($fileId, $resourceKey);
+            $compressedUrl = $this->driveService->prepareInstagramEligibleFromUrl($previewUrl);
+            $compressedPath = $this->extractPublicStoragePathFromUrl($compressedUrl);
+
+            if ($compressedPath === null || !Storage::disk('public')->exists($compressedPath)) {
+                throw $exception;
+            }
+
+            return [
+                'content' => Storage::disk('public')->get($compressedPath),
+                'content_type' => 'image/jpeg',
+            ];
+        }
+    }
+
+    private function extractPublicStoragePathFromUrl(string $url): ?string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        $storagePrefix = '/storage/';
+
+        if ($path === '' || !str_contains($path, $storagePrefix)) {
+            return null;
+        }
+
+        return ltrim(substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix)), '/');
     }
 
     private function resolvePreferredDriveApiKeyId(): int

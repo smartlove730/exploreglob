@@ -36,22 +36,22 @@ class MediaProcessingService
         });
     }
 
-    public function markPosted(string $fileId): void
+    public function markPosted(string $fileId, array $platforms = []): void
     {
-        $this->markStatus($fileId, AutomationProcessedMedia::STATUS_POSTED);
+        $this->markStatus($fileId, AutomationProcessedMedia::STATUS_POSTED, null, $platforms);
     }
 
-    public function markSkipped(string $fileId): void
+    public function markSkipped(string $fileId, ?string $reason = null, array $platforms = []): void
     {
-        $this->markStatus($fileId, AutomationProcessedMedia::STATUS_SKIPPED);
+        $this->markStatus($fileId, AutomationProcessedMedia::STATUS_SKIPPED, $reason, $platforms);
     }
 
-    public function markFailed(string $fileId): void
+    public function markFailed(string $fileId, ?string $reason = null, array $platforms = []): void
     {
-        $this->markStatus($fileId, AutomationProcessedMedia::STATUS_FAILED);
+        $this->markStatus($fileId, AutomationProcessedMedia::STATUS_FAILED, $reason, $platforms);
     }
 
-    private function markStatus(string $fileId, string $status): void
+    private function markStatus(string $fileId, string $status, ?string $reason = null, array $platforms = []): void
     {
         if ($fileId === '') {
             return;
@@ -59,6 +59,11 @@ class MediaProcessingService
 
         AutomationProcessedMedia::query()
             ->where('file_id', $fileId)
-            ->update(['status' => $status]);
+            ->update([
+                'status' => $status,
+                'platform' => empty($platforms) ? null : implode(',', array_values(array_unique($platforms))),
+                'last_error' => $reason ? mb_strimwidth($reason, 0, 2000, '...') : null,
+                'failed_at' => $status === AutomationProcessedMedia::STATUS_FAILED ? now() : null,
+            ]);
     }
 }

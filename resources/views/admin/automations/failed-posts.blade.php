@@ -18,8 +18,10 @@
                         <th>Drive File ID</th>
                         <th>Folder ID</th>
                         <th>Drive Media Link</th>
+                        <th>Platform</th>
+                        <th>Failure Reason</th>
                         <th>Status</th>
-                        <th>Updated</th>
+                        <th>Failed At</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -33,12 +35,14 @@
                                     Open media
                                 </a>
                             </td>
+                            <td>{{ $failedPost->platform ?: '-' }}</td>
+                            <td class="small text-danger">{{ $failedPost->last_error ?: '-' }}</td>
                             <td><span class="badge text-bg-danger">{{ $failedPost->status }}</span></td>
-                            <td>{{ $failedPost->updated_at?->diffForHumans() }}</td>
+                            <td>{{ ($failedPost->failed_at ?: $failedPost->updated_at)?->diffForHumans() }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No failed automation posts found.</td>
+                            <td colspan="8" class="text-center text-muted">No failed automation posts found.</td>
                         </tr>
                     @endforelse
                 </tbody>

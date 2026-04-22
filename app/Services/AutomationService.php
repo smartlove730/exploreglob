@@ -164,7 +164,7 @@ class AutomationService
                 }
 
                 if (!in_array($mediaType, ['image', 'video'], true)) {
-                    $this->mediaProcessingService->markSkipped($driveFileId);
+                    $this->mediaProcessingService->markSkipped($driveFileId, 'Unsupported media type.', $attemptPlatforms);
 
                     continue;
                 }
@@ -187,7 +187,7 @@ class AutomationService
                     $attemptPlatforms = $platformReservations['platforms_to_publish'];
 
                     if (empty($attemptPlatforms)) {
-                        $this->mediaProcessingService->markSkipped($driveFileId);
+                        $this->mediaProcessingService->markSkipped($driveFileId, 'No unposted platforms available for selected media.', $attemptPlatforms);
                         continue;
                     }
 
@@ -258,7 +258,7 @@ class AutomationService
                     });
 
                     $this->markMediaPlatformsPosted($config, $driveFileId, $attemptPlatforms, $result);
-                    $this->mediaProcessingService->markPosted($driveFileId);
+                    $this->mediaProcessingService->markPosted($driveFileId, $attemptPlatforms);
                     $posted = true;
 
                     break;
@@ -269,9 +269,9 @@ class AutomationService
 
                     $lastError = $mediaException->getMessage();
                     if ($this->isSkippableMediaError($lastError)) {
-                        $this->mediaProcessingService->markSkipped($driveFileId);
+                        $this->mediaProcessingService->markSkipped($driveFileId, $lastError, $attemptPlatforms);
                     } else {
-                        $this->mediaProcessingService->markFailed($driveFileId);
+                        $this->mediaProcessingService->markFailed($driveFileId, $lastError, $attemptPlatforms);
                     }
 
                     Log::warning('Automation media skipped due to failure', [
