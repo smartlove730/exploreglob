@@ -150,6 +150,8 @@ class PostController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        @set_time_limit(120);
+
         $data = $this->validatePostRequest($request);
         $pages = $this->resolveAuthorizedPages((int) $data['app_id'], $data['page_ids'] ?? []);
         if ($pages->isEmpty()) {
@@ -170,6 +172,13 @@ class PostController extends Controller
         }
 
         $createdCount = 0;
+        $cachedEligibleImageUrl = null;
+        if ($mediaType === FacebookPost::MEDIA_TYPE_IMAGE && !empty($data['image_url'])) {
+            $cachedEligibleImageUrl = $this->ensureInstagramEligibleImage((string) $data['image_url'], $data['platforms']);
+            if ($cachedEligibleImageUrl) {
+                $this->assertPublicHttpsImageUrl($cachedEligibleImageUrl);
+            }
+        }
         foreach ($pages as $page) {
             $post = FacebookPost::create([
                 'user_id' => $page->user_id,
@@ -198,8 +207,10 @@ class PostController extends Controller
             }
 
             $this->syncImages($post, $request, []);
-            $publishImageUrl = $this->resolvePublishImageUrl($post);
-            $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
+            $publishImageUrl = $cachedEligibleImageUrl ?: $this->resolvePublishImageUrl($post);
+            if (!$cachedEligibleImageUrl) {
+                $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
+            }
 
             if (in_array('instagram', $data['platforms'], true) && !$publishImageUrl) {
                 throw ValidationException::withMessages(['images' => 'Instagram requires at least one image URL or upload.']);
@@ -569,6 +580,8 @@ class PostController extends Controller
 
     public function postDriveImages(Request $request): JsonResponse
     {
+        @set_time_limit(180);
+
         $data = $request->validate([
             'app_id' => 'required|integer|exists:facebook_apps,id',
             'page_id' => 'nullable|integer|exists:facebook_pages,id',
@@ -635,6 +648,7 @@ class PostController extends Controller
         }
 
         $results = [];
+        $instagramEligibleCache = [];
         $requestedMetaPlatforms = collect($platforms)
             ->filter(fn (string $platform) => in_array($platform, ['facebook', 'instagram'], true))
             ->values()
@@ -689,7 +703,12 @@ class PostController extends Controller
                 }
 
                 $queueImageUrls = collect($publishableMedia)
-                    ->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platforms))
+                    ->map(fn (array $imageMeta) => $this->ensureInstagramEligibleImageCached(
+                        $instagramEligibleCache,
+                        (string) $imageMeta['file_id'].'|'.implode(',', $platforms),
+                        $imageMeta['public_url'],
+                        $platforms
+                    ))
                     ->all();
                 foreach ($queueImageUrls as $queueImageUrl) {
                     if ($queueImageUrl) {
@@ -766,7 +785,12 @@ class PostController extends Controller
 
                 $mediaType = $imageMeta['media_type'] ?? FacebookPost::MEDIA_TYPE_IMAGE;
                 $imageUrl = $mediaType === FacebookPost::MEDIA_TYPE_IMAGE
-                    ? $this->ensureInstagramEligibleImage($imageMeta['public_url'], $platformsToPublish)
+                    ? $this->ensureInstagramEligibleImageCached(
+                        $instagramEligibleCache,
+                        (string) $imageMeta['file_id'].'|'.implode(',', $platformsToPublish),
+                        $imageMeta['public_url'],
+                        $platformsToPublish
+                    )
                     : null;
                 $videoUrl = $mediaType === FacebookPost::MEDIA_TYPE_VIDEO ? $imageMeta['public_url'] : null;
                 if ($imageUrl) {
@@ -1039,6 +1063,21 @@ class PostController extends Controller
 
             return $imageUrl;
         }
+    }
+
+    private function ensureInstagramEligibleImageCached(array &$cache, string $cacheKey, ?string $imageUrl, array $platforms): ?string
+    {
+        if ($cacheKey !== '' && array_key_exists($cacheKey, $cache)) {
+            return $cache[$cacheKey];
+        }
+
+        $resolved = $this->ensureInstagramEligibleImage($imageUrl, $platforms);
+
+        if ($cacheKey !== '') {
+            $cache[$cacheKey] = $resolved;
+        }
+
+        return $resolved;
     }
 
     private function assertPublicHttpsImageUrl(string $imageUrl): void

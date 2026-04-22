@@ -107,6 +107,7 @@ use App\Http\Controllers\Admin\DriveApiKeyController;
 use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\GoogleController;
 use App\Http\Controllers\Admin\AutomationConfigController;
+use App\Http\Controllers\Admin\AutomationFailedPostController;
 use App\Http\Controllers\Admin\ScheduledPostController;
 use App\Http\Controllers\Admin\SaasManagementController;
 use App\Http\Controllers\Admin\SocialPostManagerController;
@@ -182,6 +183,7 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
     ->name('admin.automations.')
     ->group(function () {
         Route::get('automations', [AutomationConfigController::class, 'index'])->name('index');
+        Route::get('automations/failed-posts', [AutomationFailedPostController::class, 'index'])->name('failed-posts.index');
         Route::get('automations/create', [AutomationConfigController::class, 'create'])->name('create');
         Route::post('automations', [AutomationConfigController::class, 'store'])->name('store');
         Route::get('automations/{automation}/edit', [AutomationConfigController::class, 'edit'])->name('edit');

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AutomationProcessedMedia extends Model
 {
@@ -19,4 +20,9 @@ class AutomationProcessedMedia extends Model
         'folder_id',
         'status',
     ];
+
+    public function automation(): BelongsTo
+    {
+        return $this->belongsTo(AutomationConfig::class, 'automation_id');
+    }
 }
