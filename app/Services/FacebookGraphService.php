@@ -8,6 +8,8 @@ use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -119,8 +121,35 @@ class FacebookGraphService
         return (array) $response->json('data', []);
     }
 
-    public function publishToPage(FacebookPage $page, string $message, ?string $imageUrl = null): array
+    public function publishToPage(FacebookPage $page, string $message, ?string $imageUrl = null, ?string $localImagePath = null): array
     {
+        if ($imageUrl) {
+            $uploadableImage = $this->resolveUploadableImage($imageUrl, $localImagePath);
+
+            if ($uploadableImage) {
+                try {
+                    $uploadResponse = Http::attach(
+                        'source',
+                        $uploadableImage['stream'],
+                        $uploadableImage['filename'],
+                        ['Content-Type' => $uploadableImage['content_type']]
+                    )->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/photos", [
+                        'access_token' => $page->page_access_token,
+                        'message' => $message,
+                    ]);
+                } finally {
+                    fclose($uploadableImage['stream']);
+                    if (!empty($uploadableImage['cleanup_path']) && is_string($uploadableImage['cleanup_path'])) {
+                        @unlink($uploadableImage['cleanup_path']);
+                    }
+                }
+
+                if ($uploadResponse->ok()) {
+                    return $uploadResponse->json();
+                }
+            }
+        }
+
         $endpoint = $imageUrl ? 'photos' : 'feed';
         $payload = [
             'access_token' => $page->page_access_token,
@@ -227,5 +256,90 @@ class FacebookGraphService
         }
 
         throw new RuntimeException($fallback.' '.$message);
+    }
+
+    private function resolveUploadableImage(string $imageUrl, ?string $localImagePath): ?array
+    {
+        $localImage = $this->resolveLocalImageUpload($localImagePath);
+        if ($localImage) {
+            return $localImage;
+        }
+
+        return $this->downloadImageToTempFile($imageUrl);
+    }
+
+    private function resolveLocalImageUpload(?string $localImagePath): ?array
+    {
+        if (!$localImagePath || !Storage::disk('public')->exists($localImagePath)) {
+            return null;
+        }
+
+        $absolutePath = Storage::disk('public')->path($localImagePath);
+        $stream = @fopen($absolutePath, 'r');
+        if (!is_resource($stream)) {
+            return null;
+        }
+
+        $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+        $contentType = match ($extension) {
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'gif' => 'image/gif',
+            default => 'image/jpeg',
+        };
+
+        return [
+            'stream' => $stream,
+            'filename' => basename($absolutePath),
+            'content_type' => $contentType,
+            'cleanup_path' => null,
+        ];
+    }
+
+    private function downloadImageToTempFile(string $imageUrl): ?array
+    {
+        try {
+            $response = Http::timeout(45)->withOptions(['allow_redirects' => true])->get($imageUrl);
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (!$response->successful()) {
+            return null;
+        }
+
+        $contentType = strtolower((string) $response->header('Content-Type', 'image/jpeg'));
+        if (!str_starts_with($contentType, 'image/')) {
+            return null;
+        }
+
+        $extension = match (true) {
+            str_contains($contentType, 'png') => 'png',
+            str_contains($contentType, 'webp') => 'webp',
+            str_contains($contentType, 'gif') => 'gif',
+            default => 'jpg',
+        };
+
+        $content = $response->body();
+        if ($content === '') {
+            return null;
+        }
+
+        $tempPath = storage_path('app/tmp/'.Str::uuid()->toString().'.'.$extension);
+        @mkdir(dirname($tempPath), 0775, true);
+        file_put_contents($tempPath, $content);
+
+        $stream = @fopen($tempPath, 'r');
+        if (!is_resource($stream)) {
+            @unlink($tempPath);
+            return null;
+        }
+
+        return [
+            'stream' => $stream,
+            'filename' => basename($tempPath),
+            'content_type' => strtok($contentType, ';') ?: 'image/jpeg',
+            'cleanup_path' => $tempPath,
+        ];
     }
 }

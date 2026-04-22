@@ -76,7 +76,8 @@ class PublishPostJob implements ShouldQueue
                     (string) $post->message,
                     $post->image_url,
                     $pendingPlatforms,
-                    $post->google_location_id
+                    $post->google_location_id,
+                    $post->images()->orderBy('id')->value('image_path')
                 );
 
                 $responses = array_merge($responses, (array) ($publishResult['response_json'] ?? []));
@@ -142,7 +143,7 @@ class PublishPostJob implements ShouldQueue
             }
 
             if ($platform === 'facebook') {
-                $responses['facebook'] = $metaVideoService->postToFacebookVideo($post->page, $post->video_url, $post->message);
+                $responses['facebook'] = $metaVideoService->postToFacebookVideo($post->page, $post->video_url, $post->message, $post->video_path);
                 $post->facebook_post_id = $post->facebook_post_id ?: (data_get($responses, 'facebook.id') ?: data_get($responses, 'facebook.post_id'));
                 continue;
             }

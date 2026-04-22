@@ -88,8 +88,8 @@ class GoogleDriveService
             }
 
             $query = [
-                'q' => "'{$folderId}' in parents and (mimeType contains 'image/' or mimeType contains 'video/') and trashed = false",
-                'fields' => 'nextPageToken,files(id,name,mimeType,webViewLink,resourceKey,thumbnailLink,imageMediaMetadata(width,height),videoMediaMetadata(width,height,durationMillis))',
+                'q' => "'{$folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false",
+                'fields' => 'nextPageToken,files(id,name,mimeType,fileExtension,webViewLink,resourceKey,thumbnailLink,imageMediaMetadata(width,height),videoMediaMetadata(width,height,durationMillis))',
                 'pageSize' => 200,
                 'pageToken' => $pageToken,
                 'supportsAllDrives' => 'true',
@@ -120,9 +120,10 @@ class GoogleDriveService
                 }
 
                 $mimeType = (string) ($file['mimeType'] ?? '');
-                $type = str_starts_with($mimeType, 'video/') ? 'video' : 'image';
+                $extension = strtolower((string) ($file['fileExtension'] ?? pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION)));
+                $type = $this->inferMediaType($mimeType, $extension);
 
-                if (!$this->isSupportedMediaMimeType($mimeType)) {
+                if ($type === null || !$this->isSupportedMediaMimeType($mimeType, $extension)) {
                     continue;
                 }
 
@@ -131,6 +132,7 @@ class GoogleDriveService
                     'name' => (string) ($file['name'] ?? 'Untitled'),
                     'type' => $type,
                     'mime_type' => $mimeType,
+                    'extension' => $extension,
                     'web_view_link' => (string) ($file['webViewLink'] ?? ''),
                     'resource_key' => $resourceKey,
                     'thumbnail_url' => $this->normalizeThumbnailLink((string) ($file['thumbnailLink'] ?? '')),
@@ -191,7 +193,11 @@ class GoogleDriveService
 
     public function fetchFileBinary(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): array
     {
-        $query = ['alt' => 'media'];
+        $query = [
+            'alt' => 'media',
+            'supportsAllDrives' => 'true',
+            'acknowledgeAbuse' => 'true',
+        ];
 
         if (!$accessToken && $apiKey) {
             $query['key'] = $apiKey;
@@ -201,7 +207,7 @@ class GoogleDriveService
             $query['resourceKey'] = $resourceKey;
         }
 
-        $request = Http::timeout(30)->withHeaders(['Accept' => 'image/*,video/*']);
+        $request = Http::timeout(60)->withOptions(['allow_redirects' => true])->withHeaders(['Accept' => 'image/*,video/*']);
 
         if ($accessToken) {
             $request = $request->withToken($accessToken);
@@ -211,7 +217,7 @@ class GoogleDriveService
 
         if (!$response->successful()) {
             throw ValidationException::withMessages([
-                'file_id' => 'Unable to load this Google Drive file.',
+                'file_id' => 'Unable to load this Google Drive file. '.$response->body(),
             ]);
         }
 
@@ -221,15 +227,36 @@ class GoogleDriveService
         ];
     }
 
-    private function isSupportedMediaMimeType(string $mimeType): bool
+    private function isSupportedMediaMimeType(string $mimeType, string $extension = ''): bool
     {
-        return in_array($mimeType, [
+        if (in_array($mimeType, [
             'image/jpeg',
             'image/png',
             'image/webp',
             'image/gif',
             'video/mp4',
             'video/quicktime',
-        ], true);
+        ], true)) {
+            return true;
+        }
+
+        if ($mimeType === 'application/octet-stream') {
+            return in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'mov'], true);
+        }
+
+        return false;
+    }
+
+    private function inferMediaType(string $mimeType, string $extension): ?string
+    {
+        if (str_starts_with($mimeType, 'image/') || in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)) {
+            return 'image';
+        }
+
+        if (str_starts_with($mimeType, 'video/') || in_array($extension, ['mp4', 'mov'], true)) {
+            return 'video';
+        }
+
+        return null;
     }
 }

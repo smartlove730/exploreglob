@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\FacebookPage;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -15,9 +17,35 @@ class MetaVideoService
     {
     }
 
-    public function postToFacebookVideo(FacebookPage $page, string $videoUrl, string $caption): array
+    public function postToFacebookVideo(FacebookPage $page, string $videoUrl, string $caption, ?string $videoPath = null): array
     {
         $this->assertPublicHttpsVideoUrl($videoUrl);
+
+        $uploadableVideo = $this->resolveUploadableVideo($videoUrl, $videoPath);
+        if ($uploadableVideo) {
+            try {
+                $uploadResponse = Http::attach(
+                    'source',
+                    $uploadableVideo['stream'],
+                    $uploadableVideo['filename'],
+                    ['Content-Type' => 'video/mp4']
+                )->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/videos", [
+                    'description' => $caption,
+                    'access_token' => $page->page_access_token,
+                ]);
+            } finally {
+                fclose($uploadableVideo['stream']);
+                if (!empty($uploadableVideo['cleanup_path']) && is_string($uploadableVideo['cleanup_path'])) {
+                    @unlink($uploadableVideo['cleanup_path']);
+                }
+            }
+
+            if ($uploadResponse->ok()) {
+                return $uploadResponse->json();
+            }
+
+            throw new RuntimeException('Unable to post Facebook video via source upload: '.$uploadResponse->body());
+        }
 
         $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/videos", [
             'file_url' => $videoUrl,
@@ -26,7 +54,7 @@ class MetaVideoService
         ]);
 
         if (!$response->ok()) {
-            throw new RuntimeException('Unable to post Facebook video: '.$response->body());
+            throw new RuntimeException('Unable to post Facebook video by URL: '.$response->body());
         }
 
         return $response->json();
@@ -170,5 +198,77 @@ class MetaVideoService
         }
 
         return false;
+    }
+
+    private function resolveUploadableVideo(string $videoUrl, ?string $videoPath): ?array
+    {
+        $localVideo = $this->resolveLocalVideoUpload($videoPath);
+        if ($localVideo) {
+            return $localVideo;
+        }
+
+        return $this->downloadVideoToTempFile($videoUrl);
+    }
+
+    private function resolveLocalVideoUpload(?string $videoPath): ?array
+    {
+        if (!$videoPath) {
+            return null;
+        }
+
+        if (!Storage::disk('public')->exists($videoPath)) {
+            return null;
+        }
+
+        $absolutePath = Storage::disk('public')->path($videoPath);
+        $stream = @fopen($absolutePath, 'r');
+        if (!is_resource($stream)) {
+            return null;
+        }
+
+        return [
+            'stream' => $stream,
+            'filename' => basename($absolutePath),
+            'cleanup_path' => null,
+        ];
+    }
+
+    private function downloadVideoToTempFile(string $videoUrl): ?array
+    {
+        try {
+            $response = Http::timeout(90)->withOptions(['allow_redirects' => true])->get($videoUrl);
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (!$response->successful()) {
+            return null;
+        }
+
+        $contentType = strtolower((string) $response->header('Content-Type'));
+        if ($contentType !== '' && !str_contains($contentType, 'video/mp4') && !str_contains($contentType, 'application/mp4')) {
+            return null;
+        }
+
+        $content = $response->body();
+        if ($content === '') {
+            return null;
+        }
+
+        $tempPath = storage_path('app/tmp/'.Str::uuid()->toString().'.mp4');
+        @mkdir(dirname($tempPath), 0775, true);
+        file_put_contents($tempPath, $content);
+
+        $stream = @fopen($tempPath, 'r');
+        if (!is_resource($stream)) {
+            @unlink($tempPath);
+            return null;
+        }
+
+        return [
+            'stream' => $stream,
+            'filename' => basename($tempPath),
+            'cleanup_path' => $tempPath,
+        ];
     }
 }

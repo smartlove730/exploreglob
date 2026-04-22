@@ -31,10 +31,17 @@ class DriveService
     {
         $folderId = $this->googleDriveService->extractFolderId($driveLink);
         $folderResourceKey = $this->googleDriveService->extractFolderResourceKey($driveLink);
+
+        $driveToken = $driveApiKey?->oauth_access_token;
+        if ($driveApiKey && ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token)) {
+            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+            $driveToken = $driveApiKey->oauth_access_token;
+        }
+
         $media = $this->googleDriveService->listPublicFolderMedia(
             $folderId,
             $driveApiKey?->api_key,
-            $driveApiKey?->oauth_access_token,
+            $driveToken,
             $folderResourceKey
         )->all();
 

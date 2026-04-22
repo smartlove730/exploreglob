@@ -68,7 +68,8 @@ class PublishScheduledPostJob implements ShouldQueue
                         $responses['facebook'] = $metaVideoService->postToFacebookVideo(
                             $scheduledPost->page,
                             (string) $scheduledPost->video_url,
-                            $scheduledPost->message
+                            $scheduledPost->message,
+                            $scheduledPost->video_path
                         );
                         continue;
                     }
