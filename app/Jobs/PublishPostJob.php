@@ -8,6 +8,7 @@ use App\Services\MetaVideoService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 class PublishPostJob implements ShouldQueue
@@ -147,10 +148,29 @@ class PublishPostJob implements ShouldQueue
                 continue;
             }
 
-            $responses['instagram'] = $metaVideoService->postToInstagramVideo($post->page, $post->video_url, $post->message);
-            $post->instagram_media_id = $post->instagram_media_id ?: data_get($responses, 'instagram.publish_response.id');
+            try {
+                $responses['instagram'] = $metaVideoService->postToInstagramVideo($post->page, $post->video_url, $post->message);
+                $post->instagram_media_id = $post->instagram_media_id ?: data_get($responses, 'instagram.publish_response.id');
+            } catch (RuntimeException $exception) {
+                if (!$this->shouldSkipInstagramPublish($exception)) {
+                    throw $exception;
+                }
+
+                $responses['instagram'] = [
+                    'status' => 'skipped',
+                    'reason' => 'instagram_not_connected',
+                    'message' => $exception->getMessage(),
+                ];
+            }
         }
 
         return $responses;
+    }
+
+    private function shouldSkipInstagramPublish(RuntimeException $exception): bool
+    {
+        $error = mb_strtolower($exception->getMessage());
+
+        return str_contains($error, 'instagram business account is not linked');
     }
 }

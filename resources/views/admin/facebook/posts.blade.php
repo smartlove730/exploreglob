@@ -94,6 +94,7 @@
                         <th>Page</th>
                         <th>Message</th>
                         <th>Media</th>
+                        <th>Posted Platforms</th>
                         <th>Images</th>
                         <th>Status</th>
                         <th>Posted</th>
@@ -113,6 +114,22 @@
                                 <span class="badge text-bg-{{ ($post->media_type ?? 'image') === 'video' ? 'warning' : 'info' }}">
                                     {{ ucfirst($post->media_type ?? 'image') }}
                                 </span>
+                            </td>
+                            <td>
+                                @php
+                                    $postedPlatforms = collect([
+                                        $post->facebook_post_id ? 'facebook' : null,
+                                        $post->instagram_media_id ? 'instagram' : null,
+                                        $post->google_post_name ? 'google_business' : null,
+                                    ])->filter()->values();
+                                @endphp
+                                @if($postedPlatforms->isEmpty())
+                                    <span class="text-muted">-</span>
+                                @else
+                                    @foreach($postedPlatforms as $platform)
+                                        <span class="badge text-bg-success me-1 mb-1">{{ str($platform)->replace('_', ' ')->title() }}</span>
+                                    @endforeach
+                                @endif
                             </td>
                             <td>{{ $post->images->count() }}</td>
                             <td><span class="badge text-bg-{{ $post->status === 'published' ? 'success' : 'secondary' }}">{{ ucfirst($post->status) }}</span></td>
@@ -217,7 +234,7 @@
                             </div>
                         </div>
                     @empty
-                        <tr><td colspan="9" class="text-center text-muted">No posts yet.</td></tr>
+                        <tr><td colspan="10" class="text-center text-muted">No posts yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
