@@ -172,6 +172,7 @@ class PostController extends Controller
         }
 
         $createdCount = 0;
+        $nextPublishAt = now();
         $cachedEligibleImageUrl = null;
         if ($mediaType === FacebookPost::MEDIA_TYPE_IMAGE && !empty($data['image_url'])) {
             $cachedEligibleImageUrl = $this->ensureInstagramEligibleImage((string) $data['image_url'], $data['platforms']);
@@ -201,7 +202,9 @@ class PostController extends Controller
                     'image_url' => null,
                 ]);
 
-                PublishPostJob::dispatch($post->id);
+                $nextPublishAt = $this->nextPostDispatchAt($nextPublishAt, 5, 10);
+                $post->update(['scheduled_at' => $nextPublishAt]);
+                PublishPostJob::dispatch($post->id)->delay($nextPublishAt);
                 $createdCount++;
                 continue;
             }
@@ -223,7 +226,9 @@ class PostController extends Controller
                 'last_error' => null,
             ]);
 
-            PublishPostJob::dispatch($post->id);
+            $nextPublishAt = $this->nextPostDispatchAt($nextPublishAt, 5, 10);
+            $post->update(['scheduled_at' => $nextPublishAt]);
+            PublishPostJob::dispatch($post->id)->delay($nextPublishAt);
             $createdCount++;
         }
 
@@ -648,6 +653,7 @@ class PostController extends Controller
         }
 
         $results = [];
+        $nextPublishAt = now();
         $instagramEligibleCache = [];
         $requestedMetaPlatforms = collect($platforms)
             ->filter(fn (string $platform) => in_array($platform, ['facebook', 'instagram'], true))
@@ -749,7 +755,9 @@ class PostController extends Controller
                     ];
                 }
 
-                PublishPostJob::dispatch($post->id);
+                $nextPublishAt = $this->nextPostDispatchAt($nextPublishAt, 5, 10);
+                $post->update(['scheduled_at' => $nextPublishAt]);
+                PublishPostJob::dispatch($post->id)->delay($nextPublishAt);
             }
 
             $successCount = count($results);
@@ -828,7 +836,9 @@ class PostController extends Controller
                         'response_json' => ['status' => 'queued', 'facebook_post_record_id' => $post->id],
                     ]);
 
-                    PublishPostJob::dispatch($post->id);
+                    $nextPublishAt = $this->nextPostDispatchAt($nextPublishAt, 5, 10);
+                    $post->update(['scheduled_at' => $nextPublishAt]);
+                    PublishPostJob::dispatch($post->id)->delay($nextPublishAt);
 
                     $results[] = [
                         'page_id' => $page->id,
@@ -867,6 +877,28 @@ class PostController extends Controller
         ], $successCount > 0 ? 200 : 422);
     }
 
+    public function executeNow(int $id): RedirectResponse
+    {
+        $post = FacebookPost::query()
+            ->ownedBy(Auth::user())
+            ->whereNull('deleted_at')
+            ->findOrFail($id);
+
+        if ($post->status === FacebookPost::STATUS_PUBLISHED) {
+            return back()->with('error', 'Post is already published.');
+        }
+
+        $post->update([
+            'status' => FacebookPost::STATUS_PENDING,
+            'last_error' => null,
+            'scheduled_at' => now(),
+        ]);
+
+        PublishPostJob::dispatch($post->id);
+
+        return back()->with('success', 'Post queued to execute immediately.');
+    }
+
     private function resolveExistingDrivePublishedPlatforms(array $pageIds, array $preparedMedia): array
     {
         if (empty($pageIds) || empty($preparedMedia)) {
@@ -886,6 +918,11 @@ class PostController extends Controller
                 ->values()
                 ->all())
             ->all();
+    }
+
+    private function nextPostDispatchAt(\Illuminate\Support\Carbon $cursor, int $minGapMinutes, int $maxGapMinutes): \Illuminate\Support\Carbon
+    {
+        return $cursor->copy()->addMinutes(random_int($minGapMinutes, $maxGapMinutes));
     }
 
     private function resolvePreviouslyPublishedPlatformsForFile(array $publishedMap, ?int $pageId, string $fileId): array

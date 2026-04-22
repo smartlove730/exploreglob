@@ -117,6 +117,12 @@
                             <td><span class="badge text-bg-{{ $post->status === 'published' ? 'success' : 'secondary' }}">{{ ucfirst($post->status) }}</span></td>
                             <td>{{ optional($post->posted_at)->format('M d, Y H:i') ?? '-' }}</td>
                             <td class="d-flex gap-1">
+                                @if($post->status !== 'published')
+                                    <form method="POST" action="{{ route('admin.posts.execute-now', $post->id) }}" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Execute Immediately</button>
+                                    </form>
+                                @endif
                                 <button
                                     type="button"
                                     class="btn btn-sm btn-outline-primary"

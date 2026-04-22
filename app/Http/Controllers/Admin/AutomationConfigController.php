@@ -230,16 +230,20 @@ class AutomationConfigController extends Controller
             return back()->with('error', 'No scheduled executions were selected.');
         }
 
+        $nextRunAt = now();
         foreach ($executions as $execution) {
+            $nextRunAt = $nextRunAt->copy()->addMinutes(random_int(1, 2));
+
             $execution->update([
                 'status' => 'scheduled',
                 'message' => 'Execution promoted to run immediately.',
-                'scheduled_for' => now(),
+                'scheduled_for' => $nextRunAt,
                 'started_at' => null,
                 'completed_at' => null,
             ]);
 
-            RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id);
+            RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id)
+                ->delay($nextRunAt);
         }
 
         return back()->with('success', $executions->count().' execution(s) queued to run immediately.');

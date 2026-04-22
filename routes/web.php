@@ -163,6 +163,7 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
         Route::post('posts/drive/images', [PostController::class, 'fetchDriveImages'])->name('drive.images');
         Route::get('posts/drive/image-proxy', [PostController::class, 'proxyDriveImage'])->name('drive.image-proxy');
         Route::post('posts/drive/publish', [PostController::class, 'postDriveImages'])->name('drive.publish');
+        Route::post('posts/{id}/execute-now', [PostController::class, 'executeNow'])->name('execute-now');
         Route::put('posts/{id}', [PostController::class, 'update'])->name('update');
         Route::delete('posts/{id}', [PostController::class, 'destroy'])->name('destroy');
         Route::post('posts/bulk-delete', [PostController::class, 'bulkDestroy'])->name('bulk-destroy');
@@ -194,6 +195,7 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
         Route::post('automations/executions/{execution}/run-now', [AutomationConfigController::class, 'executeNow'])->name('executions.run-now');
         Route::post('automations/executions/bulk-run-now', [AutomationConfigController::class, 'bulkExecuteNow'])->name('executions.bulk-run-now');
         Route::delete('automations/executions/bulk-delete', [AutomationConfigController::class, 'bulkCancelExecutions'])->name('executions.bulk-destroy');
+        Route::post('automations/executions/bulk-delete', [AutomationConfigController::class, 'bulkCancelExecutions'])->name('executions.bulk-destroy.post');
     });
 
 Route::middleware(['auth', 'admin'])
