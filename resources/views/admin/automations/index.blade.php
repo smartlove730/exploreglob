@@ -80,6 +80,11 @@
 
 <div class="card border-0 shadow-sm mt-3">
     <div class="card-body">
+        @if(!empty($noPostableContentWarning))
+            <div class="alert alert-warning">
+                Your selected Drive folder in Automations does not contain any postable material.
+            </div>
+        @endif
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
             <h2 class="h5 mb-0">Scheduled / In-Progress Automations</h2>
             <div class="d-flex gap-2">

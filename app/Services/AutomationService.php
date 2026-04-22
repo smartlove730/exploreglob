@@ -20,9 +20,11 @@ use Throwable;
 class AutomationService
 {
     private const STALE_IN_PROGRESS_MINUTES = 20;
+    public const NO_POSTABLE_MEDIA_MESSAGE = 'Your selected Drive folder in Automations does not contain any postable material.';
 
     public function __construct(
         private readonly DriveService $driveService,
+        private readonly MediaProcessingService $mediaProcessingService,
         private readonly AiCaptionService $aiCaptionService,
         private readonly MetaPostService $metaPostService,
         private readonly MetaVideoService $metaVideoService,
@@ -42,28 +44,30 @@ class AutomationService
         $scheduledLogs = collect();
 
         foreach ($configs as $config) {
-            $nextRunAt = $nextRunAt->copy()->addMinutes(random_int(10, 120));
-            $message = 'Scheduled for '.$nextRunAt->toDateTimeString().'.';
+            Cache::lock('automation-post-lock-'.$config->id, 60)->get(function () use ($config, $forceRun, &$nextRunAt, $scheduledLogs): void {
+                $nextRunAt = $nextRunAt->copy()->addMinutes(random_int(10, 120));
+                $message = 'Scheduled for '.$nextRunAt->toDateTimeString().'.';
 
-            $log = AutomationPostLog::create([
-                'user_id' => $config->user_id,
-                'automation_config_id' => $config->id,
-                'page_id' => $config->page_id,
-                'status' => 'scheduled',
-                'message' => $message,
-                'scheduled_for' => $nextRunAt,
-                'posted_at' => $nextRunAt,
-                'caption' => null,
-                'platforms' => $this->normalizePlatforms($config->platforms),
-                'response_json' => [
-                    'automation_name' => $config->name,
-                    'drive_link' => $config->drive_link,
-                    'prompt' => $config->prompt,
-                ],
-            ]);
+                $log = AutomationPostLog::create([
+                    'user_id' => $config->user_id,
+                    'automation_config_id' => $config->id,
+                    'page_id' => $config->page_id,
+                    'status' => 'scheduled',
+                    'message' => $message,
+                    'scheduled_for' => $nextRunAt,
+                    'posted_at' => $nextRunAt,
+                    'caption' => null,
+                    'platforms' => $this->normalizePlatforms($config->platforms),
+                    'response_json' => [
+                        'automation_name' => $config->name,
+                        'drive_link' => $config->drive_link,
+                        'prompt' => $config->prompt,
+                    ],
+                ]);
 
-            RunAutomationJob::dispatch($config->id, $forceRun, $log->id)->delay($nextRunAt);
-            $scheduledLogs->push($log);
+                RunAutomationJob::dispatch($config->id, $forceRun, $log->id)->delay($nextRunAt);
+                $scheduledLogs->push($log);
+            });
         }
 
         return $scheduledLogs;
@@ -132,7 +136,7 @@ class AutomationService
             $mediaCandidates = $this->resolveUnusedMediaCandidates($config, $mediaItems, $platforms);
 
             if ($mediaCandidates->isEmpty()) {
-                $this->logSkipped($config, 'No unused media available in Drive folder.', $automationLogId);
+                $this->logSkipped($config, self::NO_POSTABLE_MEDIA_MESSAGE, $automationLogId);
 
                 return;
             }
@@ -153,6 +157,17 @@ class AutomationService
                 $driveFileId = (string) ($unusedMedia['id'] ?? '');
                 $mediaType = (string) ($unusedMedia['type'] ?? 'image');
                 $mediaUrl = (string) ($unusedMedia['download_url'] ?? $unusedMedia['preview_url'] ?? '');
+                $isReserved = $this->mediaProcessingService->reserveForProcessing($config->id, $driveFileId, $folderId !== '' ? $folderId : null);
+
+                if (!$isReserved) {
+                    continue;
+                }
+
+                if (!in_array($mediaType, ['image', 'video'], true)) {
+                    $this->mediaProcessingService->markSkipped($driveFileId);
+
+                    continue;
+                }
 
                 try {
                     if ($mediaType === 'image' && in_array('instagram', $attemptPlatforms, true)) {
@@ -172,6 +187,7 @@ class AutomationService
                     $attemptPlatforms = $platformReservations['platforms_to_publish'];
 
                     if (empty($attemptPlatforms)) {
+                        $this->mediaProcessingService->markSkipped($driveFileId);
                         continue;
                     }
 
@@ -242,6 +258,7 @@ class AutomationService
                     });
 
                     $this->markMediaPlatformsPosted($config, $driveFileId, $attemptPlatforms, $result);
+                    $this->mediaProcessingService->markPosted($driveFileId);
                     $posted = true;
 
                     break;
@@ -251,7 +268,11 @@ class AutomationService
                     }
 
                     $lastError = $mediaException->getMessage();
-                    $this->driveService->moveFailedMediaToPostingFailedFolder($unusedMedia, $config->driveApiKey);
+                    if ($this->isSkippableMediaError($lastError)) {
+                        $this->mediaProcessingService->markSkipped($driveFileId);
+                    } else {
+                        $this->mediaProcessingService->markFailed($driveFileId);
+                    }
 
                     Log::warning('Automation media skipped due to failure', [
                         'automation_config_id' => $config->id,
@@ -266,7 +287,7 @@ class AutomationService
                     $config,
                     null,
                     $this->normalizePlatforms($config->platforms),
-                    $lastError ?: 'All eligible media failed. Skipped until new media is available.',
+                    self::NO_POSTABLE_MEDIA_MESSAGE.($lastError ? ' Last error: '.$lastError : ''),
                     $automationLogId
                 );
             }
@@ -338,6 +359,10 @@ class AutomationService
                     return false;
                 }
 
+                if (!$this->mediaProcessingService->shouldProcess($driveFileId)) {
+                    return false;
+                }
+
                 return PostedMedia::query()
                     ->where('automation_config_id', $config->id)
                     ->where('page_id', $config->page_id)
@@ -347,6 +372,15 @@ class AutomationService
                     ->count() < count($platforms);
             })
             ->values();
+    }
+
+    private function isSkippableMediaError(string $message): bool
+    {
+        $normalized = strtolower($message);
+
+        return str_contains($normalized, 'too large')
+            || str_contains($normalized, 'unsupported')
+            || str_contains($normalized, 'no postable');
     }
 
     private function reserveMediaPlatforms(AutomationConfig $config, string $driveFileId, array $platforms): array

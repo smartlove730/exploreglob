@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\AutomationPostLog;
+use App\Models\AutomationProcessedMedia;
 use App\Services\AutomationService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -48,6 +49,17 @@ class RunAutomationJob implements ShouldQueue, ShouldBeUnique
 
                 if (!$log || $log->completed_at || in_array($log->status, ['cancelled', 'success', 'failed', 'skipped'], true)) {
                     return;
+                }
+
+                if ($log->drive_file_id !== null && $log->drive_file_id !== '') {
+                    $alreadyPosted = AutomationProcessedMedia::query()
+                        ->where('file_id', $log->drive_file_id)
+                        ->where('status', AutomationProcessedMedia::STATUS_POSTED)
+                        ->exists();
+
+                    if ($alreadyPosted) {
+                        return;
+                    }
                 }
             }
 
