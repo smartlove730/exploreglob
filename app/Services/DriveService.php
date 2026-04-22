@@ -12,6 +12,7 @@ class DriveService
 {
     private const MAX_IMAGE_DOWNLOAD_BYTES = 20 * 1024 * 1024; // 20 MB
     private const MAX_MEDIA_DOWNLOAD_BYTES = 40 * 1024 * 1024; // 40 MB
+    private const FAILED_MEDIA_FOLDER_NAME = 'postingfFailed';
 
     public function __construct(
         private readonly GoogleDriveService $googleDriveService,
@@ -45,6 +46,31 @@ class DriveService
             'folder_id' => $folderId,
             'media' => $media,
         ];
+    }
+
+    public function moveFailedMediaToPostingFailedFolder(array $media, ?DriveApiKey $driveApiKey): void
+    {
+        $fileId = (string) ($media['id'] ?? '');
+        if ($fileId === '' || !$driveApiKey) {
+            return;
+        }
+
+        if (!$driveApiKey->oauth_access_token && !$driveApiKey->oauth_refresh_token) {
+            return;
+        }
+
+        try {
+            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+            $accessToken = (string) $driveApiKey->oauth_access_token;
+            if ($accessToken === '') {
+                return;
+            }
+
+            $failedFolderId = $this->googleDriveService->ensureFolderExists(self::FAILED_MEDIA_FOLDER_NAME, $accessToken);
+            $this->googleDriveService->moveFileToFolder($fileId, $failedFolderId, $accessToken);
+        } catch (\Throwable) {
+            // Keep the original automation failure as the source of truth.
+        }
     }
 
     public function prepareInstagramEligibleImage(array $image, DriveApiKey $driveApiKey): string

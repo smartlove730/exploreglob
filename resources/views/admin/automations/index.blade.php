@@ -161,50 +161,6 @@
     </div>
 </div>
 
-<div class="card border-0 shadow-sm mt-3">
-    <div class="card-body">
-        <h2 class="h5 mb-2">Failed Media (Skipped in Next Runs)</h2>
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>Automation</th>
-                        <th>Page</th>
-                        <th>Drive File ID</th>
-                        <th>Media</th>
-                        <th>Platforms</th>
-                        <th>Reason of Failure</th>
-                        <th>Fail Count</th>
-                        <th>Last Failed</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($failedMediaItems as $failedMedia)
-                        <tr>
-                            <td>{{ $failedMedia->automationConfig?->name ?: 'Automation #'.$failedMedia->automation_config_id }}</td>
-                            <td>{{ $failedMedia->page?->page_name ?? '-' }}</td>
-                            <td><code>{{ $failedMedia->drive_file_id }}</code></td>
-                            <td>
-                                <div>{{ $failedMedia->drive_file_name ?: '-' }}</div>
-                                @if($failedMedia->source_url)
-                                    <a href="{{ $failedMedia->source_url }}" target="_blank" rel="noopener">View source</a>
-                                @endif
-                            </td>
-                            <td>{{ collect($failedMedia->platforms ?? [])->implode(', ') ?: '-' }}</td>
-                            <td class="small text-danger">{{ $failedMedia->failure_reason }}</td>
-                            <td>{{ $failedMedia->fail_count }}</td>
-                            <td>{{ $failedMedia->last_failed_at?->diffForHumans() ?? '-' }}</td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="text-center text-muted">No failed media records yet.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
 @endsection
 
 @push('scripts')

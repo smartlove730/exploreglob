@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Jobs\RunAutomationJob;
 use App\Models\AutomationConfig;
-use App\Models\AutomationFailedMedia;
 use App\Models\AutomationPostLog;
 use App\Models\DriveImagePost;
 use App\Models\FacebookPage;
@@ -252,7 +251,7 @@ class AutomationService
                     }
 
                     $lastError = $mediaException->getMessage();
-                    $this->recordFailedMedia($config, $unusedMedia, $folderId, $attemptPlatforms, $mediaException->getMessage());
+                    $this->driveService->moveFailedMediaToPostingFailedFolder($unusedMedia, $config->driveApiKey);
 
                     Log::warning('Automation media skipped due to failure', [
                         'automation_config_id' => $config->id,
@@ -331,24 +330,11 @@ class AutomationService
 
     private function resolveUnusedMediaCandidates(AutomationConfig $config, Collection $images, array $platforms): Collection
     {
-        $failedFileIds = AutomationFailedMedia::query()
-            ->where('automation_config_id', $config->id)
-            ->where('page_id', $config->page_id)
-            ->pluck('drive_file_id')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
         return $images
-            ->filter(function ($image) use ($config, $platforms, $failedFileIds) {
+            ->filter(function ($image) use ($config, $platforms) {
                 $driveFileId = (string) ($image['id'] ?? '');
 
                 if ($driveFileId === '') {
-                    return false;
-                }
-
-                if (in_array($driveFileId, $failedFileIds, true)) {
                     return false;
                 }
 
@@ -361,46 +347,6 @@ class AutomationService
                     ->count() < count($platforms);
             })
             ->values();
-    }
-
-    private function recordFailedMedia(AutomationConfig $config, array $media, string $folderId, array $platforms, string $error): void
-    {
-        $driveFileId = (string) ($media['id'] ?? '');
-        if ($driveFileId === '') {
-            return;
-        }
-
-        $existing = AutomationFailedMedia::query()
-            ->where('automation_config_id', $config->id)
-            ->where('page_id', $config->page_id)
-            ->where('drive_file_id', $driveFileId)
-            ->first();
-
-        $payload = [
-            'user_id' => $config->user_id,
-            'automation_config_id' => $config->id,
-            'page_id' => $config->page_id,
-            'drive_folder_id' => $folderId !== '' ? $folderId : null,
-            'drive_file_id' => $driveFileId,
-            'drive_file_name' => (string) ($media['name'] ?? ''),
-            'media_type' => (string) ($media['type'] ?? 'image'),
-            'source_url' => (string) ($media['download_url'] ?? $media['preview_url'] ?? ''),
-            'platforms' => array_values($platforms),
-            'failure_reason' => mb_strimwidth($error, 0, 65500, '...'),
-            'last_failed_at' => now(),
-        ];
-
-        if ($existing) {
-            $existing->update($payload + [
-                'fail_count' => $existing->fail_count + 1,
-            ]);
-
-            return;
-        }
-
-        AutomationFailedMedia::query()->create($payload + [
-            'fail_count' => 1,
-        ]);
     }
 
     private function reserveMediaPlatforms(AutomationConfig $config, string $driveFileId, array $platforms): array
