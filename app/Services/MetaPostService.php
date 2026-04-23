@@ -34,7 +34,19 @@ class MetaPostService
                     throw new RuntimeException('Instagram publishing requires an image.');
                 }
 
-                $responses['instagram'] = $this->instagramService->publishImageWithCaption($page, $imageUrl, $message, 3);
+                try {
+                    $responses['instagram'] = $this->instagramService->publishImageWithCaption($page, $imageUrl, $message, 3);
+                } catch (RuntimeException $exception) {
+                    if (!$this->shouldSkipInstagramPublish($exception)) {
+                        throw $exception;
+                    }
+
+                    $responses['instagram'] = [
+                        'status' => 'skipped',
+                        'reason' => 'instagram_not_connected',
+                        'message' => $exception->getMessage(),
+                    ];
+                }
                 continue;
             }
             if ($platform === 'google_business') {
@@ -89,7 +101,19 @@ class MetaPostService
             }
 
             if ($platform === 'instagram') {
-                $responses['instagram'] = $this->instagramService->publishCarouselWithCaption($page, $imageUrls, $message, 3);
+                try {
+                    $responses['instagram'] = $this->instagramService->publishCarouselWithCaption($page, $imageUrls, $message, 3);
+                } catch (RuntimeException $exception) {
+                    if (!$this->shouldSkipInstagramPublish($exception)) {
+                        throw $exception;
+                    }
+
+                    $responses['instagram'] = [
+                        'status' => 'skipped',
+                        'reason' => 'instagram_not_connected',
+                        'message' => $exception->getMessage(),
+                    ];
+                }
                 continue;
             }
 
@@ -162,6 +186,13 @@ class MetaPostService
         return Http::delete("https://graph.facebook.com/{$this->apiVersion}/{$instagramMediaId}", [
             'access_token' => $accessToken,
         ]);
+    }
+
+    private function shouldSkipInstagramPublish(RuntimeException $exception): bool
+    {
+        $error = mb_strtolower($exception->getMessage());
+
+        return str_contains($error, 'instagram business account is not linked');
     }
 
     public function fetchFacebookPagePosts(FacebookPage $page, int $limit = 25): Collection
