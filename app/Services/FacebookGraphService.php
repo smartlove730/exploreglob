@@ -143,11 +143,13 @@ class FacebookGraphService
         $endpoint = $imageUrl ? 'photos' : 'feed';
         $payload = [
             'access_token' => $page->page_access_token,
-            'message' => $message,
         ];
 
         if ($imageUrl) {
             $payload['url'] = $imageUrl;
+            $payload['caption'] = $message;
+        } else {
+            $payload['message'] = $message;
         }
 
         $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/{$endpoint}", $payload);
