@@ -363,15 +363,44 @@ class AutomationService
                     return false;
                 }
 
-                return PostedMedia::query()
+                $postedAutomationPlatforms = PostedMedia::query()
                     ->where('automation_config_id', $config->id)
                     ->where('page_id', $config->page_id)
                     ->where('drive_file_id', $driveFileId)
                     ->whereIn('platform', $platforms)
                     ->where('status', PostedMedia::STATUS_POSTED)
-                    ->count() < count($platforms);
+                    ->pluck('platform')
+                    ->all();
+
+                $postedManualPlatforms = $this->resolvePreviouslyPublishedDrivePlatforms($config, $driveFileId, $platforms);
+                $postedPlatforms = collect(array_merge($postedAutomationPlatforms, $postedManualPlatforms))
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                return count($postedPlatforms) < count($platforms);
             })
             ->values();
+    }
+
+
+    private function resolvePreviouslyPublishedDrivePlatforms(AutomationConfig $config, string $driveFileId, array $platforms): array
+    {
+        if ($driveFileId === '' || empty($platforms)) {
+            return [];
+        }
+
+        return DriveImagePost::query()
+            ->where('user_id', $config->user_id)
+            ->where('page_id', $config->page_id)
+            ->where('drive_file_id', $driveFileId)
+            ->whereNotNull('posted_at')
+            ->get()
+            ->flatMap(fn (DriveImagePost $record) => $record->platforms ?? [])
+            ->filter(fn (string $platform) => in_array($platform, $platforms, true))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function isSkippableMediaError(string $message): bool
@@ -403,9 +432,15 @@ class AutomationService
                 ->get()
                 ->keyBy('platform');
 
+            $alreadyPublishedPlatforms = $this->resolvePreviouslyPublishedDrivePlatforms($config, $driveFileId, $platforms);
+
             foreach ($platforms as $platform) {
                 /** @var PostedMedia|null $existing */
                 $existing = $existingRecords->get($platform);
+
+                if (in_array($platform, $alreadyPublishedPlatforms, true)) {
+                    continue;
+                }
 
                 if ($existing && $existing->status === PostedMedia::STATUS_POSTED) {
                     continue;
