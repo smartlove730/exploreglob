@@ -108,15 +108,33 @@ class FacebookGraphService
 
     public function fetchManagedPages(string $longLivedToken): array
     {
-        $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/me/accounts", [
+        $pages = [];
+        $nextUrl = "https://graph.facebook.com/{$this->apiVersion}/me/accounts";
+        $query = [
             'access_token' => $longLivedToken,
-        ]);
+            'limit' => 100,
+            'fields' => 'id,name,access_token,tasks',
+        ];
+        $requestCount = 0;
 
-        if (!$response->ok()) {
-            $this->throwRefreshException($response->json(), 'Unable to fetch Facebook pages.');
+        while ($nextUrl && $requestCount < 20) {
+            $response = Http::get($nextUrl, $query);
+            $requestCount++;
+
+            if (!$response->ok()) {
+                $this->throwRefreshException($response->json(), 'Unable to fetch Facebook pages.');
+            }
+
+            $batch = (array) $response->json('data', []);
+            if (!empty($batch)) {
+                $pages = array_merge($pages, $batch);
+            }
+
+            $nextUrl = (string) $response->json('paging.next', '');
+            $query = [];
         }
 
-        return (array) $response->json('data', []);
+        return $pages;
     }
 
     public function publishToPage(FacebookPage $page, string $message, ?string $imageUrl = null): array
