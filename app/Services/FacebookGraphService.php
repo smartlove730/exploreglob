@@ -30,9 +30,11 @@ class FacebookGraphService
 
     public function getOAuthRedirectUrl(FacebookApp $app): string
     {
+        $credentials = $this->resolveAppCredentials($app);
+
         $query = http_build_query([
-            'client_id' => $app->app_id,
-            'redirect_uri' => $app->redirect_uri,
+            'client_id' => $credentials['app_id'],
+            'redirect_uri' => $credentials['redirect_uri'],
             'scope' => implode(',', self::OAUTH_SCOPES),
             'auth_type' => 'rerequest',
         ]);
@@ -42,10 +44,12 @@ class FacebookGraphService
 
     public function exchangeCodeForToken(FacebookApp $app, string $code): string
     {
+        $credentials = $this->resolveAppCredentials($app);
+
         $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/oauth/access_token", [
-            'client_id' => $app->app_id,
-            'client_secret' => $app->app_secret,
-            'redirect_uri' => $app->redirect_uri,
+            'client_id' => $credentials['app_id'],
+            'client_secret' => $credentials['app_secret'],
+            'redirect_uri' => $credentials['redirect_uri'],
             'code' => $code,
         ]);
 
@@ -58,10 +62,12 @@ class FacebookGraphService
 
     public function exchangeForLongLivedToken(FacebookApp $app, string $shortToken): array
     {
+        $credentials = $this->resolveAppCredentials($app);
+
         $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/oauth/access_token", [
             'grant_type' => 'fb_exchange_token',
-            'client_id' => $app->app_id,
-            'client_secret' => $app->app_secret,
+            'client_id' => $credentials['app_id'],
+            'client_secret' => $credentials['app_secret'],
             'fb_exchange_token' => $shortToken,
         ]);
 
@@ -81,10 +87,12 @@ class FacebookGraphService
             throw new RuntimeException('Facebook account is not linked to an app.');
         }
 
+        $credentials = $this->resolveAppCredentials($account->app);
+
         $response = Http::get("https://graph.facebook.com/{$this->apiVersion}/oauth/access_token", [
             'grant_type' => 'fb_exchange_token',
-            'client_id' => $account->app->app_id,
-            'client_secret' => $account->app->app_secret,
+            'client_id' => $credentials['app_id'],
+            'client_secret' => $credentials['app_secret'],
             'fb_exchange_token' => $account->long_lived_user_token,
         ]);
 
@@ -248,5 +256,14 @@ class FacebookGraphService
         }
 
         throw new RuntimeException($fallback.' '.$message);
+    }
+
+    private function resolveAppCredentials(FacebookApp $app): array
+    {
+        return [
+            'app_id' => (string) (config('services.facebook.app_id') ?: $app->app_id),
+            'app_secret' => (string) (config('services.facebook.app_secret') ?: $app->app_secret),
+            'redirect_uri' => (string) (config('services.facebook.redirect_uri') ?: $app->redirect_uri),
+        ];
     }
 }

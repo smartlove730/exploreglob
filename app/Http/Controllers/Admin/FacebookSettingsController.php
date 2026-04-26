@@ -25,6 +25,10 @@ class FacebookSettingsController extends Controller
         $apps = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
         $selectedAppId = (int) $request->integer('app_id');
 
+        if ($selectedAppId <= 0) {
+            $selectedAppId = (int) ($apps->first()?->id ?? $this->resolveDefaultApp()?->id ?? 0);
+        }
+
         $accountQuery = FacebookAccount::with(['pages', 'app'])
             ->where('user_id', Auth::id());
 
@@ -45,10 +49,11 @@ class FacebookSettingsController extends Controller
     public function redirectToFacebook(Request $request): RedirectResponse
     {
         $appId = $request->integer('app_id');
-        $app = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)
-            ->when($appId > 0, fn ($query) => $query->whereKey($appId))
-            ->orderBy('id')
-            ->firstOrFail();
+        $app = $this->resolveConnectApp($appId);
+
+        if (!$app) {
+            return back()->with('error', 'No active Facebook app is configured. Please check your Facebook env settings.');
+        }
 
         session(['facebook_auth_app_id' => $app->id]);
 
@@ -62,7 +67,7 @@ class FacebookSettingsController extends Controller
         ]);
 
         $appId = (int) session('facebook_auth_app_id');
-        $app = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->findOrFail($appId);
+        $app = FacebookApp::query()->where('is_active', true)->findOrFail($appId);
 
         try {
             $shortToken = $this->facebookGraphService->exchangeCodeForToken($app, $request->string('code')->toString());
@@ -100,8 +105,14 @@ class FacebookSettingsController extends Controller
 
     public function syncPages(Request $request): RedirectResponse
     {
+        $appId = (int) $request->integer('app_id');
+
+        if ($appId <= 0) {
+            $appId = (int) ($this->resolveDefaultApp()?->id ?? 0);
+        }
+
         $account = FacebookAccount::where('user_id', Auth::id())
-            ->where('facebook_app_id', $request->integer('app_id'))
+            ->where('facebook_app_id', $appId)
             ->first();
 
         if (!$account) {
@@ -152,5 +163,57 @@ class FacebookSettingsController extends Controller
         $page->update(['is_active' => true]);
 
         return back()->with('success', 'Page marked as active.');
+    }
+
+    private function resolveConnectApp(int $appId = 0): ?FacebookApp
+    {
+        if ($appId > 0) {
+            return FacebookApp::query()
+                ->where('is_active', true)
+                ->whereKey($appId)
+                ->first();
+        }
+
+        return $this->resolveDefaultApp();
+    }
+
+    private function resolveDefaultApp(): ?FacebookApp
+    {
+        $ownedApp = FacebookApp::query()
+            ->ownedBy(Auth::user())
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+
+        if ($ownedApp) {
+            return $ownedApp;
+        }
+
+        $envAppId = (string) config('services.facebook.app_id');
+        $envAppSecret = (string) config('services.facebook.app_secret');
+        $envRedirectUri = (string) config('services.facebook.redirect_uri');
+
+        if ($envAppId === '' || $envAppSecret === '' || $envRedirectUri === '') {
+            return null;
+        }
+
+        $app = FacebookApp::query()->firstOrCreate(
+            ['app_id' => $envAppId],
+            [
+                'user_id' => Auth::id(),
+                'name' => 'Default Facebook App',
+                'app_secret' => $envAppSecret,
+                'redirect_uri' => $envRedirectUri,
+                'is_active' => true,
+            ]
+        );
+
+        $app->update([
+            'app_secret' => $envAppSecret,
+            'redirect_uri' => $envRedirectUri,
+            'is_active' => true,
+        ]);
+
+        return $app->fresh();
     }
 }

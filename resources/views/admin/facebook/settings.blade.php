@@ -9,20 +9,9 @@
 
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
-        <form method="GET" action="{{ route('admin.facebook.settings') }}" class="row g-2 align-items-end">
-            <div class="col-md-6">
-                <label class="form-label">Facebook App</label>
-                <select name="app_id" class="form-select" onchange="this.form.submit()">
-                    <option value="">Select an app</option>
-                    @foreach($apps as $app)
-                        <option value="{{ $app->id }}" {{ $selectedAppId === $app->id ? 'selected' : '' }}>{{ $app->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-6 d-flex gap-2">
-                <a href="{{ route('admin.facebook.connect', ['app_id' => $selectedAppId]) }}" class="btn btn-primary {{ $selectedAppId ? '' : 'disabled' }}">Connect Facebook</a>
-            </div>
-        </form>
+        <div class="d-flex gap-2">
+            <a href="{{ route('admin.facebook.connect', ['app_id' => $selectedAppId]) }}" class="btn btn-primary">Connect Facebook</a>
+        </div>
 
         @if($account)
             <form method="POST" action="{{ route('admin.facebook.sync-pages') }}" class="mt-2">
