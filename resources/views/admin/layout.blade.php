@@ -10,6 +10,14 @@
     <style>
         body { background-color: #f8fafc; }
         .sidebar-link.active { background: rgba(255,255,255,.15); }
+        .admin-sidebar-body {
+            height: 100dvh;
+            max-height: 100dvh;
+            overflow-y: auto;
+        }
+        .admin-sidebar-nav {
+            min-height: 0;
+        }
     </style>
 </head>
 <body>
@@ -22,6 +30,8 @@
     $googleDriveKeysUrl = Route::has('admin.facebook.google-drive-keys.index') ? route('admin.facebook.google-drive-keys.index') : url('/admin/facebook/google-drive-keys');
     $googleDriveFoldersUrl = Route::has('admin.facebook.drive-folders.index') ? route('admin.facebook.drive-folders.index') : url('/admin/facebook/drive-folders');
     $googleSettingsUrl = Route::has('admin.google.settings') ? route('admin.google.settings') : url('/admin/google/settings');
+    $isFailedAutomationRoute = request()->routeIs('admin.automations.failed-posts.*');
+    $isAutomationRoute = request()->routeIs('admin.automations.*') && !$isFailedAutomationRoute;
 @endphp
 @if(auth()->check())
 <div class="d-flex">
@@ -39,8 +49,8 @@
             <h5 class="offcanvas-title">{{ $isAdmin ? 'Admin Panel' : 'User Panel' }}</h5>
             <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas"></button>
         </div>
-        <div class="offcanvas-body d-flex flex-column p-3 vh-100">
-            <ul class="nav nav-pills flex-column gap-2">
+        <div class="offcanvas-body admin-sidebar-body d-flex flex-column p-3">
+            <ul class="nav nav-pills flex-column gap-2 flex-grow-1 admin-sidebar-nav">
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">Dashboard</a></li>
                 @if($isAdmin)
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.blogs.*') ? 'active' : '' }}" href="{{ route('admin.blogs.index') }}">Blogs</a></li>
@@ -53,8 +63,8 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.google.*') ? 'active' : '' }}" href="{{ $googleSettingsUrl }}">Google Business</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.manage-posts.*') ? 'active' : '' }}" href="{{ $facebookManagePostsUrl }}">Manage Social Posts</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.automations.*') ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.automations.failed-posts.*') ? 'active' : '' }}" href="{{ route('admin.automations.failed-posts.index') }}">Failed Automation Posts</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ $isAutomationRoute ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
+                <li><a class="nav-link text-white sidebar-link {{ $isFailedAutomationRoute ? 'active' : '' }}" href="{{ route('admin.automations.failed-posts.index') }}">Failed Automation Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.billing.*') ? 'active' : '' }}" href="{{ route('app.billing.plans') }}">Subscription</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.settings.*') ? 'active' : '' }}" href="{{ route('app.settings.index') }}">Settings</a></li>
                 @if($isAdmin)

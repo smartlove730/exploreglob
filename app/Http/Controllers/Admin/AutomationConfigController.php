@@ -185,6 +185,7 @@ class AutomationConfigController extends Controller
             'message' => 'Execution cancelled by user.',
             'completed_at' => now(),
         ]);
+        $this->removeQueuedAutomationJobs(collect([(int) $execution->id]));
 
         return back()->with('success', 'Execution deleted successfully.');
     }
@@ -197,17 +198,21 @@ class AutomationConfigController extends Controller
             return back()->with('error', 'Only scheduled executions can be run immediately.');
         }
 
+        $runAt = now()->addMinutes(2)->startOfMinute();
+
         $execution->update([
             'status' => 'scheduled',
-            'message' => 'Execution promoted to run immediately.',
-            'scheduled_for' => now(),
+            'message' => 'Execution promoted to run at '.$runAt->toDateTimeString().'.',
+            'scheduled_for' => $runAt,
             'started_at' => null,
             'completed_at' => null,
         ]);
+        $this->removeQueuedAutomationJobs(collect([(int) $execution->id]));
 
-        RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id);
+        RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id)
+            ->delay($runAt);
 
-        return back()->with('success', 'Execution queued to run immediately.');
+        return back()->with('success', 'Execution queued for the next 2nd minute.');
     }
 
     public function bulkExecuteNow(Request $request): RedirectResponse
@@ -241,6 +246,7 @@ class AutomationConfigController extends Controller
                 'started_at' => null,
                 'completed_at' => null,
             ]);
+            $this->removeQueuedAutomationJobs(collect([(int) $execution->id]));
 
             RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id)
                 ->delay($nextRunAt);
@@ -272,8 +278,27 @@ class AutomationConfigController extends Controller
         if ($affected === 0) {
             return back()->with('error', 'No scheduled or in-progress executions were selected.');
         }
+        $this->removeQueuedAutomationJobs($executionIds);
 
         return back()->with('success', $affected.' execution(s) deleted successfully.');
+    }
+
+    private function removeQueuedAutomationJobs(\Illuminate\Support\Collection $executionIds): void
+    {
+        if ($executionIds->isEmpty()) {
+            return;
+        }
+
+        $query = DB::table('jobs')
+            ->where('payload', 'like', '%RunAutomationJob%')
+            ->where(function ($outer) use ($executionIds): void {
+                foreach ($executionIds as $executionId) {
+                    $outer->orWhere('payload', 'like', '%automationLogId\";i:'.$executionId.';%')
+                        ->orWhere('payload', 'like', '%automationLogId\";s:'.strlen((string) $executionId).':\"'.$executionId.'\";%');
+                }
+            });
+
+        $query->delete();
     }
 
     private function authorizeAutomation(AutomationConfig $automation): void

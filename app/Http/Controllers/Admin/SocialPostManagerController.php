@@ -115,7 +115,7 @@ class SocialPostManagerController extends Controller
         }
 
         $posts = $query
-            ->orderByDesc('external_created_at')
+            ->orderByRaw('COALESCE(external_created_at, updated_at, created_at) DESC')
             ->limit(1000)
             ->get();
 
