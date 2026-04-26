@@ -246,7 +246,17 @@ class GoogleService
     public function syncLocations(GoogleAccount $googleAccount): int
     {
         $googleAccount = $this->ensureValidGoogleAccountToken($googleAccount);
-        $locations = $this->fetchLocations($googleAccount->access_token, $googleAccount->google_account_id);
+        try {
+            $locations = $this->fetchLocations($googleAccount->access_token, $googleAccount->google_account_id);
+        } catch (\Throwable $exception) {
+            if ($this->isQuotaExceededError($exception)) {
+                return GoogleLocation::query()
+                    ->where('google_account_id', $googleAccount->id)
+                    ->count();
+            }
+
+            throw $exception;
+        }
 
         GoogleLocation::query()->where('google_account_id', $googleAccount->id)->delete();
 
@@ -268,6 +278,122 @@ class GoogleService
         }
 
         return $inserted;
+    }
+
+    public function ensureGoogleAccountForUser(int $userId, ?int $driveApiKeyId = null): ?GoogleAccount
+    {
+        if ($driveApiKeyId === null) {
+            $googleAccount = GoogleAccount::query()->where('user_id', $userId)->latest('id')->first();
+            if ($googleAccount) {
+                return $this->ensureValidGoogleAccountToken($googleAccount);
+            }
+        }
+
+        $driveApiKey = DriveApiKey::query()
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->when($driveApiKeyId !== null, fn ($query) => $query->whereKey($driveApiKeyId))
+            ->latest('id')
+            ->first();
+
+        if (!$driveApiKey) {
+            if ($driveApiKeyId !== null) {
+                throw new RuntimeException('Selected Google account is invalid, inactive, or missing OAuth token.');
+            }
+
+            return null;
+        }
+
+        $driveApiKey = $this->ensureValidDriveToken($driveApiKey);
+        if (!$driveApiKey->oauth_access_token) {
+            return null;
+        }
+
+        try {
+            $accounts = $this->fetchAccounts($driveApiKey->oauth_access_token);
+        } catch (\Throwable $exception) {
+            if ($this->isQuotaExceededError($exception)) {
+                $fallbackAccount = GoogleAccount::query()
+                    ->where('user_id', $userId)
+                    ->latest('id')
+                    ->first();
+
+                if ($fallbackAccount) {
+                    return $this->ensureValidGoogleAccountToken($fallbackAccount);
+                }
+
+                throw new RuntimeException('Google quota limit reached (429). Please wait about 1 minute and try again.');
+            }
+
+            throw $exception;
+        }
+
+        $primaryAccount = (string) Arr::get($accounts, '0.name', '');
+        if ($primaryAccount === '') {
+            return null;
+        }
+
+        return GoogleAccount::updateOrCreate(
+            ['user_id' => $userId, 'google_account_id' => $primaryAccount],
+            [
+                'access_token' => $driveApiKey->oauth_access_token,
+                'refresh_token' => $driveApiKey->oauth_refresh_token,
+                'expires_at' => $driveApiKey->oauth_expires_at ?: now()->addHour(),
+                'token_last_refreshed_at' => now(),
+                'reauthorization_required' => false,
+                'reauthorization_reason' => null,
+            ]
+        );
+    }
+
+    public function syncLocationsForUser(int $userId, ?int $driveApiKeyId = null): int
+    {
+        $googleAccount = $this->ensureGoogleAccountForUser($userId, $driveApiKeyId);
+        if (!$googleAccount) {
+            throw new RuntimeException('No Google Business account found for this user. Reconnect Google with business.manage scope.');
+        }
+
+        return $this->syncLocations($googleAccount);
+    }
+
+    public function listBusinessProfilesForUser(int $userId): array
+    {
+        $googleAccount = $this->ensureGoogleAccountForUser($userId);
+        if (!$googleAccount) {
+            return [];
+        }
+
+        $connectedEmail = (string) (DriveApiKey::query()
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNotNull('oauth_access_token')
+                    ->orWhereNotNull('oauth_refresh_token');
+            })
+            ->latest('id')
+            ->value('email') ?? '');
+
+        $googleAccount = $this->ensureValidGoogleAccountToken($googleAccount);
+        $accounts = $this->fetchAccounts($googleAccount->access_token);
+
+        return collect($accounts)->map(function (array $account) use ($googleAccount, $connectedEmail) {
+            $accountName = (string) Arr::get($account, 'name', '');
+            $locations = [];
+
+            if ($accountName !== '') {
+                $locations = $this->fetchLocations($googleAccount->access_token, $accountName);
+            }
+
+            return [
+                'connected_email' => $connectedEmail,
+                'account' => $account,
+                'locations' => $locations,
+            ];
+        })->values()->all();
     }
 
     public function uploadLocationMedia(string $accessToken, string $locationId, string $sourceUrl): string
@@ -320,5 +446,14 @@ class GoogleService
         $message = $exception->getMessage();
 
         return str_contains(strtolower($message), 'invalid_grant');
+    }
+
+    private function isQuotaExceededError(\Throwable $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, '429')
+            || str_contains($message, 'quota exceeded')
+            || str_contains($message, 'too many requests');
     }
 }
