@@ -25,6 +25,10 @@ class FacebookSettingsController extends Controller
         $apps = FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get();
         $selectedAppId = (int) $request->integer('app_id');
 
+        if ($selectedAppId <= 0) {
+            $selectedAppId = (int) ($apps->first()?->id ?? 0);
+        }
+
         $accountQuery = FacebookAccount::with(['pages', 'app'])
             ->where('user_id', Auth::id());
 
@@ -100,8 +104,18 @@ class FacebookSettingsController extends Controller
 
     public function syncPages(Request $request): RedirectResponse
     {
+        $appId = (int) $request->integer('app_id');
+
+        if ($appId <= 0) {
+            $appId = (int) FacebookApp::query()
+                ->ownedBy(Auth::user())
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->value('id');
+        }
+
         $account = FacebookAccount::where('user_id', Auth::id())
-            ->where('facebook_app_id', $request->integer('app_id'))
+            ->where('facebook_app_id', $appId)
             ->first();
 
         if (!$account) {
