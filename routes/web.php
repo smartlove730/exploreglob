@@ -5,6 +5,22 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\App\BillingController;
 use App\Http\Controllers\App\ContentCalendarController;
 use App\Http\Controllers\App\MediaLibraryController;
+use App\Http\Controllers\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Admin\AutomationConfigController;
+use App\Http\Controllers\Admin\AutomationFailedPostController;
+use App\Http\Controllers\Admin\BlogController as AdminBlogController;
+use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Admin\DriveApiKeyController;
+use App\Http\Controllers\Admin\DriveFolderController;
+use App\Http\Controllers\Admin\FacebookAppController;
+use App\Http\Controllers\Admin\FacebookPostController;
+use App\Http\Controllers\Admin\FacebookSettingsController;
+use App\Http\Controllers\Admin\GoogleController;
+use App\Http\Controllers\Admin\PostController;
+use App\Http\Controllers\Admin\SaasManagementController;
+use App\Http\Controllers\Admin\ScheduledPostController;
+use App\Http\Controllers\Admin\SocialPostManagerController;
+use App\Http\Controllers\AutomationController;
 use App\Http\Controllers\MarketingController;
 
 use App\Http\Controllers\{
@@ -96,22 +112,6 @@ Route::post('/addblog', [BlogController::class, 'store'])->name('store');
 Route::post('/genimage', [BlogController::class, 'genImage'])->name('genImage');
 
 // Admin routes (simple Blade-based admin)
-use App\Http\Controllers\Admin\AuthController as AdminAuthController;
-use App\Http\Controllers\Admin\BlogController as AdminBlogController;
-use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
-use App\Http\Controllers\Admin\FacebookSettingsController;
-use App\Http\Controllers\Admin\FacebookPostController;
-use App\Http\Controllers\Admin\PostController;
-use App\Http\Controllers\Admin\FacebookAppController;
-use App\Http\Controllers\Admin\DriveApiKeyController;
-use App\Http\Controllers\Admin\DriveFolderController;
-use App\Http\Controllers\Admin\GoogleController;
-use App\Http\Controllers\Admin\AutomationConfigController;
-use App\Http\Controllers\Admin\AutomationFailedPostController;
-use App\Http\Controllers\Admin\ScheduledPostController;
-use App\Http\Controllers\Admin\SaasManagementController;
-use App\Http\Controllers\Admin\SocialPostManagerController;
-use App\Http\Controllers\AutomationController;
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
 Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])->get('/run-automations/{userId}/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
