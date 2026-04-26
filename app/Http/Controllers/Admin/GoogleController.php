@@ -169,7 +169,7 @@ class GoogleController extends Controller
             ->get();
 
         if ($accounts->isEmpty()) {
-            return back()->with('error', 'Connect Google Business first.');
+            return back()->with('success', 'No locations found.');
         }
 
         try {
@@ -180,6 +180,10 @@ class GoogleController extends Controller
                 }
 
                 $count += $this->googleService->syncLocations($account);
+            }
+
+            if ($count === 0) {
+                return back()->with('success', 'No locations found.');
             }
 
             return back()->with('success', "Synced {$count} location(s).");
