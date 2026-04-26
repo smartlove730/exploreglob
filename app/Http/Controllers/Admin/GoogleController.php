@@ -30,6 +30,9 @@ class GoogleController extends Controller
             ->get();
 
         $account = $accounts->first();
+        $businessProfiles = $accounts->filter(
+            fn (GoogleAccount $googleAccount) => str_starts_with($googleAccount->google_account_id, 'accounts/')
+        )->values();
         $locations = GoogleLocation::query()
             ->where('user_id', Auth::id())
             ->with('googleAccount')
@@ -40,6 +43,7 @@ class GoogleController extends Controller
         return view('admin.google-business.settings', [
             'account' => $account,
             'accounts' => $accounts,
+            'businessProfiles' => $businessProfiles,
             'locations' => $locations,
         ]);
     }
@@ -74,7 +78,11 @@ class GoogleController extends Controller
                 $oauthUserInfo = [];
             }
 
-            $accounts = $this->googleService->fetchAccounts($accessToken);
+            try {
+                $accounts = $this->googleService->fetchAccounts($accessToken);
+            } catch (\Throwable) {
+                $accounts = [];
+            }
             $oauthIdentifier = (string) ($oauthUserInfo['sub'] ?? $oauthUserInfo['email'] ?? '');
             $accountNames = collect($accounts)->pluck('name')->filter()->values();
             if ($accountNames->isEmpty()) {
@@ -162,24 +170,35 @@ class GoogleController extends Controller
 
     public function syncLocations(): RedirectResponse
     {
-        $account = GoogleAccount::query()->where('user_id', Auth::id())->first();
-        if (!$account) {
+        $accounts = GoogleAccount::query()
+            ->where('user_id', Auth::id())
+            ->where('google_account_id', 'like', 'accounts/%')
+            ->orderByDesc('token_last_refreshed_at')
+            ->get();
+
+        if ($accounts->isEmpty()) {
             return back()->with('error', 'Connect Google Business first.');
         }
 
         try {
-            if ($account->reauthorization_required) {
-                return back()->with('error', 'Google needs to be reconnected before syncing locations.');
-            }
+            $count = 0;
+            foreach ($accounts as $account) {
+                if ($account->reauthorization_required) {
+                    continue;
+                }
 
-            $count = $this->googleService->syncLocations($account);
+                $count += $this->googleService->syncLocations($account);
+            }
 
             return back()->with('success', "Synced {$count} location(s).");
         } catch (ReauthorizationRequiredException $exception) {
-            $account->update([
-                'reauthorization_required' => true,
-                'reauthorization_reason' => $exception->getMessage(),
-            ]);
+            GoogleAccount::query()
+                ->where('user_id', Auth::id())
+                ->where('google_account_id', 'like', 'accounts/%')
+                ->update([
+                    'reauthorization_required' => true,
+                    'reauthorization_reason' => $exception->getMessage(),
+                ]);
 
             return back()->with('error', $exception->getMessage());
         } catch (\Throwable $exception) {

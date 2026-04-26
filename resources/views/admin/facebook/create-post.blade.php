@@ -22,6 +22,19 @@
             <div class="alert alert-warning">
                 Google Business is not connected. <a href="{{ route('admin.google.settings') }}">Connect Google account</a> to enable Google Business posting.
             </div>
+        @else
+            <div class="alert alert-success">
+                Google Business connected ({{ $googleBusinessProfiles->count() }} profile{{ $googleBusinessProfiles->count() === 1 ? '' : 's' }}).
+                <a href="{{ route('admin.google.settings') }}">Manage profiles</a>.
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Connected Business Profiles</label>
+                <ul class="mb-0">
+                    @foreach($googleBusinessProfiles as $googleBusinessProfile)
+                        <li><small>{{ $googleBusinessProfile->google_account_id }}</small></li>
+                    @endforeach
+                </ul>
+            </div>
         @endif
 
         <form id="driveFilterForm" class="row g-3">

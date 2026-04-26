@@ -16,7 +16,7 @@
                 <p class="mb-2 text-muted">{{ $account->reauthorization_reason ?: 'Google token refresh failed. Reconnect your account to continue posting/syncing.' }}</p>
                 <a href="{{ route('admin.google.connect') }}" class="btn btn-sm btn-primary mb-2">Reconnect Google</a>
             @else
-                <p class="mb-1"><span class="badge text-bg-success">Connected</span></p>
+                <p class="mb-1"><span class="badge {{ $businessProfiles->isNotEmpty() ? 'text-bg-success' : 'text-bg-warning' }}">{{ $businessProfiles->isNotEmpty() ? 'Connected' : 'OAuth Connected (No Business Profiles)' }}</span></p>
             @endif
             <p class="mb-2 text-muted">Connected profiles: {{ $accounts->count() }}</p>
             <p class="mb-2 text-muted">Active account: {{ $account->google_account_id }}</p>
@@ -34,11 +34,11 @@
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <h2 class="h5">Business Profiles & Locations</h2>
-        @if(isset($accounts) && $accounts->isNotEmpty())
+        @if(isset($businessProfiles) && $businessProfiles->isNotEmpty())
             <div class="mb-3">
                 <p class="text-muted mb-2">Business profiles connected via this Google login:</p>
                 <ul class="mb-0">
-                    @foreach($accounts as $connectedAccount)
+                    @foreach($businessProfiles as $connectedAccount)
                         <li><small>{{ $connectedAccount->google_account_id }}</small></li>
                     @endforeach
                 </ul>

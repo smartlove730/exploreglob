@@ -130,6 +130,13 @@ class PostController extends Controller
             $request->integer('drive_api_key_id', $this->resolvePreferredDriveApiKeyId())
         );
 
+        $googleAccounts = GoogleAccount::query()
+            ->where('user_id', Auth::id())
+            ->where('google_account_id', 'like', 'accounts/%')
+            ->orderByDesc('token_last_refreshed_at')
+            ->orderByDesc('updated_at')
+            ->get();
+
         return view('admin.facebook.create-post', [
             'apps' => $apps,
             'selectedAppId' => $selectedAppId,
@@ -142,7 +149,8 @@ class PostController extends Controller
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
             'selectedDriveApiKeyId' => $selectedDriveApiKeyId,
             'driveFolders' => DriveFolder::query()->ownedBy(Auth::user())->with('driveApiKey')->where('is_active', true)->orderBy('name')->get(),
-            'googleAccount' => GoogleAccount::query()->where('user_id', Auth::id())->first(),
+            'googleAccount' => $googleAccounts->first(),
+            'googleBusinessProfiles' => $googleAccounts,
             'googleLocations' => GoogleLocation::query()->where('user_id', Auth::id())->orderByDesc('is_default')->orderBy('name')->get(),
             'defaultGoogleLocationId' => old('google_location_id', optional(GoogleLocation::query()->where('user_id', Auth::id())->where('is_default', true)->first())->id),
         ]);
