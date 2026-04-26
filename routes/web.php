@@ -15,7 +15,6 @@ use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\FacebookAppController;
 use App\Http\Controllers\Admin\FacebookPostController;
 use App\Http\Controllers\Admin\FacebookSettingsController;
-use App\Http\Controllers\Admin\GoogleController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\SaasManagementController;
 use App\Http\Controllers\Admin\ScheduledPostController;
@@ -64,9 +63,6 @@ Route::prefix('app')
         Route::get('/facebook/settings', [FacebookSettingsController::class, 'index'])->name('facebook.settings');
         Route::get('/facebook/connect', [FacebookSettingsController::class, 'redirectToFacebook'])->name('facebook.connect');
         Route::post('/facebook/sync-pages', [FacebookSettingsController::class, 'syncPages'])->name('facebook.sync-pages');
-        Route::get('/google/settings', [GoogleController::class, 'index'])->name('google.settings');
-        Route::get('/google/connect', [GoogleController::class, 'redirect'])->name('google.connect');
-        Route::post('/google/sync-locations', [GoogleController::class, 'syncLocations'])->name('google.sync-locations');
 
         Route::get('/calendar', [ContentCalendarController::class, 'index'])->name('calendar.index');
         Route::get('/calendar/events', [ContentCalendarController::class, 'events'])->name('calendar.events');
@@ -117,7 +113,6 @@ Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryContr
 Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])->get('/run-automations/{userId}/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
 
 Route::middleware(['auth'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('oauth.facebook.callback');
-Route::middleware(['auth'])->get('/auth/google/callback', [GoogleController::class, 'callback'])->name('oauth.google.callback');
 Route::middleware(['auth', 'role:customer,admin'])->get('/auth/google/drive/connect', [DriveApiKeyController::class, 'redirectToGoogleOauth'])->name('admin.google-drive.connect');
 Route::middleware(['auth', 'role:customer,admin'])->get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
 
@@ -141,16 +136,6 @@ Route::middleware(['auth', 'role:customer,admin'])
         Route::post('manage-posts/list', [SocialPostManagerController::class, 'listPosts'])->name('manage-posts.list');
         Route::post('manage-posts/delete', [SocialPostManagerController::class, 'deletePosts'])->name('manage-posts.delete');
         Route::get('manage-posts/statuses', [SocialPostManagerController::class, 'statuses'])->name('manage-posts.statuses');
-    });
-
-Route::middleware(['auth', 'role:customer,admin'])
-    ->prefix('admin/google')
-    ->name('admin.google.')
-    ->group(function () {
-        Route::get('settings', [GoogleController::class, 'index'])->name('settings');
-        Route::get('connect', [GoogleController::class, 'redirect'])->name('connect');
-        Route::post('sync-locations', [GoogleController::class, 'syncLocations'])->name('sync-locations');
-        Route::post('locations/{location}/default', [GoogleController::class, 'setDefaultLocation'])->name('locations.default');
     });
 
 Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])

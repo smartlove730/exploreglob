@@ -220,7 +220,7 @@ class ContentCalendarController extends Controller
             'video_url' => 'nullable|url|max:2048',
             'media_id' => 'nullable|integer|exists:user_media,id',
             'platforms' => 'required|array|min:1',
-            'platforms.*' => 'required|string|in:facebook,instagram,google_business',
+            'platforms.*' => 'required|string|in:facebook,instagram',
             'scheduled_for' => 'required|date|after:now',
         ]);
 

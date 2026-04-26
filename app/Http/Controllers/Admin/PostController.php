@@ -10,8 +10,6 @@ use App\Models\DriveImagePost;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Models\FacebookPost;
-use App\Models\GoogleAccount;
-use App\Models\GoogleLocation;
 use App\Services\DriveService;
 use App\Services\GoogleDriveService;
 use App\Services\GoogleService;
@@ -85,7 +83,7 @@ class PostController extends Controller
             FacebookPost::MEDIA_TYPE_VIDEO,
         ];
 
-        $platformOptions = ['facebook', 'instagram', 'google_business'];
+        $platformOptions = ['facebook', 'instagram'];
 
         $apps = FacebookApp::query()
             ->ownedBy(Auth::user())
@@ -130,13 +128,6 @@ class PostController extends Controller
             $request->integer('drive_api_key_id', $this->resolvePreferredDriveApiKeyId())
         );
 
-        $googleAccounts = GoogleAccount::query()
-            ->where('user_id', Auth::id())
-            ->where('google_account_id', 'like', 'accounts/%')
-            ->orderByDesc('token_last_refreshed_at')
-            ->orderByDesc('updated_at')
-            ->get();
-
         return view('admin.facebook.create-post', [
             'apps' => $apps,
             'selectedAppId' => $selectedAppId,
@@ -149,10 +140,6 @@ class PostController extends Controller
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
             'selectedDriveApiKeyId' => $selectedDriveApiKeyId,
             'driveFolders' => DriveFolder::query()->ownedBy(Auth::user())->with('driveApiKey')->where('is_active', true)->orderBy('name')->get(),
-            'googleAccount' => $googleAccounts->first(),
-            'googleBusinessProfiles' => $googleAccounts,
-            'googleLocations' => GoogleLocation::query()->where('user_id', Auth::id())->orderByDesc('is_default')->orderBy('name')->get(),
-            'defaultGoogleLocationId' => old('google_location_id', optional(GoogleLocation::query()->where('user_id', Auth::id())->where('is_default', true)->first())->id),
         ]);
     }
 
@@ -166,14 +153,7 @@ class PostController extends Controller
             return back()->withInput()->with('error', 'Select at least one valid page for this app/user.');
         }
 
-        $googleLocationId = $this->resolveGoogleLocationId($data);
-
         $mediaType = $data['media_type'] ?? FacebookPost::MEDIA_TYPE_IMAGE;
-        if ($mediaType === FacebookPost::MEDIA_TYPE_VIDEO && in_array('google_business', $data['platforms'], true)) {
-            throw ValidationException::withMessages([
-                'platforms' => 'Google Business posting currently supports image posts only.',
-            ]);
-        }
 
         if ($mediaType === FacebookPost::MEDIA_TYPE_VIDEO) {
             $videoMeta = $this->storeVideoAndResolveUrl($request);
@@ -198,7 +178,7 @@ class PostController extends Controller
                 'video_path' => null,
                 'video_url' => null,
                 'platforms' => $data['platforms'],
-                'google_location_id' => $googleLocationId,
+                'google_location_id' => null,
                 'status' => FacebookPost::STATUS_PENDING,
                 'last_error' => null,
             ]);
@@ -229,7 +209,7 @@ class PostController extends Controller
 
             $post->update([
                 'image_url' => $publishImageUrl,
-                'google_location_id' => $googleLocationId,
+                'google_location_id' => null,
                 'status' => FacebookPost::STATUS_PENDING,
                 'last_error' => null,
             ]);
@@ -263,13 +243,6 @@ class PostController extends Controller
             'video_url' => $data['video_url'] ?? $post->video_url,
         ]);
 
-        if (($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO
-            && in_array('google_business', $data['platforms'], true)) {
-            throw ValidationException::withMessages([
-                'platforms' => 'Google Business posting currently supports image posts only.',
-            ]);
-        }
-
         if (($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO && $request->hasFile('video')) {
             $videoMeta = $this->storeVideoAndResolveUrl($request);
 
@@ -283,7 +256,6 @@ class PostController extends Controller
         $this->syncImages($post, $request, $data['remove_images'] ?? []);
         $publishImageUrl = $this->resolvePublishImageUrl($post);
         $publishImageUrl = $this->ensureInstagramEligibleImage($publishImageUrl, $data['platforms']);
-        $googleLocationId = $this->resolveGoogleLocationId($data);
 
         $isImagePost = ($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_IMAGE;
         $isVideoPost = ($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO;
@@ -313,7 +285,7 @@ class PostController extends Controller
         $post->update([
             'status' => FacebookPost::STATUS_PENDING,
             'image_url' => $isImagePost ? $publishImageUrl : null,
-            'google_location_id' => $googleLocationId,
+            'google_location_id' => null,
             'facebook_post_id' => null,
             'instagram_media_id' => null,
             'google_post_name' => null,
@@ -605,8 +577,7 @@ class PostController extends Controller
             'caption' => 'required|string|max:60000',
             'post_mode' => 'nullable|string|in:separate,combined',
             'platforms' => 'required|array|min:1',
-            'platforms.*' => 'required|string|in:facebook,instagram,google_business',
-            'google_location_id' => 'nullable|integer|exists:google_locations,id',
+            'platforms.*' => 'required|string|in:facebook,instagram',
             'images' => 'required|array|min:1',
             'images.*.id' => 'required|string|max:255',
             'images.*.url' => 'required|url|max:2048',
@@ -679,16 +650,7 @@ class PostController extends Controller
             ], 422);
         }
 
-        if ($containsVideo && in_array('google_business', $platforms, true)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Google Business does not support video/reel publishing in this flow.',
-                'data' => ['results' => []],
-            ], 422);
-        }
-
         if ($postMode === 'combined') {
-            $googleLocationId = $this->resolveGoogleLocationId($data);
             foreach ($pages as $page) {
                 $publishableMedia = [];
                 foreach ($preparedMedia as $imageMeta) {
@@ -736,7 +698,7 @@ class PostController extends Controller
                     'message' => $data['caption'],
                     'image_url' => $queueImageUrls[0] ?? null,
                     'platforms' => $platforms,
-                    'google_location_id' => $googleLocationId,
+                    'google_location_id' => null,
                     'status' => FacebookPost::STATUS_PENDING,
                     'last_error' => null,
                 ]);
@@ -814,7 +776,6 @@ class PostController extends Controller
                 }
 
                 try {
-                    $googleLocationId = $this->resolveGoogleLocationId($data);
                     $post = FacebookPost::create([
                         'user_id' => $page->user_id,
                         'page_id' => $page->id,
@@ -824,7 +785,7 @@ class PostController extends Controller
                         'video_path' => $mediaType === FacebookPost::MEDIA_TYPE_VIDEO ? $imageMeta['storage_path'] : null,
                         'video_url' => $videoUrl,
                         'platforms' => $platformsToPublish,
-                        'google_location_id' => $googleLocationId,
+                        'google_location_id' => null,
                         'status' => FacebookPost::STATUS_PENDING,
                         'last_error' => null,
                     ]);
@@ -1073,8 +1034,7 @@ class PostController extends Controller
             'video' => 'nullable|file|mimes:mp4|max:51200',
             'video_url' => 'nullable|url|max:2048',
             'platforms' => 'required|array|min:1',
-            'platforms.*' => 'required|string|in:facebook,instagram,google_business',
-            'google_location_id' => 'nullable|integer|exists:google_locations,id',
+            'platforms.*' => 'required|string|in:facebook,instagram',
             'images' => 'nullable|array',
             'images.*' => 'image|max:5120',
             'remove_images' => $isUpdate ? 'nullable|array' : 'nullable',
@@ -1082,30 +1042,6 @@ class PostController extends Controller
         ]);
     }
 
-
-    private function resolveGoogleLocationId(array $data): ?int
-    {
-        $platforms = $data['platforms'] ?? [];
-
-        if (!in_array('google_business', $platforms, true)) {
-            return null;
-        }
-
-        $locationId = (int) ($data['google_location_id'] ?? 0);
-
-        $location = GoogleLocation::query()
-            ->where('user_id', Auth::id())
-            ->when($locationId > 0, fn ($query) => $query->whereKey($locationId), fn ($query) => $query->where('is_default', true))
-            ->first();
-
-        if (!$location) {
-            throw ValidationException::withMessages([
-                'google_location_id' => 'Select a Google Business location or set a default location first.',
-            ]);
-        }
-
-        return (int) $location->id;
-    }
 
     private function resolveAuthorizedPage(int $appId, int $pageId): ?FacebookPage
     {

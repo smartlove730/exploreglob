@@ -36,7 +36,7 @@ class PublishPostJob implements ShouldQueue
         }
 
         $platforms = collect($post->platforms ?: ['facebook'])
-            ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram', 'google_business'], true))
+            ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
             ->values()
             ->all();
 
@@ -65,10 +65,6 @@ class PublishPostJob implements ShouldQueue
 
         try {
             if (($post->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO) {
-                if (in_array('google_business', $pendingPlatforms, true)) {
-                    throw new \RuntimeException('Google Business does not support video posting.');
-                }
-
                 $videoResult = $this->publishVideo($post, $metaVideoService, $pendingPlatforms);
                 $responses = array_merge($responses, $videoResult);
             } else {
@@ -83,7 +79,6 @@ class PublishPostJob implements ShouldQueue
                 $responses = array_merge($responses, (array) ($publishResult['response_json'] ?? []));
                 $post->facebook_post_id = $post->facebook_post_id ?: ($publishResult['facebook_post_id'] ?? null);
                 $post->instagram_media_id = $post->instagram_media_id ?: ($publishResult['instagram_media_id'] ?? null);
-                $post->google_post_name = $post->google_post_name ?: ($publishResult['google_post_name'] ?? null);
             }
 
             $post->forceFill([
@@ -121,7 +116,6 @@ class PublishPostJob implements ShouldQueue
                 return match ($platform) {
                     'facebook' => empty($post->facebook_post_id),
                     'instagram' => empty($post->instagram_media_id),
-                    'google_business' => empty($post->google_post_name),
                     default => false,
                 };
             })
@@ -138,10 +132,6 @@ class PublishPostJob implements ShouldQueue
         $responses = [];
 
         foreach ($platforms as $platform) {
-            if ($platform === 'google_business') {
-                continue;
-            }
-
             if ($platform === 'facebook') {
                 $responses['facebook'] = $metaVideoService->postToFacebookVideo($post->page, $post->video_url, $post->message);
                 $post->facebook_post_id = $post->facebook_post_id ?: (data_get($responses, 'facebook.id') ?: data_get($responses, 'facebook.post_id'));

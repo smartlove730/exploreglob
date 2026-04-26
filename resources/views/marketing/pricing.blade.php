@@ -25,7 +25,6 @@
                             <li>{{ $plan->post_limit }} posts / period</li>
                             <li>Facebook: {{ $plan->facebook_enabled ? '✅ Yes' : '❌ No' }}</li>
                             <li>Instagram: {{ $plan->instagram_enabled ? '✅ Yes' : '❌ No' }}</li>
-                            <li>Google Business: {{ $plan->google_business_enabled ? '✅ Yes' : '❌ No' }}</li>
                         </ul>
                         <a href="{{ route('register') }}" class="btn btn-primary mt-auto">Choose {{ $plan->name }}</a>
                     </div>

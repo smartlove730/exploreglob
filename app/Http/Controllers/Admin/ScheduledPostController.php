@@ -116,7 +116,7 @@ class ScheduledPostController extends Controller
             'video_path' => 'nullable|string|max:2048',
             'video_url' => 'nullable|url|max:2048',
             'platforms' => 'required|array|min:1',
-            'platforms.*' => 'required|string|in:facebook,instagram,google_business',
+            'platforms.*' => 'required|string|in:facebook,instagram',
             'scheduled_for' => 'required|date|after:now',
         ]);
 

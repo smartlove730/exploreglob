@@ -91,19 +91,14 @@
                         <span>Facebook / Instagram</span>
                         <span class="badge {{ $facebookConnected ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $facebookConnected ? 'Connected' : 'Not connected' }}</span>
                     </div>
-                    <div class="d-flex align-items-center justify-content-between border rounded p-2 mb-3 bg-light">
-                        <span>Google Business</span>
-                        <span class="badge {{ $googleConnected ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $googleConnected ? 'Connected' : 'Not connected' }}</span>
-                    </div>
+                    <div class="mb-3"></div>
                     @if(auth()->user()->isAdmin())
                         <div class="d-flex flex-wrap gap-2">
                             <a href="{{ route('admin.facebook.settings') }}" class="btn btn-outline-secondary btn-sm">Facebook Settings</a>
-                            <a href="{{ route('admin.google.settings') }}" class="btn btn-outline-secondary btn-sm">Google Settings</a>
                         </div>
                     @else
                         <div class="d-flex flex-wrap gap-2">
                             <a href="{{ route('app.facebook.connect') }}" class="btn btn-outline-primary btn-sm">Connect Facebook</a>
-                            <a href="{{ route('app.google.connect') }}" class="btn btn-outline-danger btn-sm">Connect Google</a>
                         </div>
                     @endif
                 </div>
@@ -121,7 +116,6 @@
                     <a href="{{ route('admin.facebook.settings') }}" class="btn btn-outline-secondary">Connect Accounts</a>
                 @else
                     <a href="{{ route('app.facebook.connect') }}" class="btn btn-outline-secondary">Connect Facebook</a>
-                    <a href="{{ route('app.google.connect') }}" class="btn btn-outline-secondary">Connect Google</a>
                 @endif
                 <a href="{{ route('app.media.index') }}" class="btn btn-outline-secondary">Open Media Library</a>
                 <a href="{{ route('app.billing.plans') }}" class="btn btn-outline-secondary">Manage Subscription</a>

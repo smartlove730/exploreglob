@@ -175,9 +175,6 @@ class ProcessScheduledPostCsvImportJob implements ShouldQueue
         }
         $payload['media_type'] = $mediaType;
 
-        if ($mediaType === 'video' && in_array('google_business', $platforms, true)) {
-            return 'google_business is not supported for video posts';
-        }
 
         if (!empty($payload['media_id'])) {
             $media = UserMedia::query()->ownedBy($user)->whereKey((int) $payload['media_id'])->first();
@@ -214,7 +211,7 @@ class ProcessScheduledPostCsvImportJob implements ShouldQueue
     {
         return collect(explode(',', $value))
             ->map(fn ($platform) => trim(strtolower($platform)))
-            ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram', 'google_business'], true))
+            ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
             ->unique()
             ->values()
             ->all();
