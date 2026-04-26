@@ -18,7 +18,8 @@
             @else
                 <p class="mb-1"><span class="badge text-bg-success">Connected</span></p>
             @endif
-            <p class="mb-2 text-muted">Account: {{ $account->google_account_id }}</p>
+            <p class="mb-2 text-muted">Connected profiles: {{ $accounts->count() }}</p>
+            <p class="mb-2 text-muted">Active account: {{ $account->google_account_id }}</p>
             <p class="mb-3 text-muted">Token expires: {{ optional($account->expires_at)->format('M d, Y H:i') }}</p>
             <form method="POST" action="{{ route('admin.google.sync-locations') }}">
                 @csrf
@@ -32,14 +33,25 @@
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
-        <h2 class="h5">Business Locations</h2>
+        <h2 class="h5">Business Profiles & Locations</h2>
+        @if(isset($accounts) && $accounts->isNotEmpty())
+            <div class="mb-3">
+                <p class="text-muted mb-2">Business profiles connected via this Google login:</p>
+                <ul class="mb-0">
+                    @foreach($accounts as $connectedAccount)
+                        <li><small>{{ $connectedAccount->google_account_id }}</small></li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
         @if($locations->isEmpty())
-            <p class="text-muted mb-0">No locations found. Connect and sync first.</p>
+            <p class="text-muted mb-0">No business locations available for the connected profiles.</p>
         @else
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
+                            <th>Business Profile</th>
                             <th>Name</th>
                             <th>Location ID</th>
                             <th>Default</th>
@@ -49,6 +61,7 @@
                     <tbody>
                     @foreach($locations as $location)
                         <tr>
+                            <td><small>{{ $location->googleAccount->google_account_id ?? '-' }}</small></td>
                             <td>{{ $location->name }}</td>
                             <td><small>{{ $location->location_id }}</small></td>
                             <td>

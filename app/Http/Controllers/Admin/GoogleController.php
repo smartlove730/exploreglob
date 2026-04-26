@@ -21,11 +21,26 @@ class GoogleController extends Controller
 
     public function index()
     {
-        $account = GoogleAccount::query()->where('user_id', Auth::id())->with('locations')->first();
+        $accounts = GoogleAccount::query()
+            ->where('user_id', Auth::id())
+            ->withCount('locations')
+            ->orderBy('reauthorization_required')
+            ->orderByDesc('token_last_refreshed_at')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $account = $accounts->first();
+        $locations = GoogleLocation::query()
+            ->where('user_id', Auth::id())
+            ->with('googleAccount')
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
 
         return view('admin.google-business.settings', [
             'account' => $account,
-            'locations' => $account?->locations ?? collect(),
+            'accounts' => $accounts,
+            'locations' => $locations,
         ]);
     }
 
@@ -60,25 +75,34 @@ class GoogleController extends Controller
             }
 
             $accounts = $this->googleService->fetchAccounts($accessToken);
-            $primaryAccount = $accounts[0]['name'] ?? null;
-            if (!$primaryAccount) {
-                return redirect()->route($settingsRoute)->with('error', 'No Google Business account found.');
+            $oauthIdentifier = (string) ($oauthUserInfo['sub'] ?? $oauthUserInfo['email'] ?? '');
+            $accountNames = collect($accounts)->pluck('name')->filter()->values();
+            if ($accountNames->isEmpty()) {
+                $fallbackAccount = $oauthIdentifier !== '' ? "oauth:{$oauthIdentifier}" : 'oauth:default';
+                $accountNames = collect([$fallbackAccount]);
             }
 
-            $account = GoogleAccount::updateOrCreate(
-                ['user_id' => Auth::id(), 'google_account_id' => $primaryAccount],
-                [
-                    'access_token' => $accessToken,
-                    'refresh_token' => $refreshToken ?: GoogleAccount::query()
-                        ->where('user_id', Auth::id())
-                        ->where('google_account_id', $primaryAccount)
-                        ->value('refresh_token'),
-                    'expires_at' => now()->addSeconds((int) ($tokenData['expires_in'] ?? 3600)),
-                    'token_last_refreshed_at' => now(),
-                    'reauthorization_required' => false,
-                    'reauthorization_reason' => null,
-                ]
-            );
+            $syncedCount = 0;
+            foreach ($accountNames as $accountName) {
+                $account = GoogleAccount::updateOrCreate(
+                    ['user_id' => Auth::id(), 'google_account_id' => $accountName],
+                    [
+                        'access_token' => $accessToken,
+                        'refresh_token' => $refreshToken ?: GoogleAccount::query()
+                            ->where('user_id', Auth::id())
+                            ->where('google_account_id', $accountName)
+                            ->value('refresh_token'),
+                        'expires_at' => now()->addSeconds((int) ($tokenData['expires_in'] ?? 3600)),
+                        'token_last_refreshed_at' => now(),
+                        'reauthorization_required' => false,
+                        'reauthorization_reason' => null,
+                    ]
+                );
+
+                if (str_starts_with((string) $accountName, 'accounts/')) {
+                    $syncedCount += $this->googleService->syncLocations($account);
+                }
+            }
 
             $oauthEmail = (string) ($oauthUserInfo['email'] ?? Auth::user()?->email ?? '');
             $oauthDisplayName = (string) ($oauthUserInfo['name'] ?? '');
@@ -128,9 +152,7 @@ class GoogleController extends Controller
                 $driveApiKeyUpdateData
             );
 
-            $count = $this->googleService->syncLocations($account);
-
-            return redirect()->route($settingsRoute)->with('success', "Google connected successfully. Synced {$count} location(s).");
+            return redirect()->route($settingsRoute)->with('success', "Google connected successfully. Synced {$syncedCount} location(s).");
         } catch (\Throwable $exception) {
             Log::error('Google OAuth callback failed', ['error' => $exception->getMessage()]);
 
