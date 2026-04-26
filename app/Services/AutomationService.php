@@ -179,10 +179,6 @@ class AutomationService
                         $mediaUrl = $this->driveService->prepareInstagramEligibleVideo($unusedMedia, $config->driveApiKey);
                     }
 
-                    if ($mediaType === 'video' && in_array('google_business', $attemptPlatforms, true)) {
-                        $attemptPlatforms = array_values(array_filter($attemptPlatforms, fn (string $platform) => $platform !== 'google_business'));
-                    }
-
                     $platformReservations = $this->reserveMediaPlatforms($config, $driveFileId, $attemptPlatforms);
                     $attemptPlatforms = $platformReservations['platforms_to_publish'];
 

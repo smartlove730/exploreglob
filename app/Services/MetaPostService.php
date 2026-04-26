@@ -15,7 +15,6 @@ class MetaPostService
     public function __construct(
         private readonly FacebookGraphService $facebookGraphService,
         private readonly InstagramService $instagramService,
-        private readonly GoogleService $googleService,
     ) {
     }
 
@@ -49,35 +48,12 @@ class MetaPostService
                 }
                 continue;
             }
-            if ($platform === 'google_business') {
-                if (!$imageUrl) {
-                    throw new RuntimeException('Google Business publishing requires an HTTPS image URL.');
-                }
-
-                $googleAccount = \App\Models\GoogleAccount::query()->where('user_id', $page->facebookAccount->user_id)->first();
-                $googleLocation = \App\Models\GoogleLocation::query()
-                    ->where('user_id', $page->facebookAccount->user_id)
-                    ->when($googleLocationId, fn ($query) => $query->whereKey($googleLocationId), fn ($query) => $query->where('is_default', true))
-                    ->first();
-
-                if (!$googleAccount || !$googleLocation) {
-                    throw new RuntimeException('Google account or location is not configured.');
-                }
-
-                $responses['google_business'] = $this->googleService->publishLocalPost(
-                    $googleAccount,
-                    $googleLocation->location_id,
-                    $message,
-                    $imageUrl
-                );
-            }
 
         }
 
         return [
             'facebook_post_id' => data_get($responses, 'facebook.post_id') ?: data_get($responses, 'facebook.id'),
             'instagram_media_id' => data_get($responses, 'instagram.publish_response.id'),
-            'google_post_name' => data_get($responses, 'google_business.name'),
             'response_json' => $responses,
         ];
     }
@@ -117,22 +93,11 @@ class MetaPostService
                 continue;
             }
 
-            if ($platform === 'google_business') {
-                $googleAccount = \App\Models\GoogleAccount::query()->where('user_id', $page->facebookAccount->user_id)->first();
-                $googleLocation = \App\Models\GoogleLocation::query()->where('user_id', $page->facebookAccount->user_id)->where('is_default', true)->first();
-
-                if (!$googleAccount || !$googleLocation) {
-                    throw new RuntimeException('Google account or default location is not configured.');
-                }
-
-                $responses['google_business'] = $this->googleService->publishLocalPost($googleAccount, $googleLocation->location_id, $message, $imageUrls[0]);
-            }
         }
 
         return [
             'facebook_post_id' => data_get($responses, 'facebook.post_id') ?: data_get($responses, 'facebook.id'),
             'instagram_media_id' => data_get($responses, 'instagram.publish_response.id'),
-            'google_post_name' => data_get($responses, 'google_business.name'),
             'response_json' => $responses,
         ];
     }

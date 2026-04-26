@@ -371,10 +371,6 @@
                                 <span class="icon {{ $plan->instagram_enabled ? 'yes' : 'no' }}">{{ $plan->instagram_enabled ? '✓' : '✕' }}</span>
                                 <span>Instagram Publishing</span>
                             </li>
-                            <li>
-                                <span class="icon {{ $plan->google_business_enabled ? 'yes' : 'no' }}">{{ $plan->google_business_enabled ? '✓' : '✕' }}</span>
-                                <span>Google Business</span>
-                            </li>
                         </ul>
 
                         @if($isActive)

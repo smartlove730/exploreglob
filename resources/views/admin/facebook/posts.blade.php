@@ -120,7 +120,6 @@
                                     $postedPlatforms = collect([
                                         $post->facebook_post_id ? 'facebook' : null,
                                         $post->instagram_media_id ? 'instagram' : null,
-                                        $post->google_post_name ? 'google_business' : null,
                                     ])->filter()->values();
                                 @endphp
                                 @if($postedPlatforms->isEmpty())
@@ -190,7 +189,6 @@
                                                 <div>
                                                     <label class="me-3"><input type="checkbox" name="platforms[]" value="facebook" {{ in_array('facebook', $post->platforms ?? [], true) ? 'checked' : '' }}> Facebook</label>
                                                     <label class="me-3"><input type="checkbox" name="platforms[]" value="instagram" {{ in_array('instagram', $post->platforms ?? [], true) ? 'checked' : '' }}> Instagram</label>
-                                                    <label><input type="checkbox" name="platforms[]" value="google_business" {{ in_array('google_business', $post->platforms ?? [], true) ? 'checked' : '' }}> Google Business</label>
                                                 </div>
                                             </div>
 

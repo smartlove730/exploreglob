@@ -7,7 +7,7 @@
     <div class="container">
         <div class="hero-content">
             <h1 class="hero-title">Plan, Schedule & Publish Content</h1>
-            <p class="hero-subtitle">Postzy helps teams manage Facebook, Instagram, and Google Business posting with scheduling and automation. </p>
+            <p class="hero-subtitle">Postzy helps teams manage Facebook and Instagram posting with scheduling and automation. </p>
             <div class="d-flex flex-wrap gap-3 justify-content-center">
                 <a href="{{ route('register') }}" class="btn btn-light btn-lg">Start Free</a>
                 <a href="{{ route('marketing.pricing') }}" class="btn btn-primary btn-lg" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.4)">View Pricing</a>

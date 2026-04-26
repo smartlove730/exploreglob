@@ -22,7 +22,6 @@
                         <td class="small">
                             FB: {{ $plan->facebook_enabled ? 'Y' : 'N' }},
                             IG: {{ $plan->instagram_enabled ? 'Y' : 'N' }},
-                            GB: {{ $plan->google_business_enabled ? 'Y' : 'N' }}
                         </td>
                         <td>{{ $plan->subscriptions_count }}</td>
                         <td>

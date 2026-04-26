@@ -46,7 +46,7 @@ class PublishScheduledPostJob implements ShouldQueue
         }
 
         $platforms = collect($scheduledPost->platforms)
-            ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram', 'google_business'], true))
+            ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
             ->values()
             ->all();
 
@@ -60,10 +60,6 @@ class PublishScheduledPostJob implements ShouldQueue
 
             if (($scheduledPost->media_type ?? FacebookPost::MEDIA_TYPE_IMAGE) === FacebookPost::MEDIA_TYPE_VIDEO) {
                 foreach ($platforms as $platform) {
-                    if ($platform === 'google_business') {
-                        continue;
-                    }
-
                     if ($platform === 'facebook') {
                         $responses['facebook'] = $metaVideoService->postToFacebookVideo(
                             $scheduledPost->page,
@@ -83,7 +79,6 @@ class PublishScheduledPostJob implements ShouldQueue
                 $result = [
                     'facebook_post_id' => data_get($responses, 'facebook.id') ?: data_get($responses, 'facebook.post_id'),
                     'instagram_media_id' => data_get($responses, 'instagram.publish_response.id'),
-                    'google_post_name' => null,
                     'response_json' => $responses,
                 ];
             } else {
@@ -110,7 +105,6 @@ class PublishScheduledPostJob implements ShouldQueue
                 'posted_at' => now(),
                 'facebook_post_id' => $result['facebook_post_id'] ?? null,
                 'instagram_media_id' => $result['instagram_media_id'] ?? null,
-                'google_post_name' => $result['google_post_name'] ?? null,
                 'response_json' => $result['response_json'] ?? null,
                 'last_error' => null,
             ]);

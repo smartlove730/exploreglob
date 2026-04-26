@@ -61,6 +61,5 @@
         <label class="form-label d-block">Platforms</label>
         <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="platforms[]" value="facebook" checked><label class="form-check-label">Facebook</label></div>
         <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="platforms[]" value="instagram"><label class="form-check-label">Instagram</label></div>
-        <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="platforms[]" value="google_business"><label class="form-check-label">Google Business</label></div>
     </div>
 </div>
