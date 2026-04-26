@@ -33,55 +33,28 @@
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
-        <h2 class="h5">Business Profiles & Locations</h2>
+        <h2 class="h5">Business Profiles</h2>
         @if(isset($businessProfiles) && $businessProfiles->isNotEmpty())
-            <div class="mb-3">
-                <p class="text-muted mb-2">Business profiles connected via this Google login:</p>
-                <ul class="mb-0">
-                    @foreach($businessProfiles as $connectedAccount)
-                        <li><small>{{ $connectedAccount->google_account_id }}</small></li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
-        @if($locations->isEmpty())
-            <p class="text-muted mb-0">No business locations available for the connected profiles.</p>
-        @else
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th>Business Profile</th>
-                            <th>Name</th>
-                            <th>Location ID</th>
-                            <th>Default</th>
-                            <th class="text-end">Action</th>
+                            <th>Profile ID</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach($locations as $location)
+                    @foreach($businessProfiles as $connectedAccount)
                         <tr>
-                            <td><small>{{ $location->googleAccount->google_account_id ?? '-' }}</small></td>
-                            <td>{{ $location->name }}</td>
-                            <td><small>{{ $location->location_id }}</small></td>
-                            <td>
-                                @if($location->is_default)
-                                    <span class="badge text-bg-success">Default</span>
-                                @endif
-                            </td>
-                            <td class="text-end">
-                                @if(!$location->is_default)
-                                    <form method="POST" action="{{ route('admin.google.locations.default', $location) }}">
-                                        @csrf
-                                        <button class="btn btn-sm btn-outline-primary">Make Default</button>
-                                    </form>
-                                @endif
-                            </td>
+                            <td><small>{{ $connectedAccount->google_account_id }}</small></td>
+                            <td><span class="badge text-bg-success">Connected</span></td>
                         </tr>
                     @endforeach
                     </tbody>
                 </table>
             </div>
+        @else
+            <p class="text-muted mb-0">No Business Profiles found for this Google account. Please reconnect with the correct account.</p>
         @endif
     </div>
 </div>

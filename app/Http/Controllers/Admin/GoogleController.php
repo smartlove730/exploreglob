@@ -33,25 +33,17 @@ class GoogleController extends Controller
         $businessProfiles = $accounts->filter(
             fn (GoogleAccount $googleAccount) => str_starts_with($googleAccount->google_account_id, 'accounts/')
         )->values();
-        $locations = GoogleLocation::query()
-            ->where('user_id', Auth::id())
-            ->with('googleAccount')
-            ->orderByDesc('is_default')
-            ->orderBy('name')
-            ->get();
-
         return view('admin.google-business.settings', [
             'account' => $account,
             'accounts' => $accounts,
             'businessProfiles' => $businessProfiles,
-            'locations' => $locations,
         ]);
     }
 
     public function redirect(): RedirectResponse
     {
         try {
-            return redirect()->away($this->googleService->getOauthRedirectUrl());
+            return redirect()->away($this->googleService->getOauthRedirectUrl(route('oauth.google.callback')));
         } catch (\Throwable $exception) {
             return back()->with('error', $exception->getMessage());
         }
@@ -63,7 +55,7 @@ class GoogleController extends Controller
         $settingsRoute = Auth::user()?->isAdmin() ? 'admin.google.settings' : 'app.google.settings';
 
         try {
-            $tokenData = $this->googleService->exchangeCodeForToken((string) request('code'));
+            $tokenData = $this->googleService->exchangeCodeForToken((string) request('code'), route('oauth.google.callback'));
             $accessToken = (string) ($tokenData['access_token'] ?? '');
             $refreshToken = (string) ($tokenData['refresh_token'] ?? '');
             $oauthUserInfo = [];

@@ -21,14 +21,14 @@ class GoogleService
     {
     }
 
-    public function getOauthRedirectUrl(): string
+    public function getOauthRedirectUrl(?string $redirectUri = null): string
     {
         $clientId = $this->resolveClientId();
-        $redirectUri = $this->resolveRedirectUri();
+        $resolvedRedirectUri = $redirectUri ?: $this->resolveRedirectUri();
 
         $query = http_build_query([
             'client_id' => $clientId,
-            'redirect_uri' => $redirectUri,
+            'redirect_uri' => $resolvedRedirectUri,
             'response_type' => 'code',
             'scope' => implode(' ', [
                 'https://www.googleapis.com/auth/business.manage',
