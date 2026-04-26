@@ -8,19 +8,27 @@
     <a href="{{ route('admin.automations.create') }}" class="btn btn-primary">Add Automation</a>
 </div>
 
+@php
+    $isAdmin = auth()->user()?->isAdmin();
+@endphp
+
+@if($isAdmin)
 <div class="row g-3 mb-3">
     <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted small">Queued Jobs</div><div class="h4 mb-0">{{ $queueStats['pending_jobs'] }}</div></div></div></div>
     <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted small">Failed Jobs</div><div class="h4 mb-0">{{ $queueStats['failed_jobs'] }}</div></div></div></div>
     <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted small">Last Automation Activity</div><div class="small">{{ $queueStats['last_activity'] ? \Illuminate\Support\Carbon::parse($queueStats['last_activity'])->diffForHumans() : 'No activity yet' }}</div></div></div></div>
 </div>
+@endif
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
+        @if($isAdmin)
         <p class="small text-muted">
             Run all for one user: <code>{{ url('/run-automations/{userId}') }}</code> |
             Run one config for one user: <code>{{ url('/run-automations/{userId}/{id}') }}</code> |
             Force run (ignore schedule/limit): <code>{{ url('/run-automations/{userId}/{id}?force=1') }}</code>
         </p>
+        @endif
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
