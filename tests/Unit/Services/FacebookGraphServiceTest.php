@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 class FacebookGraphServiceTest extends TestCase
 {
-    public function test_oauth_redirect_url_contains_required_instagram_and_page_scopes(): void
+    public function test_oauth_redirect_url_contains_required_instagram_page_and_business_scopes(): void
     {
         $service = new FacebookGraphService($this->createMock(InstagramService::class));
         $app = new FacebookApp([
@@ -24,7 +24,7 @@ class FacebookGraphServiceTest extends TestCase
         parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
 
         $this->assertSame(
-            'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,instagram_manage_contents',
+            'pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish,instagram_manage_contents',
             $query['scope'] ?? null
         );
         $this->assertSame('rerequest', $query['auth_type'] ?? null);
