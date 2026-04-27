@@ -145,7 +145,7 @@
                     <input type="file" name="images[]" class="form-control" accept="image/*" multiple>
                 </div>
                 <div class="mb-3 d-none" id="video_upload_group">
-                    <label class="form-label">Upload Video (MP4, max 50MB)</label>
+                    <label class="form-label">Upload Video (MP4)</label>
                     <input type="file" name="video" class="form-control" accept="video/mp4">
                 </div>
                 <button class="btn btn-primary">Publish Post</button>

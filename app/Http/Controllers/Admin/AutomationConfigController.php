@@ -9,7 +9,6 @@ use App\Models\DriveApiKey;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Jobs\RunAutomationJob;
-use App\Services\AutomationService;
 use App\Services\InstagramService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,13 +47,7 @@ class AutomationConfigController extends Controller
             ->limit(25)
             ->get();
 
-        $noPostableContentWarning = AutomationPostLog::query()
-            ->ownedBy(Auth::user())
-            ->where('message', 'like', AutomationService::NO_POSTABLE_MEDIA_MESSAGE.'%')
-            ->where('created_at', '>=', now()->subDay())
-            ->exists();
-
-        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs', 'instagramUsernames', 'noPostableContentWarning'));
+        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs', 'instagramUsernames'));
     }
 
     public function create()
