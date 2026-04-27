@@ -20,7 +20,6 @@ use Throwable;
 class AutomationService
 {
     private const STALE_IN_PROGRESS_MINUTES = 20;
-    public const NO_POSTABLE_MEDIA_MESSAGE = 'Your selected Drive folder in Automations does not contain any postable material.';
 
     public function __construct(
         private readonly DriveService $driveService,
@@ -136,7 +135,7 @@ class AutomationService
             $mediaCandidates = $this->resolveUnusedMediaCandidates($config, $mediaItems, $platforms);
 
             if ($mediaCandidates->isEmpty()) {
-                $this->logSkipped($config, self::NO_POSTABLE_MEDIA_MESSAGE, $automationLogId);
+                $this->logSkipped($config, 'Automation skipped: no eligible media found in the selected Drive folder.', $automationLogId);
 
                 return;
             }
@@ -283,7 +282,7 @@ class AutomationService
                     $config,
                     null,
                     $this->normalizePlatforms($config->platforms),
-                    self::NO_POSTABLE_MEDIA_MESSAGE.($lastError ? ' Last error: '.$lastError : ''),
+                    'Automation failed: no eligible media could be posted from the selected Drive folder.'.($lastError ? ' Last error: '.$lastError : ''),
                     $automationLogId
                 );
             }
@@ -405,7 +404,7 @@ class AutomationService
 
         return str_contains($normalized, 'too large')
             || str_contains($normalized, 'unsupported')
-            || str_contains($normalized, 'no postable');
+            || str_contains($normalized, 'no eligible media');
     }
 
     private function reserveMediaPlatforms(AutomationConfig $config, string $driveFileId, array $platforms): array
