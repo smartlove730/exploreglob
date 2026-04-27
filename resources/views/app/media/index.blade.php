@@ -27,7 +27,7 @@
             <form method="POST" action="{{ route('app.media.store') }}" enctype="multipart/form-data" class="row g-3 align-items-end">
                 @csrf
                 <div class="col-md-9">
-                    <label class="form-label">Upload images/videos (max 50MB each)</label>
+                    <label class="form-label">Upload images/videos</label>
                     <input class="form-control" type="file" name="files[]" accept="image/*,video/mp4,video/quicktime" multiple required>
                 </div>
                 <div class="col-md-3 d-grid">

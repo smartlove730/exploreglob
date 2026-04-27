@@ -1031,7 +1031,7 @@ class PostController extends Controller
             'message' => 'required|string|max:60000',
             'media_type' => 'nullable|string|in:image,video',
             'image_url' => 'nullable|url|max:2048',
-            'video' => 'nullable|file|mimes:mp4|max:51200',
+            'video' => 'nullable|file|mimes:mp4',
             'video_url' => 'nullable|url|max:2048',
             'platforms' => 'required|array|min:1',
             'platforms.*' => 'required|string|in:facebook,instagram',

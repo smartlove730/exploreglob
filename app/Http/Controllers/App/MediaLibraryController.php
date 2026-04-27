@@ -44,7 +44,7 @@ class MediaLibraryController extends Controller
     {
         $data = $request->validate([
             'files' => 'required|array|min:1|max:10',
-            'files.*' => 'required|file|max:51200|mimetypes:image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime',
+            'files.*' => 'required|file|mimetypes:image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime',
         ]);
 
         foreach ($data['files'] as $file) {
