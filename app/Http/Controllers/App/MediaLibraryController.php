@@ -8,7 +8,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class MediaLibraryController extends Controller
@@ -43,8 +42,6 @@ class MediaLibraryController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $this->applyRuntimeUploadLimits();
-
         $data = $request->validate([
             'files' => 'required|array|min:1|max:10',
             'files.*' => 'required|file|mimetypes:image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime',
@@ -81,39 +78,5 @@ class MediaLibraryController extends Controller
         $item->delete();
 
         return back()->with('success', 'Media deleted successfully.');
-    }
-
-    private function applyRuntimeUploadLimits(): void
-    {
-        $targets = [
-            'memory_limit' => '512M',
-            'max_execution_time' => '300',
-            'upload_max_filesize' => '512M',
-            'post_max_size' => '512M',
-        ];
-
-        $applied = [];
-
-        foreach ($targets as $key => $value) {
-            $before = (string) ini_get($key);
-            $result = function_exists('ini_set') ? @ini_set($key, $value) : false;
-            $after = (string) ini_get($key);
-
-            $applied[$key] = [
-                'before' => $before,
-                'desired' => $value,
-                'after' => $after,
-                'changed' => $result !== false,
-            ];
-        }
-
-        if (function_exists('set_time_limit')) {
-            @set_time_limit(300);
-        }
-
-        Log::info('Media library upload runtime limits applied.', [
-            'user_id' => Auth::id(),
-            'limits' => $applied,
-        ]);
     }
 }
