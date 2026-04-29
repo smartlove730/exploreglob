@@ -130,6 +130,7 @@ Route::middleware(['auth', 'role:customer,admin'])
         Route::resource('google-drive-keys', DriveApiKeyController::class)->except(['show']);
         Route::resource('drive-folders', DriveFolderController::class)->except(['show']);
         Route::post('drive-folders/sync', [DriveFolderController::class, 'sync'])->name('drive-folders.sync');
+        Route::post('drive-folders/bulk-status', [DriveFolderController::class, 'bulkStatus'])->name('drive-folders.bulk-status');
 
         Route::post('posts/generate-caption', [FacebookPostController::class, 'generateCaption'])->name('posts.generate-caption');
         Route::get('manage-posts', [SocialPostManagerController::class, 'index'])->name('manage-posts.index');

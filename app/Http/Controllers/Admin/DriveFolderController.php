@@ -20,7 +20,7 @@ class DriveFolderController extends Controller
 
     public function index()
     {
-        $folders = $this->scopedFolders()->with('driveApiKey')->latest()->paginate(20);
+        $folders = $this->scopedFolders()->with('driveApiKey')->latest()->get();
 
         return view('admin.drive-folders.index', compact('folders'));
     }
@@ -109,6 +109,22 @@ class DriveFolderController extends Controller
         }
 
         return redirect()->route('admin.facebook.drive-folders.index')->with('success', "Sync completed. {$syncedCount} folders synced.");
+    }
+
+    public function bulkStatus(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'folder_ids' => 'required|array|min:1',
+            'folder_ids.*' => 'integer|exists:drive_folders,id',
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        $updated = $this->scopedFolders()
+            ->whereIn('id', $data['folder_ids'])
+            ->update(['is_active' => $data['status'] === 'active']);
+
+        return redirect()->route('admin.facebook.drive-folders.index')
+            ->with('success', "{$updated} folder(s) updated to {$data['status']}.");
     }
 
     private function scopedFolders()

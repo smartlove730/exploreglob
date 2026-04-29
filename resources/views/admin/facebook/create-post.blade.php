@@ -48,10 +48,6 @@
                 </select>
                 <small class="text-muted">Optional. Leave blank to auto-use your latest active OAuth Drive connection.</small>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Google Drive Folder URL</label>
-                <input type="url" name="folder_url" id="drive_folder_url" class="form-control" placeholder="https://drive.google.com/drive/folders/..." required>
-            </div>
             <div class="col-12">
                 <label class="form-label">Select Folder</label>
                 <div>
@@ -245,8 +241,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const appIdInput = document.getElementById('drive_app_id');
     const pageIdsInput = document.getElementById('drive_page_ids');
     const driveApiKeyInput = document.getElementById('drive_api_key_id');
-    const folderUrlInput = document.getElementById('drive_folder_url');
     const savedFolderInput = document.getElementById('saved_drive_folder_id');
+    const initialFolderOptions = [...savedFolderInput.options].slice(1).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        folderUrl: option.dataset.folderUrl,
+        driveKeyId: option.dataset.driveKeyId,
+    }));
     const getSelectedPageIds = () => [...(pageIdsInput?.selectedOptions || [])]
         .map((option) => option.value)
         .filter(Boolean);
@@ -352,10 +353,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const appId = appIdInput.value;
         const pageIds = getSelectedPageIds();
         const driveApiKeyId = driveApiKeyInput.value;
-        const folderUrl = folderUrlInput.value.trim();
+        const selected = savedFolderInput.options[savedFolderInput.selectedIndex];
+        const folderUrl = selected?.dataset?.folderUrl?.trim() || '';
 
         if (!appId || !pageIds.length || !folderUrl) {
-            setStatus('App, at least one page, and folder URL are required.', 'danger');
+            setStatus('App, at least one page, and folder are required.', 'danger');
             return;
         }
 
@@ -390,13 +392,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const rebuildFolderOptionsByAccount = () => {
+        const selectedAccountId = driveApiKeyInput.value;
+        const filtered = initialFolderOptions.filter((folder) => !selectedAccountId || String(folder.driveKeyId) === String(selectedAccountId));
+
+        savedFolderInput.innerHTML = '<option value="">Select folder</option>';
+        filtered.forEach((folder) => {
+            const option = document.createElement('option');
+            option.value = folder.value;
+            option.textContent = folder.text;
+            option.dataset.folderUrl = folder.folderUrl;
+            option.dataset.driveKeyId = folder.driveKeyId;
+            savedFolderInput.appendChild(option);
+        });
+    };
+
+    driveApiKeyInput?.addEventListener('change', () => {
+        rebuildFolderOptionsByAccount();
+        state.images = [];
+        state.selectedIds.clear();
+        renderGrid();
+        setStatus('', 'muted');
+    });
+
     savedFolderInput?.addEventListener('change', async () => {
         const selected = savedFolderInput.options[savedFolderInput.selectedIndex];
         if (!selected || !selected.value) return;
-
-        if (selected.dataset.folderUrl) {
-            folderUrlInput.value = selected.dataset.folderUrl;
-        }
 
         if (selected.dataset.driveKeyId) {
             driveApiKeyInput.value = selected.dataset.driveKeyId;
@@ -404,6 +425,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await fetchMedia();
     });
+
+    rebuildFolderOptionsByAccount();
 
     gridNode?.addEventListener('change', (event) => {
         const checkbox = event.target.closest('.drive-image-select');
