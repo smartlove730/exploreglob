@@ -258,11 +258,23 @@ class AutomationService
 
                     break;
                 } catch (Throwable $mediaException) {
+                    $lastError = $mediaException->getMessage();
+                    if ($this->isOversizedDriveMediaError($lastError)) {
+                        $this->mediaProcessingService->markSkipped($driveFileId, $lastError, $attemptPlatforms);
+
+                        Log::warning('Automation media skipped due to oversized Drive file, moving to next file', [
+                            'automation_config_id' => $config->id,
+                            'drive_file_id' => $driveFileId,
+                            'error' => $lastError,
+                        ]);
+
+                        continue;
+                    }
+
                     if (!empty($driveFileId) && !empty($attemptPlatforms)) {
                         $this->markMediaPlatformsFailed($config, $driveFileId, $attemptPlatforms, $mediaException->getMessage());
                     }
 
-                    $lastError = $mediaException->getMessage();
                     if ($this->isSkippableMediaError($lastError)) {
                         $this->mediaProcessingService->markSkipped($driveFileId, $lastError, $attemptPlatforms);
                     } else {
@@ -405,6 +417,14 @@ class AutomationService
         return str_contains($normalized, 'too large')
             || str_contains($normalized, 'unsupported')
             || str_contains($normalized, 'no eligible media');
+    }
+
+    private function isOversizedDriveMediaError(string $message): bool
+    {
+        $normalized = strtolower($message);
+
+        return str_contains($normalized, 'google drive file is too large to process on this server')
+            || (str_contains($normalized, 'drive image preparation failed') && str_contains($normalized, 'too large'));
     }
 
     private function reserveMediaPlatforms(AutomationConfig $config, string $driveFileId, array $platforms): array
