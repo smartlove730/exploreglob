@@ -15,6 +15,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class AutomationService
@@ -254,6 +255,7 @@ class AutomationService
 
                     $this->markMediaPlatformsPosted($config, $driveFileId, $attemptPlatforms, $result);
                     $this->mediaProcessingService->markPosted($driveFileId, $attemptPlatforms);
+                    $this->cleanupLocalAutomationMedia($mediaUrl);
                     $posted = true;
 
                     break;
@@ -323,6 +325,23 @@ class AutomationService
         }
 
         return $imageUrl;
+    }
+
+    private function cleanupLocalAutomationMedia(string $mediaUrl): void
+    {
+        $path = $this->resolveImagePathForHistory($mediaUrl);
+
+        if ($path === '' || $path === $mediaUrl) {
+            return;
+        }
+
+        if (!str_starts_with($path, 'automation/instagram/')) {
+            return;
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     private function getRunBlockReason(AutomationConfig $config, bool $forceRun = false): ?string

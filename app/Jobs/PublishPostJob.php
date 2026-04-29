@@ -8,6 +8,7 @@ use App\Services\MetaVideoService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -88,6 +89,8 @@ class PublishPostJob implements ShouldQueue
                 'last_error' => null,
                 'response_json' => $responses,
             ])->save();
+
+            $this->cleanupStoredDriveMedia($post);
         } catch (Throwable $exception) {
             Log::error('Queued post publish failed', [
                 'facebook_post_id' => $post->id,
@@ -163,4 +166,43 @@ class PublishPostJob implements ShouldQueue
 
         return str_contains($error, 'instagram business account is not linked');
     }
+
+    private function cleanupStoredDriveMedia(FacebookPost $post): void
+    {
+        $paths = collect([
+            $post->video_path,
+            $this->extractPublicStoragePathFromUrl((string) ($post->image_url ?? '')),
+            $this->extractPublicStoragePathFromUrl((string) ($post->video_url ?? '')),
+        ])
+            ->merge($post->images->pluck('image_path'))
+            ->filter(fn ($path) => is_string($path) && $path !== '')
+            ->filter(fn (string $path) => str_starts_with($path, 'drive-posts/') || str_starts_with($path, 'automation/instagram/'))
+            ->unique()
+            ->values();
+
+        foreach ($paths as $path) {
+            if (!Storage::disk('public')->exists($path)) {
+                continue;
+            }
+
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    private function extractPublicStoragePathFromUrl(string $url): ?string
+    {
+        if ($url === '') {
+            return null;
+        }
+
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        $storagePrefix = '/storage/';
+
+        if ($path === '' || !str_contains($path, $storagePrefix)) {
+            return null;
+        }
+
+        return ltrim(substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix)), '/');
+    }
+
 }
