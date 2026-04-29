@@ -54,11 +54,14 @@
                     <select class="form-select" id="saved_drive_folder_id">
                         <option value="">Select folder</option>
                         @foreach($driveFolders as $driveFolder)
-                            <option
-                                value="{{ $driveFolder->id }}"
-                                data-folder-url="{{ $driveFolder->folder_url }}"
-                                data-drive-key-id="{{ $driveFolder->drive_api_key_id }}"
-                            >{{ $driveFolder->name }}</option>
+                            @if($driveFolder->is_active)
+                                <option
+                                    value="{{ $driveFolder->id }}"
+                                    data-folder-url="{{ $driveFolder->folder_url }}"
+                                    data-drive-key-id="{{ $driveFolder->drive_api_key_id }}"
+                                    data-is-active="1"
+                                >{{ $driveFolder->name }}</option>
+                            @endif
                         @endforeach
                     </select>
                 </div>
@@ -247,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         text: option.textContent,
         folderUrl: option.dataset.folderUrl,
         driveKeyId: option.dataset.driveKeyId,
+        isActive: option.dataset.isActive === '1',
     }));
     const getSelectedPageIds = () => [...(pageIdsInput?.selectedOptions || [])]
         .map((option) => option.value)
@@ -394,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const rebuildFolderOptionsByAccount = () => {
         const selectedAccountId = driveApiKeyInput.value;
-        const filtered = initialFolderOptions.filter((folder) => !selectedAccountId || String(folder.driveKeyId) === String(selectedAccountId));
+        const filtered = initialFolderOptions.filter((folder) => folder.isActive && (!selectedAccountId || String(folder.driveKeyId) === String(selectedAccountId)));
 
         savedFolderInput.innerHTML = '<option value="">Select folder</option>';
         filtered.forEach((folder) => {
@@ -403,6 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
             option.textContent = folder.text;
             option.dataset.folderUrl = folder.folderUrl;
             option.dataset.driveKeyId = folder.driveKeyId;
+            option.dataset.isActive = '1';
             savedFolderInput.appendChild(option);
         });
     };
