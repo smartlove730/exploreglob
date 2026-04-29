@@ -50,16 +50,13 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Google Drive Folder URL</label>
-                <div class="input-group">
-                    <input type="url" name="folder_url" id="drive_folder_url" class="form-control" placeholder="https://drive.google.com/drive/folders/..." required>
-                    <button type="button" class="btn btn-primary" id="fetch_drive_images_btn" data-fetch-url="{{ route('admin.posts.drive.images') }}" {{ $driveApiKeys->isEmpty() ? 'disabled' : '' }}>Fetch Media</button>
-                </div>
+                <input type="url" name="folder_url" id="drive_folder_url" class="form-control" placeholder="https://drive.google.com/drive/folders/..." required>
             </div>
             <div class="col-12">
-                <label class="form-label">Or select saved folder</label>
-                <div class="input-group">
+                <label class="form-label">Select Folder</label>
+                <div>
                     <select class="form-select" id="saved_drive_folder_id">
-                        <option value="">Select saved folder</option>
+                        <option value="">Select folder</option>
                         @foreach($driveFolders as $driveFolder)
                             <option
                                 value="{{ $driveFolder->id }}"
@@ -68,7 +65,6 @@
                             >{{ $driveFolder->name }}</option>
                         @endforeach
                     </select>
-                    <a href="{{ route('admin.facebook.drive-folders.create') }}" class="btn btn-outline-secondary">Manage Folders</a>
                 </div>
             </div>
         </form>
@@ -238,7 +234,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-    const fetchBtn = document.getElementById('fetch_drive_images_btn');
     const statusNode = document.getElementById('drive_status');
     const gridNode = document.getElementById('drive_images_grid');
     const postSelectedContainer = document.getElementById('post_selected_container');
@@ -353,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
     };
 
-    fetchBtn?.addEventListener('click', async () => {
+    const fetchMedia = async () => {
         const appId = appIdInput.value;
         const pageIds = getSelectedPageIds();
         const driveApiKeyId = driveApiKeyInput.value;
@@ -365,10 +360,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setStatus('Fetching media from Google Drive...', 'muted');
-        fetchBtn.disabled = true;
-
         try {
-            const response = await fetch(fetchBtn.dataset.fetchUrl, {
+            const response = await fetch('{{ route('admin.posts.drive.images') }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -394,12 +387,10 @@ document.addEventListener('DOMContentLoaded', () => {
             state.selectedIds.clear();
             renderGrid();
             setStatus(error.message || 'Unexpected error while fetching media.', 'danger');
-        } finally {
-            fetchBtn.disabled = false;
         }
-    });
+    };
 
-    savedFolderInput?.addEventListener('change', () => {
+    savedFolderInput?.addEventListener('change', async () => {
         const selected = savedFolderInput.options[savedFolderInput.selectedIndex];
         if (!selected || !selected.value) return;
 
@@ -410,6 +401,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selected.dataset.driveKeyId) {
             driveApiKeyInput.value = selected.dataset.driveKeyId;
         }
+
+        await fetchMedia();
     });
 
     gridNode?.addEventListener('change', (event) => {

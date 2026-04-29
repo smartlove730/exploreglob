@@ -6,15 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\DriveApiKey;
 use App\Models\DriveFolder;
 use App\Services\GoogleDriveService;
+use App\Services\GoogleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class DriveFolderController extends Controller
 {
-    public function __construct(private readonly GoogleDriveService $googleDriveService)
-    {
-    }
+    public function __construct(
+        private readonly GoogleDriveService $googleDriveService,
+        private readonly GoogleService $googleService,
+    ) {}
 
     public function index()
     {
@@ -70,6 +72,43 @@ class DriveFolderController extends Controller
         $drive_folder->delete();
 
         return redirect()->route('admin.facebook.drive-folders.index')->with('success', 'Drive folder deleted successfully.');
+    }
+
+    public function sync(): RedirectResponse
+    {
+        $driveApiKeys = DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->get();
+        $syncedCount = 0;
+
+        foreach ($driveApiKeys as $driveApiKey) {
+            try {
+                $token = null;
+                if ($driveApiKey->oauth_access_token) {
+                    $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+                    $token = $driveApiKey->oauth_access_token;
+                }
+
+                $folders = $this->googleDriveService->listAccessibleFolders($driveApiKey->api_key, $token);
+                foreach ($folders as $folder) {
+                    DriveFolder::updateOrCreate(
+                        [
+                            'user_id' => Auth::id(),
+                            'drive_api_key_id' => $driveApiKey->id,
+                            'folder_id' => $folder['id'],
+                        ],
+                        [
+                            'name' => $folder['name'],
+                            'folder_url' => $folder['url'],
+                            'is_active' => true,
+                        ]
+                    );
+                    $syncedCount++;
+                }
+            } catch (\Throwable $exception) {
+                continue;
+            }
+        }
+
+        return redirect()->route('admin.facebook.drive-folders.index')->with('success', "Sync completed. {$syncedCount} folders synced.");
     }
 
     private function scopedFolders()

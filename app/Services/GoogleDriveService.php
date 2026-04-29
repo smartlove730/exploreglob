@@ -150,6 +150,62 @@ class GoogleDriveService
         return collect($filesList);
     }
 
+    public function listAccessibleFolders(?string $apiKey = null, ?string $accessToken = null): \Illuminate\Support\Collection
+    {
+        $apiKey = $apiKey ?: config('services.google_drive.api_key');
+
+        if (!$accessToken && !$apiKey) {
+            return collect();
+        }
+
+        $folders = [];
+        $pageToken = null;
+
+        do {
+            $request = Http::timeout(30);
+
+            if ($accessToken) {
+                $request = $request->withToken($accessToken);
+            }
+
+            $query = [
+                'q' => "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+                'fields' => 'nextPageToken,files(id,name,webViewLink)',
+                'pageSize' => 200,
+                'pageToken' => $pageToken,
+                'supportsAllDrives' => 'true',
+                'includeItemsFromAllDrives' => 'true',
+            ];
+
+            if (!$accessToken && $apiKey) {
+                $query['key'] = $apiKey;
+            }
+
+            $response = $request->get('https://www.googleapis.com/drive/v3/files', $query);
+            if (!$response->successful()) {
+                break;
+            }
+
+            $payload = $response->json();
+            foreach (($payload['files'] ?? []) as $file) {
+                $folderId = (string) ($file['id'] ?? '');
+                if ($folderId === '') {
+                    continue;
+                }
+
+                $folders[] = [
+                    'id' => $folderId,
+                    'name' => (string) ($file['name'] ?? 'Untitled Folder'),
+                    'url' => (string) ($file['webViewLink'] ?? "https://drive.google.com/drive/folders/{$folderId}"),
+                ];
+            }
+
+            $pageToken = $payload['nextPageToken'] ?? null;
+        } while ($pageToken);
+
+        return collect($folders);
+    }
+
     public function buildPreviewUrl(string $fileId, string $resourceKey = ''): string
     {
         return $this->buildUserContentUrl($fileId, 'view', $resourceKey);
