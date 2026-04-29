@@ -24,6 +24,8 @@ class AutomationService
 
     public function __construct(
         private readonly DriveService $driveService,
+        private readonly GoogleDriveService $googleDriveService,
+        private readonly GoogleService $googleService,
         private readonly MediaProcessingService $mediaProcessingService,
         private readonly AiCaptionService $aiCaptionService,
         private readonly MetaPostService $metaPostService,
@@ -255,6 +257,7 @@ class AutomationService
 
                     $this->markMediaPlatformsPosted($config, $driveFileId, $attemptPlatforms, $result);
                     $this->mediaProcessingService->markPosted($driveFileId, $attemptPlatforms);
+                    $this->moveDriveFileForPostStatus($config, $driveFileId, 'success');
                     $this->cleanupLocalAutomationMedia($mediaUrl);
                     $posted = true;
 
@@ -281,6 +284,7 @@ class AutomationService
                         $this->mediaProcessingService->markSkipped($driveFileId, $lastError, $attemptPlatforms);
                     } else {
                         $this->mediaProcessingService->markFailed($driveFileId, $lastError, $attemptPlatforms);
+                        $this->moveDriveFileForPostStatus($config, $driveFileId, 'failed');
                     }
 
                     Log::warning('Automation media skipped due to failure', [
@@ -313,6 +317,34 @@ class AutomationService
             $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), $exception->getMessage(), $automationLogId);
             }
         });
+    }
+
+    private function moveDriveFileForPostStatus(AutomationConfig $config, string $driveFileId, string $status): void
+    {
+        if ($driveFileId === '' || !$config->driveApiKey) {
+            return;
+        }
+
+        try {
+            $driveApiKey = $config->driveApiKey;
+            if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
+                $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+            }
+
+            $this->googleDriveService->moveFileBasedOnStatus(
+                $driveFileId,
+                $status,
+                $driveApiKey->oauth_access_token,
+                true
+            );
+        } catch (Throwable $exception) {
+            Log::warning('Automation post status move to Drive folder failed.', [
+                'automation_config_id' => $config->id,
+                'drive_file_id' => $driveFileId,
+                'status' => $status,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function resolveImagePathForHistory(string $imageUrl): string
