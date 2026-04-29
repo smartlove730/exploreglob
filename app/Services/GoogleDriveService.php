@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class GoogleDriveService
@@ -189,6 +190,123 @@ class GoogleDriveService
     public function fetchImageBinary(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): array
     {
         return $this->fetchFileBinary($fileId, $apiKey, $resourceKey, $accessToken);
+    }
+
+    public function moveFileBasedOnStatus(string $fileId, string $status, ?string $accessToken, bool $useDateSubfolder = false): bool
+    {
+        $targetFolderName = match ($status) {
+            'failed' => 'FailedPosts',
+            'success' => 'SuccessPosts',
+            default => null,
+        };
+
+        if (!$targetFolderName) {
+            Log::warning('Skipped Drive file move due to unsupported status.', ['file_id' => $fileId, 'status' => $status]);
+            return false;
+        }
+
+        if (!$accessToken) {
+            Log::error('Unable to move Drive file because access token is missing.', ['file_id' => $fileId, 'status' => $status]);
+            return false;
+        }
+
+        try {
+            $targetFolderId = $this->findFolderByName($targetFolderName, $accessToken) ?? $this->createFolder($targetFolderName, $accessToken);
+
+            if ($useDateSubfolder) {
+                $dateFolder = now()->toDateString();
+                $targetFolderId = $this->findFolderByName($dateFolder, $accessToken, $targetFolderId)
+                    ?? $this->createFolder($dateFolder, $accessToken, $targetFolderId);
+            }
+
+            return $this->moveFileToFolder($fileId, $targetFolderId, $status, $accessToken);
+        } catch (\Throwable $exception) {
+            Log::error('Google Drive moveFileBasedOnStatus failed.', [
+                'file_id' => $fileId,
+                'status' => $status,
+                'error' => $exception->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    public function findFolderByName(string $folderName, string $accessToken, ?string $parentId = null): ?string
+    {
+        $query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false and name = '{$folderName}'";
+        if ($parentId) {
+            $query .= " and '{$parentId}' in parents";
+        }
+
+        $response = Http::timeout(20)->withToken($accessToken)->get('https://www.googleapis.com/drive/v3/files', [
+            'q' => $query,
+            'fields' => 'files(id,name)',
+            'pageSize' => 1,
+            'supportsAllDrives' => 'true',
+            'includeItemsFromAllDrives' => 'true',
+        ]);
+
+        if (!$response->successful()) {
+            throw new \RuntimeException('Unable to find Drive folder: '.$response->body());
+        }
+
+        return data_get($response->json(), 'files.0.id');
+    }
+
+    public function createFolder(string $folderName, string $accessToken, ?string $parentId = null): string
+    {
+        $body = [
+            'name' => $folderName,
+            'mimeType' => 'application/vnd.google-apps.folder',
+        ];
+        if ($parentId) {
+            $body['parents'] = [$parentId];
+        }
+
+        $response = Http::timeout(20)->withToken($accessToken)->post('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true', $body);
+
+        if (!$response->successful()) {
+            throw new \RuntimeException('Unable to create Drive folder: '.$response->body());
+        }
+
+        return (string) data_get($response->json(), 'id');
+    }
+
+    public function moveFileToFolder(string $fileId, string $newFolderId, string $status, string $accessToken): bool
+    {
+        $metaResponse = Http::timeout(20)->withToken($accessToken)->get("https://www.googleapis.com/drive/v3/files/{$fileId}", [
+            'fields' => 'id,parents',
+            'supportsAllDrives' => 'true',
+        ]);
+
+        if ($metaResponse->status() === 404) {
+            Log::error('Drive file not found while attempting move.', ['file_id' => $fileId, 'status' => $status]);
+            return false;
+        }
+
+        if (!$metaResponse->successful()) {
+            throw new \RuntimeException('Unable to fetch Drive file metadata: '.$metaResponse->body());
+        }
+
+        $oldParents = collect((array) data_get($metaResponse->json(), 'parents', []))->filter()->implode(',');
+
+        $moveResponse = Http::timeout(20)->withToken($accessToken)->patch("https://www.googleapis.com/drive/v3/files/{$fileId}", [
+            'addParents' => $newFolderId,
+            'removeParents' => $oldParents,
+            'supportsAllDrives' => 'true',
+        ]);
+
+        if (!$moveResponse->successful()) {
+            throw new \RuntimeException('Unable to move Drive file: '.$moveResponse->body());
+        }
+
+        Log::info('Drive file moved based on posting status.', [
+            'file_id' => $fileId,
+            'old_folder' => $oldParents,
+            'new_folder' => $newFolderId,
+            'status' => $status,
+        ]);
+
+        return true;
     }
 
     public function fetchFileBinary(string $fileId, ?string $apiKey = null, string $resourceKey = '', ?string $accessToken = null): array
