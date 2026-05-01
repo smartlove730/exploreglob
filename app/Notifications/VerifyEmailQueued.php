@@ -2,13 +2,11 @@
 
 namespace App\Notifications;
 
+use App\Services\DynamicMailConfigService;
 use App\Services\EmailLogService;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Bus\Queueable;
-use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Config;
 
 class VerifyEmailQueued extends VerifyEmail
 {
@@ -21,6 +19,10 @@ class VerifyEmailQueued extends VerifyEmail
 
     public function toMail($notifiable): MailMessage
     {
+        // Ensure the active SMTP settings from the database are applied
+        // (.env defaults to 'log' driver which just writes to laravel.log)
+        app(DynamicMailConfigService::class)->apply();
+
         app(EmailLogService::class)->queued('email_verification', $notifiable->email, 'Verify Email Address', $notifiable);
 
         $url = $this->verificationUrl($notifiable);

@@ -29,7 +29,10 @@ class GoogleLoginController extends Controller
             $user = User::where('email', $googleUser->getEmail())->first();
 
             if ($user) {
-                $user->update(['google_id' => $googleUser->getId()]);
+                $user->update([
+                    'google_id' => $googleUser->getId(),
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                ]);
             } else {
                 $user = User::create([
                     'name' => $googleUser->getName(),
@@ -39,6 +42,8 @@ class GoogleLoginController extends Controller
                     'role' => User::ROLE_CUSTOMER,
                 ]);
             }
+        } elseif (!$user->hasVerifiedEmail()) {
+            $user->update(['email_verified_at' => now()]);
         }
 
         Auth::login($user, remember: true);
