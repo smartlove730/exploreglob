@@ -8,6 +8,7 @@ use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -223,8 +224,8 @@ class FacebookGraphService
             $this->throwRefreshException($response->json(), $fallbackError);
         }
 
-        $imageResponse = Http::timeout(30)->get($imageUrl);
-        if (!$imageResponse->ok() || $imageResponse->body() === '') {
+        $imageBinary = $this->resolveImageBinary($imageUrl);
+        if ($imageBinary === null) {
             $this->throwRefreshException($response->json(), $fallbackError);
         }
 
@@ -232,7 +233,7 @@ class FacebookGraphService
             'access_token' => $page->page_access_token,
         ], $extraPayload);
 
-        $binaryUploadResponse = Http::attach('source', $imageResponse->body(), basename(parse_url($imageUrl, PHP_URL_PATH) ?: 'image.jpg'))
+        $binaryUploadResponse = Http::attach('source', $imageBinary, basename(parse_url($imageUrl, PHP_URL_PATH) ?: 'image.jpg'))
             ->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/photos", $binaryPayload);
 
         if (!$binaryUploadResponse->ok()) {
@@ -240,6 +241,56 @@ class FacebookGraphService
         }
 
         return $binaryUploadResponse->json();
+    }
+
+
+    private function resolveImageBinary(string $imageUrl): ?string
+    {
+        $candidates = [
+            $imageUrl,
+            preg_replace('#(?<!:)/{2,}#', '/', $imageUrl) ?: $imageUrl,
+        ];
+
+        foreach (array_unique($candidates) as $candidateUrl) {
+            $imageResponse = Http::timeout(30)->get($candidateUrl);
+            if ($imageResponse->ok() && $imageResponse->body() !== '') {
+                return $imageResponse->body();
+            }
+        }
+
+        $storagePath = $this->extractPublicStoragePathFromUrl($imageUrl);
+        if (!$storagePath || !Storage::disk('public')->exists($storagePath)) {
+            return null;
+        }
+
+        $binary = Storage::disk('public')->get($storagePath);
+
+        return $binary !== '' ? $binary : null;
+    }
+
+    private function extractPublicStoragePathFromUrl(string $url): ?string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        if ($path === '') {
+            return null;
+        }
+
+        $segments = preg_split('#/+#', $path, -1, PREG_SPLIT_NO_EMPTY);
+        if (!$segments) {
+            return null;
+        }
+
+        $storageIndex = array_search('storage', $segments, true);
+        if ($storageIndex === false) {
+            return null;
+        }
+
+        $relativeSegments = array_slice($segments, $storageIndex + 1);
+        if (empty($relativeSegments)) {
+            return null;
+        }
+
+        return implode('/', $relativeSegments);
     }
 
     private function shouldRetryImageUploadAsBinary(?array $payload): bool
