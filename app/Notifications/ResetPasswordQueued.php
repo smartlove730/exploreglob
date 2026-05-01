@@ -4,17 +4,10 @@ namespace App\Notifications;
 
 use App\Services\EmailLogService;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class ResetPasswordQueued extends ResetPassword implements ShouldQueue
+class ResetPasswordQueued extends ResetPassword
 {
-    use Queueable;
-
-    public int $tries = 3;
-
-    public array $backoff = [60, 180, 300];
 
     public function toMail($notifiable): MailMessage
     {

@@ -172,6 +172,7 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
     ->name('admin.automations.')
     ->group(function () {
         Route::get('automations', [AutomationConfigController::class, 'index'])->name('index');
+        Route::get('automations/drive-folders', [AutomationConfigController::class, 'driveFolders'])->name('drive-folders');
         Route::get('automations/create', [AutomationConfigController::class, 'create'])->name('create');
         Route::post('automations', [AutomationConfigController::class, 'store'])->name('store');
         Route::get('automations/{automation}/edit', [AutomationConfigController::class, 'edit'])->name('edit');
@@ -208,6 +209,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('mail-settings', [MailSettingsController::class, 'index'])->name('mail-settings.index');
             Route::put('mail-settings', [MailSettingsController::class, 'update'])->name('mail-settings.update');
             Route::post('mail-settings/test', [MailSettingsController::class, 'test'])->name('mail-settings.test');
+            Route::delete('mail-settings/logs/{log}', [MailSettingsController::class, 'destroyLog'])->name('mail-settings.logs.destroy');
 
             // Modal endpoints for dynamic forms
             Route::get('blogs/create-modal', [AdminBlogController::class, 'createModal'])->name('blogs.createModal');

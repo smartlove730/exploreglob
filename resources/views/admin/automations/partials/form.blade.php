@@ -62,7 +62,7 @@
             <div class="media-source media-source-drive">
                 <div class="mb-3">
                     <label class="form-label">Drive Account</label>
-                    <select name="drive_api_key_id" class="form-select">
+                    <select name="drive_api_key_id" class="form-select" id="driveApiKeySelect">
                         <option value="">Select Drive account</option>
                         @foreach($driveApiKeys as $key)
                             <option value="{{ $key->id }}" @selected((int) old('drive_api_key_id', $payload['drive_api_key_id'] ?? 0) === $key->id)>{{ $key->name }}</option>
@@ -70,8 +70,14 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Drive Link</label>
-                    <input type="url" name="drive_link" class="form-control" value="{{ old('drive_link', $payload['drive_link'] ?? '') }}">
+                    <label class="form-label">Drive Folder</label>
+                    <select name="drive_link" class="form-select" id="driveLinkSelect">
+                        <option value="">Select a Drive folder</option>
+                        @foreach($driveFolders as $folder)
+                            <option value="{{ $folder->folder_url }}" data-key-id="{{ $folder->drive_api_key_id }}" @selected(old('drive_link', $payload['drive_link'] ?? '') === $folder->folder_url)>{{ $folder->name }}</option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">Folders are filtered based on the selected Drive account.</small>
                 </div>
             </div>
         </section>
@@ -126,6 +132,52 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     sourceType.addEventListener('change', refresh);
     refresh();
+
+    // Drive folder dropdown — filter by selected Drive account
+    const driveKeySelect = document.getElementById('driveApiKeySelect');
+    const driveLinkSelect = document.getElementById('driveLinkSelect');
+
+    if (driveKeySelect && driveLinkSelect) {
+        const filterFolders = () => {
+            const keyId = driveKeySelect.value;
+            const currentValue = driveLinkSelect.value;
+
+            if (!keyId) {
+                // Show all options when no account selected
+                Array.from(driveLinkSelect.options).forEach(opt => {
+                    opt.style.display = opt.value ? 'none' : '';
+                });
+                driveLinkSelect.value = '';
+                return;
+            }
+
+            // Fetch folders via AJAX
+            fetch(`{{ route('admin.automations.drive-folders') }}?drive_api_key_id=${keyId}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            })
+            .then(res => res.json())
+            .then(folders => {
+                // Clear existing options
+                driveLinkSelect.innerHTML = '<option value="">Select a Drive folder</option>';
+                folders.forEach(folder => {
+                    const opt = document.createElement('option');
+                    opt.value = folder.folder_url;
+                    opt.textContent = folder.name;
+                    if (folder.folder_url === currentValue) opt.selected = true;
+                    driveLinkSelect.appendChild(opt);
+                });
+            })
+            .catch(err => console.error('Failed to load folders:', err));
+        };
+
+        driveKeySelect.addEventListener('change', filterFolders);
+
+        // Run initial filter if a drive account is pre-selected (edit mode)
+        if (driveKeySelect.value) {
+            filterFolders();
+        }
+    }
 });
 </script>
 @endpush

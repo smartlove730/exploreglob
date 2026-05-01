@@ -4,17 +4,10 @@ namespace App\Notifications;
 
 use App\Services\EmailLogService;
 use Illuminate\Auth\Notifications\VerifyEmail;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class VerifyEmailQueued extends VerifyEmail implements ShouldQueue
+class VerifyEmailQueued extends VerifyEmail
 {
-    use Queueable;
-
-    public int $tries = 3;
-
-    public array $backoff = [60, 180, 300];
 
     public function toMail($notifiable): MailMessage
     {

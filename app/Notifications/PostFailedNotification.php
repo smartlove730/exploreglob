@@ -5,18 +5,11 @@ namespace App\Notifications;
 use App\Models\FacebookPost;
 use App\Models\ScheduledPost;
 use App\Services\EmailLogService;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class PostFailedNotification extends Notification implements ShouldQueue
+class PostFailedNotification extends Notification
 {
-    use Queueable;
-
-    public int $tries = 3;
-
-    public array $backoff = [60, 180, 300];
 
     public function __construct(
         public FacebookPost|ScheduledPost $post,

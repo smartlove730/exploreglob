@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\AutomationQueueItem;
 use App\Models\AutomationRule;
 use App\Models\DriveApiKey;
+use App\Models\DriveFolder;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Services\AutomationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -149,7 +151,24 @@ class AutomationConfigController extends Controller
             'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
             'pages' => FacebookPage::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('page_name')->get(),
             'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'driveFolders' => DriveFolder::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
         ];
+    }
+
+    public function driveFolders(Request $request): JsonResponse
+    {
+        $request->validate([
+            'drive_api_key_id' => ['required', 'integer'],
+        ]);
+
+        $folders = DriveFolder::query()
+            ->ownedBy(Auth::user())
+            ->where('drive_api_key_id', (int) $request->input('drive_api_key_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'folder_url']);
+
+        return response()->json($folders);
     }
 
     private function validated(Request $request): array
@@ -171,7 +190,7 @@ class AutomationConfigController extends Controller
             'platforms.*' => ['required', 'string', 'in:facebook,instagram'],
             'media_source_type' => ['required', 'string', 'in:urls,drive'],
             'media_urls' => ['nullable', 'string', 'max:60000'],
-            'drive_link' => ['nullable', 'url', 'max:4096'],
+            'drive_link' => ['nullable', 'string', 'max:4096'],
             'drive_api_key_id' => ['nullable', 'integer', 'exists:drive_api_keys,id'],
             'post_frequency' => ['required', 'integer', 'min:1', 'max:3'],
             'schedule_times' => ['required', 'array', 'min:1', 'max:3'],

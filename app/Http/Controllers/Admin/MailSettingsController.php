@@ -63,14 +63,21 @@ class MailSettingsController extends Controller
         try {
             $mailConfig->apply($setting);
             app(EmailLogService::class)->queued('test_email', $data['test_email'], 'Postzy test email', $request->user());
-            Mail::to($data['test_email'])->queue(new TestMail());
+            Mail::to($data['test_email'])->send(new TestMail());
             $setting->update(['last_tested_at' => now()]);
 
-            return back()->with('success', 'Test email queued.');
+            return back()->with('success', 'Test email sent successfully.');
         } catch (\Throwable $exception) {
             app(EmailLogService::class)->failed('test_email', $data['test_email'], $exception->getMessage(), 'Postzy test email', $request->user());
 
-            return back()->with('error', 'Unable to queue test email: '.$exception->getMessage());
+            return back()->with('error', 'Unable to send test email: '.$exception->getMessage());
         }
+    }
+
+    public function destroyLog(EmailLog $log): RedirectResponse
+    {
+        $log->delete();
+
+        return back()->with('success', 'Email log deleted.');
     }
 }

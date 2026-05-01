@@ -100,6 +100,7 @@
                             <th>Status</th>
                             <th>Error</th>
                             <th>Created</th>
+                            <th class="no-export">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -111,9 +112,18 @@
                                 <td><span class="badge text-bg-{{ $log->status === 'failed' ? 'danger' : ($log->status === 'sent' ? 'success' : 'secondary') }}">{{ ucfirst($log->status) }}</span></td>
                                 <td class="small text-danger">{{ $log->error_message }}</td>
                                 <td>{{ optional($log->created_at)->format('M d, Y H:i') }}</td>
+                                <td>
+                                    <form method="POST" action="{{ route('admin.mail-settings.logs.destroy', $log) }}" onsubmit="return confirm('Delete this log entry?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete log">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
+                                    </form>
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="text-center text-muted">No email logs yet.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted">No email logs yet.</td></tr>
                         @endforelse
                     </tbody>
                 </x-data-table>
