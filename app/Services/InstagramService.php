@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\FacebookPage;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class InstagramService
@@ -57,7 +59,7 @@ class InstagramService
     public function createMediaContainer(string $igUserId, string $pageAccessToken, string $imageUrl, string $caption, bool $isCarouselItem = false): string
     {
         $payload = [
-            'image_url' => $imageUrl,
+            'image_url' => $this->resolveInstagramMediaUrl($imageUrl),
             'caption' => $caption,
             'access_token' => $pageAccessToken,
         ];
@@ -104,6 +106,59 @@ class InstagramService
         }
 
         return $response->json();
+    }
+
+
+    private function resolveInstagramMediaUrl(string $imageUrl): string
+    {
+        $normalizedUrl = preg_replace('#(?<!:)/{2,}#', '/', $imageUrl) ?: $imageUrl;
+
+        $storagePath = $this->extractPublicStoragePathFromUrl($normalizedUrl);
+        if (!$storagePath || !Storage::disk('public')->exists($storagePath)) {
+            return $normalizedUrl;
+        }
+
+        $binary = Storage::disk('public')->get($storagePath);
+        if ($binary === '') {
+            return $normalizedUrl;
+        }
+
+        $extension = pathinfo($storagePath, PATHINFO_EXTENSION) ?: 'jpg';
+        $proxyDir = public_path('ig-media');
+        if (!File::exists($proxyDir)) {
+            File::makeDirectory($proxyDir, 0755, true);
+        }
+
+        $fileName = sha1($storagePath.'|'.md5($binary)).'.'.$extension;
+        $proxyPath = $proxyDir.DIRECTORY_SEPARATOR.$fileName;
+
+        if (!File::exists($proxyPath)) {
+            File::put($proxyPath, $binary);
+        }
+
+        return url('ig-media/'.$fileName);
+    }
+
+    private function extractPublicStoragePathFromUrl(string $url): ?string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        if ($path === '') {
+            return null;
+        }
+
+        $segments = preg_split('#/+#', $path, -1, PREG_SPLIT_NO_EMPTY);
+        if (!$segments) {
+            return null;
+        }
+
+        $storageIndex = array_search('storage', $segments, true);
+        if ($storageIndex === false) {
+            return null;
+        }
+
+        $relativeSegments = array_slice($segments, $storageIndex + 1);
+
+        return empty($relativeSegments) ? null : implode('/', $relativeSegments);
     }
 
     public function publishImageWithCaption(FacebookPage $page, string $imageUrl, string $caption, int $publishDelaySeconds = 3): array
