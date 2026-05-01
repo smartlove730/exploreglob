@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SyncedSocialPost extends Model
 {
@@ -30,5 +31,10 @@ class SyncedSocialPost extends Model
     public function page(): BelongsTo
     {
         return $this->belongsTo(FacebookPage::class, 'facebook_page_id');
+    }
+
+    public function latestDeletionJob(): HasOne
+    {
+        return $this->hasOne(SocialPostDeletionJob::class)->latestOfMany();
     }
 }

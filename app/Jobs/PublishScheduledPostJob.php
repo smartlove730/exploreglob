@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\FacebookPost;
 use App\Models\ScheduledPost;
+use App\Notifications\PostFailedNotification;
 use App\Services\MetaPostService;
 use App\Services\MetaVideoService;
 use App\Services\PlanEnforcementService;
@@ -41,7 +42,7 @@ class PublishScheduledPostJob implements ShouldQueue
 
         if ((int) $scheduledPost->page->user_id !== (int) $scheduledPost->user_id
             || (int) data_get($scheduledPost, 'page.facebookAccount.user_id') !== (int) $scheduledPost->user_id) {
-            $this->markFailed($scheduledPost, 'Scheduled post page ownership is invalid.');
+            $this->markFailed($scheduledPost, 'Scheduled post page ownership is invalid.', true);
             return;
         }
 
@@ -130,7 +131,17 @@ class PublishScheduledPostJob implements ShouldQueue
         }
     }
 
-    private function markFailed(ScheduledPost $scheduledPost, string $message): void
+    public function failed(Throwable $exception): void
+    {
+        $scheduledPost = ScheduledPost::query()->with('user')->find($this->scheduledPostId);
+        if (!$scheduledPost) {
+            return;
+        }
+
+        $scheduledPost->user?->notify(new PostFailedNotification($scheduledPost, $exception->getMessage()));
+    }
+
+    private function markFailed(ScheduledPost $scheduledPost, string $message, bool $notify = false): void
     {
         $scheduledPost->update([
             'status' => ScheduledPost::STATUS_FAILED,
@@ -138,5 +149,9 @@ class PublishScheduledPostJob implements ShouldQueue
             'last_error' => $message,
             'response_json' => array_merge((array) $scheduledPost->response_json, ['error' => $message]),
         ]);
+
+        if ($notify) {
+            $scheduledPost->user?->notify(new PostFailedNotification($scheduledPost, $message));
+        }
     }
 }

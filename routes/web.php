@@ -8,7 +8,6 @@ use App\Http\Controllers\App\MediaLibraryController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\AutomationConfigController;
-use App\Http\Controllers\Admin\AutomationFailedPostController;
 use App\Http\Controllers\Admin\BlogController as AdminBlogController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\DriveApiKeyController;
@@ -16,11 +15,11 @@ use App\Http\Controllers\Admin\DriveFolderController;
 use App\Http\Controllers\Admin\FacebookAppController;
 use App\Http\Controllers\Admin\FacebookPostController;
 use App\Http\Controllers\Admin\FacebookSettingsController;
+use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\SaasManagementController;
 use App\Http\Controllers\Admin\ScheduledPostController;
 use App\Http\Controllers\Admin\SocialPostManagerController;
-use App\Http\Controllers\AutomationController;
 use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\RedirectController;
 
@@ -108,10 +107,6 @@ Route::post('/genimage', [BlogController::class, 'genImage'])->name('genImage');
 // Admin routes (simple Blade-based admin)
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
-Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
-    ->post('/run-automations/{userId}/{automationConfigId?}', [AutomationController::class, 'run'])
-    ->name('automations.run');
-
 Route::middleware(['auth'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('oauth.facebook.callback');
 Route::middleware(['auth', 'role:customer,admin'])->get('/auth/google/drive/connect', [DriveApiKeyController::class, 'redirectToGoogleOauth'])->name('admin.google-drive.connect');
 Route::middleware(['auth', 'role:customer,admin'])->get('/auth/google/drive/callback', [DriveApiKeyController::class, 'callback'])->name('admin.google-drive.callback');
@@ -123,7 +118,10 @@ Route::middleware(['auth', 'role:customer,admin'])
     ->group(function () {
         Route::get('settings', [FacebookSettingsController::class, 'index'])->name('settings');
         Route::get('connect', [FacebookSettingsController::class, 'redirectToFacebook'])->name('connect');
+        Route::post('refresh-token', [FacebookSettingsController::class, 'refreshToken'])->name('refresh-token');
         Route::post('sync-pages', [FacebookSettingsController::class, 'syncPages'])->name('sync-pages');
+        Route::get('pages/{page}', [FacebookSettingsController::class, 'pageDetails'])->name('pages.details');
+        Route::delete('pages/{page}', [FacebookSettingsController::class, 'removePage'])->name('pages.destroy');
         Route::post('pages/{page}/activate', [FacebookSettingsController::class, 'activatePage'])->name('pages.activate');
 
         Route::resource('apps', FacebookAppController::class)->except(['show']);
@@ -137,6 +135,7 @@ Route::middleware(['auth', 'role:customer,admin'])
         Route::post('manage-posts/sync', [SocialPostManagerController::class, 'syncPosts'])->name('manage-posts.sync');
         Route::post('manage-posts/list', [SocialPostManagerController::class, 'listPosts'])->name('manage-posts.list');
         Route::post('manage-posts/delete', [SocialPostManagerController::class, 'deletePosts'])->name('manage-posts.delete');
+        Route::post('manage-posts/retry-failed', [SocialPostManagerController::class, 'retryFailed'])->name('manage-posts.retry-failed');
         Route::get('manage-posts/statuses', [SocialPostManagerController::class, 'statuses'])->name('manage-posts.statuses');
     });
 
@@ -173,18 +172,15 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
     ->name('admin.automations.')
     ->group(function () {
         Route::get('automations', [AutomationConfigController::class, 'index'])->name('index');
-        Route::get('automations/failed-posts', [AutomationFailedPostController::class, 'index'])->name('failed-posts.index');
         Route::get('automations/create', [AutomationConfigController::class, 'create'])->name('create');
         Route::post('automations', [AutomationConfigController::class, 'store'])->name('store');
         Route::get('automations/{automation}/edit', [AutomationConfigController::class, 'edit'])->name('edit');
         Route::put('automations/{automation}', [AutomationConfigController::class, 'update'])->name('update');
         Route::delete('automations/{automation}', [AutomationConfigController::class, 'destroy'])->name('destroy');
-        Route::post('automations/{automation}/toggle', [AutomationConfigController::class, 'toggle'])->name('toggle');
-        Route::delete('automations/executions/{execution}', [AutomationConfigController::class, 'cancelExecution'])->name('executions.destroy');
-        Route::post('automations/executions/{execution}/run-now', [AutomationConfigController::class, 'executeNow'])->name('executions.run-now');
-        Route::post('automations/executions/bulk-run-now', [AutomationConfigController::class, 'bulkExecuteNow'])->name('executions.bulk-run-now');
-        Route::delete('automations/executions/bulk-delete', [AutomationConfigController::class, 'bulkCancelExecutions'])->name('executions.bulk-destroy');
-        Route::post('automations/executions/bulk-delete', [AutomationConfigController::class, 'bulkCancelExecutions'])->name('executions.bulk-destroy.post');
+        Route::post('automations/{automation}/pause', [AutomationConfigController::class, 'pause'])->name('pause');
+        Route::post('automations/{automation}/resume', [AutomationConfigController::class, 'resume'])->name('resume');
+        Route::post('automations/{automation}/stop', [AutomationConfigController::class, 'stop'])->name('stop');
+        Route::post('automations/{automation}/queue-now', [AutomationConfigController::class, 'queueNow'])->name('queue-now');
     });
 
 Route::middleware(['auth', 'admin'])
@@ -209,6 +205,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::middleware(['auth', 'role:customer,admin'])->group(function () {
         Route::get('/', AdminDashboardController::class)->name('dashboard');
         Route::middleware('admin')->group(function () {
+            Route::get('mail-settings', [MailSettingsController::class, 'index'])->name('mail-settings.index');
+            Route::put('mail-settings', [MailSettingsController::class, 'update'])->name('mail-settings.update');
+            Route::post('mail-settings/test', [MailSettingsController::class, 'test'])->name('mail-settings.test');
+
             // Modal endpoints for dynamic forms
             Route::get('blogs/create-modal', [AdminBlogController::class, 'createModal'])->name('blogs.createModal');
             Route::get('blogs/{blog}/edit-modal', [AdminBlogController::class, 'editModal'])->name('blogs.editModal');

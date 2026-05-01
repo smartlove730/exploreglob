@@ -9,7 +9,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class ContactFormSubmissionMail extends Mailable implements ShouldQueue
+class TestMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -17,21 +17,13 @@ class ContactFormSubmissionMail extends Mailable implements ShouldQueue
 
     public array $backoff = [60, 180, 300];
 
-    public function __construct(public array $payload)
-    {
-    }
-
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: 'New Contact Form Submission: '.$this->payload['subject']
-        );
+        return new Envelope(subject: 'Postzy test email');
     }
 
     public function content(): Content
     {
-        return new Content(
-            view: 'emails.contact-submission'
-        );
+        return new Content(view: 'emails.test');
     }
 }

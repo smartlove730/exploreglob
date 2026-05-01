@@ -3,6 +3,9 @@
 namespace App\Jobs;
 
 use App\Models\FacebookPost;
+use App\Models\AutomationQueueItem;
+use App\Models\AutomationRunLog;
+use App\Notifications\PostFailedNotification;
 use App\Services\MetaPostService;
 use App\Services\MetaVideoService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -90,6 +93,7 @@ class PublishPostJob implements ShouldQueue
                 'response_json' => $responses,
             ])->save();
 
+            $this->markAutomationQueueItemPublished($post, $responses);
             $this->cleanupStoredDriveMedia($post);
         } catch (Throwable $exception) {
             Log::error('Queued post publish failed', [
@@ -110,6 +114,35 @@ class PublishPostJob implements ShouldQueue
 
             throw $exception;
         }
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        $post = FacebookPost::query()->with('user')->find($this->facebookPostId);
+        if (!$post) {
+            return;
+        }
+
+        $post->user?->notify(new PostFailedNotification($post, $exception->getMessage()));
+
+        $queueItemId = (int) data_get($post->response_json, 'automation_queue_item_id', 0);
+        if ($queueItemId <= 0) {
+            return;
+        }
+
+        $item = AutomationQueueItem::query()->with('rule')->find($queueItemId);
+        if (!$item) {
+            return;
+        }
+
+        $item->update([
+            'status' => AutomationQueueItem::STATUS_FAILED,
+            'last_error' => $exception->getMessage(),
+            'completed_at' => now(),
+            'response_json' => $post->response_json,
+        ]);
+        $item->rule?->increment('failed_count');
+        $this->logAutomation($item, 'failed', $exception->getMessage());
     }
 
     private function resolvePendingPlatforms(FacebookPost $post, array $platforms): array
@@ -165,6 +198,41 @@ class PublishPostJob implements ShouldQueue
         $error = mb_strtolower($exception->getMessage());
 
         return str_contains($error, 'instagram business account is not linked');
+    }
+
+    private function markAutomationQueueItemPublished(FacebookPost $post, array $responses): void
+    {
+        $queueItemId = (int) data_get($post->response_json, 'automation_queue_item_id', 0);
+        if ($queueItemId <= 0) {
+            return;
+        }
+
+        $item = AutomationQueueItem::query()->with('rule')->find($queueItemId);
+        if (!$item) {
+            return;
+        }
+
+        $item->update([
+            'status' => AutomationQueueItem::STATUS_PUBLISHED,
+            'facebook_post_id_external' => $post->facebook_post_id,
+            'instagram_media_id' => $post->instagram_media_id,
+            'response_json' => $responses,
+            'completed_at' => now(),
+            'last_error' => null,
+        ]);
+        $item->rule?->increment('success_count');
+        $this->logAutomation($item, 'published', 'Post published successfully.');
+    }
+
+    private function logAutomation(AutomationQueueItem $item, string $status, string $message): void
+    {
+        AutomationRunLog::create([
+            'automation_rule_id' => $item->automation_rule_id,
+            'automation_queue_item_id' => $item->id,
+            'page_id' => $item->page_id,
+            'status' => $status,
+            'message' => $message,
+        ]);
     }
 
     private function cleanupStoredDriveMedia(FacebookPost $post): void

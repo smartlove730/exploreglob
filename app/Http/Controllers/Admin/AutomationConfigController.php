@@ -3,427 +3,236 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AutomationConfig;
-use App\Models\AutomationPostLog;
+use App\Models\AutomationQueueItem;
+use App\Models\AutomationRule;
 use App\Models\DriveApiKey;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
-use App\Jobs\RunAutomationJob;
-use App\Services\InstagramService;
+use App\Services\AutomationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Throwable;
 
 class AutomationConfigController extends Controller
 {
-    public function __construct(private readonly InstagramService $instagramService)
+    public function __construct(private readonly AutomationService $automationService)
     {
     }
 
     public function index()
     {
-        $configs = AutomationConfig::query()
+        $rules = AutomationRule::query()
             ->ownedBy(Auth::user())
-            ->with(['app', 'page', 'driveApiKey'])
+            ->with('app')
             ->latest()
             ->paginate(20);
 
-        $instagramUsernames = $this->resolveInstagramUsernames($configs->getCollection());
-
-        $queueStats = [
-            'pending_jobs' => DB::table('jobs')->count(),
-            'failed_jobs' => Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0,
-            'last_activity' => AutomationPostLog::query()->ownedBy(Auth::user())->latest('created_at')->value('created_at'),
-        ];
-
-        $inProgressLogs = AutomationPostLog::query()
+        $pages = FacebookPage::query()
             ->ownedBy(Auth::user())
-            ->with(['automationConfig', 'page'])
-            ->whereIn('status', ['scheduled', 'in_progress'])
-            ->orderByRaw('COALESCE(scheduled_for, created_at) asc')
-            ->limit(25)
+            ->whereIn('id', $rules->getCollection()->flatMap(fn (AutomationRule $rule) => $rule->page_ids ?: [])->unique())
+            ->get(['id', 'page_name'])
+            ->keyBy('id');
+
+        $queueItems = AutomationQueueItem::query()
+            ->ownedBy(Auth::user())
+            ->with(['rule:id,name', 'page:id,page_name'])
+            ->latest()
+            ->limit(40)
             ->get();
 
-        return view('admin.automations.index', compact('configs', 'queueStats', 'inProgressLogs', 'instagramUsernames'));
+        return view('admin.automations.index', compact('rules', 'pages', 'queueItems'));
     }
 
     public function create()
     {
-        return view('admin.automations.create', [
-            'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
-            'pages' => $this->pagesForUser(),
-            'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
-            'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $this->resolvePreferredDriveApiKeyId()),
-        ]);
+        return view('admin.automations.create', $this->formData());
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $this->validateData($request);
-        $pageIds = collect($data['page_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
-        $this->assertAuthorizedAppAndPages((int) $data['app_id'], $pageIds);
-        $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
-        $data['user_id'] = Auth::id();
+        $data = $this->validated($request);
 
-        // Enforce automation limit from the user's active plan
-        $user = Auth::user();
-        if ($user && !$user->isAdmin()) {
-            $activeSubscription = \App\Models\Subscription::query()
-                ->where('user_id', $user->id)
-                ->whereIn('status', [\App\Models\Subscription::STATUS_ACTIVE, \App\Models\Subscription::STATUS_AUTHENTICATED])
-                ->with('plan')
-                ->latest('id')
-                ->first();
-
-            if ($activeSubscription && $activeSubscription->plan) {
-                $currentCount = AutomationConfig::where('user_id', $user->id)->count();
-                $limit = (int) $activeSubscription->plan->automation_limit;
-
-                if (($currentCount + count($pageIds)) > $limit) {
-                    return redirect()->route('admin.automations.index')
-                        ->with('error', "Automation limit reached. Your plan allows {$limit} automation(s). You currently have {$currentCount}.");
-                }
-            }
-        }
-
-        $created = 0;
-        foreach ($pageIds as $pageId) {
-            AutomationConfig::create($data + ['page_id' => $pageId]);
-            $created++;
-        }
-
-        return redirect()->route('admin.automations.index')->with('success', $created.' automation config(s) created successfully.');
-    }
-
-    public function edit(AutomationConfig $automation)
-    {
-        $this->authorizeAutomation($automation);
-
-        return view('admin.automations.edit', [
-            'automation' => $automation,
-            'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
-            'pages' => $this->pagesForUser(),
-            'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
-            'selectedDriveApiKeyId' => (int) old('drive_api_key_id', $automation->drive_api_key_id),
+        $rule = AutomationRule::create($data + [
+            'user_id' => Auth::id(),
+            'status' => AutomationRule::STATUS_ACTIVE,
+            'daily_limit' => min(AutomationService::MAX_DAILY_POSTS_PER_PAGE, (int) $data['daily_limit']),
         ]);
+
+        $result = $this->automationService->queueRule($rule, true);
+
+        return redirect()
+            ->route('admin.automations.index')
+            ->with('success', "Automation created. {$result['queued']} post(s) queued.");
     }
 
-    public function update(Request $request, AutomationConfig $automation): RedirectResponse
+    public function edit(AutomationRule $automation)
     {
-        $this->authorizeAutomation($automation);
+        $this->authorizeRule($automation);
 
-        $data = $this->validateData($request);
-        $pageIds = collect($data['page_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
-        $this->assertAuthorizedAppAndPages((int) $data['app_id'], $pageIds);
-        $this->assertDriveKeyIsActive((int) $data['drive_api_key_id']);
-
-        $baseData = collect($data)->except(['page_ids', 'page_id'])->all();
-
-        $primaryPageId = array_shift($pageIds);
-        $automation->update($baseData + ['page_id' => $primaryPageId]);
-
-        $created = 0;
-        foreach ($pageIds as $pageId) {
-            $exists = AutomationConfig::query()
-                ->ownedBy(Auth::user())
-                ->where('app_id', (int) $data['app_id'])
-                ->where('page_id', $pageId)
-                ->exists();
-
-            if ($exists) {
-                continue;
-            }
-
-            AutomationConfig::create($baseData + [
-                'user_id' => Auth::id(),
-                'page_id' => $pageId,
-            ]);
-            $created++;
-        }
-
-        return redirect()->route('admin.automations.index')->with('success', 'Automation config updated successfully.'.($created > 0 ? " {$created} additional config(s) created for other selected pages." : ''));
+        return view('admin.automations.edit', $this->formData() + ['automation' => $automation]);
     }
 
-    public function destroy(AutomationConfig $automation): RedirectResponse
+    public function update(Request $request, AutomationRule $automation): RedirectResponse
     {
-        $this->authorizeAutomation($automation);
+        $this->authorizeRule($automation);
+        $data = $this->validated($request);
 
+        $automation->update($data + [
+            'daily_limit' => min(AutomationService::MAX_DAILY_POSTS_PER_PAGE, (int) $data['daily_limit']),
+        ]);
+
+        return redirect()->route('admin.automations.index')->with('success', 'Automation updated.');
+    }
+
+    public function destroy(AutomationRule $automation): RedirectResponse
+    {
+        $this->authorizeRule($automation);
         $automation->delete();
 
-        return redirect()->route('admin.automations.index')->with('success', 'Automation config deleted successfully.');
+        return back()->with('success', 'Automation deleted.');
     }
 
-    public function toggle(AutomationConfig $automation): RedirectResponse
+    public function pause(AutomationRule $automation): RedirectResponse
     {
-        $this->authorizeAutomation($automation);
-
-        $automation->update(['is_active' => !$automation->is_active]);
-
-        return back()->with('success', 'Automation status updated.');
-    }
-
-    public function cancelExecution(AutomationPostLog $execution): RedirectResponse
-    {
-        $this->authorizeExecution($execution);
-
-        if (!in_array($execution->status, ['scheduled', 'in_progress'], true)) {
-            return back()->with('error', 'Only scheduled or in-progress executions can be deleted.');
-        }
-
-        $execution->update([
-            'status' => 'cancelled',
-            'message' => 'Execution cancelled by user.',
-            'completed_at' => now(),
+        $this->authorizeRule($automation);
+        $automation->update([
+            'status' => AutomationRule::STATUS_PAUSED,
+            'paused_at' => now(),
         ]);
-        $this->removeQueuedAutomationJobs(collect([(int) $execution->id]));
 
-        return back()->with('success', 'Execution deleted successfully.');
+        return back()->with('success', 'Automation paused.');
     }
 
-    public function executeNow(AutomationPostLog $execution): RedirectResponse
+    public function resume(AutomationRule $automation): RedirectResponse
     {
-        $this->authorizeExecution($execution);
-
-        if ($execution->status !== 'scheduled') {
-            return back()->with('error', 'Only scheduled executions can be run immediately.');
-        }
-
-        $runAt = now()->addMinutes(2)->startOfMinute();
-
-        $execution->update([
-            'status' => 'scheduled',
-            'message' => 'Execution promoted to run at '.$runAt->toDateTimeString().'.',
-            'scheduled_for' => $runAt,
-            'started_at' => null,
-            'completed_at' => null,
+        $this->authorizeRule($automation);
+        $automation->update([
+            'status' => AutomationRule::STATUS_ACTIVE,
+            'paused_at' => null,
+            'stopped_at' => null,
+            'next_run_at' => now(),
         ]);
-        $this->removeQueuedAutomationJobs(collect([(int) $execution->id]));
 
-        RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id)
-            ->delay($runAt);
-
-        return back()->with('success', 'Execution queued for the next 2nd minute.');
+        return back()->with('success', 'Automation resumed.');
     }
 
-    public function bulkExecuteNow(Request $request): RedirectResponse
+    public function stop(AutomationRule $automation): RedirectResponse
     {
-        $executionIds = collect($request->validate([
-            'execution_ids' => ['required', 'array', 'min:1'],
-            'execution_ids.*' => ['required', 'integer', 'distinct'],
-        ])['execution_ids'])
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
+        $this->authorizeRule($automation);
+        $automation->update([
+            'status' => AutomationRule::STATUS_STOPPED,
+            'stopped_at' => now(),
+        ]);
 
-        $executions = AutomationPostLog::query()
-            ->ownedBy(Auth::user())
-            ->whereIn('id', $executionIds)
-            ->where('status', 'scheduled')
-            ->get();
-
-        if ($executions->isEmpty()) {
-            return back()->with('error', 'No scheduled executions were selected.');
-        }
-
-        $nextRunAt = now();
-        foreach ($executions as $execution) {
-            $nextRunAt = $nextRunAt->copy()->addMinutes(random_int(1, 2));
-
-            $execution->update([
-                'status' => 'scheduled',
-                'message' => 'Execution promoted to run immediately.',
-                'scheduled_for' => $nextRunAt,
-                'started_at' => null,
-                'completed_at' => null,
-            ]);
-            $this->removeQueuedAutomationJobs(collect([(int) $execution->id]));
-
-            RunAutomationJob::dispatch($execution->automation_config_id, true, $execution->id)
-                ->delay($nextRunAt);
-        }
-
-        return back()->with('success', $executions->count().' execution(s) queued to run immediately.');
-    }
-
-    public function bulkCancelExecutions(Request $request): RedirectResponse
-    {
-        $executionIds = collect($request->validate([
-            'execution_ids' => ['required', 'array', 'min:1'],
-            'execution_ids.*' => ['required', 'integer', 'distinct'],
-        ])['execution_ids'])
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        $affected = AutomationPostLog::query()
-            ->ownedBy(Auth::user())
-            ->whereIn('id', $executionIds)
-            ->whereIn('status', ['scheduled', 'in_progress'])
+        $automation->queueItems()
+            ->where('status', AutomationQueueItem::STATUS_QUEUED)
             ->update([
-                'status' => 'cancelled',
-                'message' => 'Execution cancelled by user.',
+                'status' => AutomationQueueItem::STATUS_CANCELLED,
                 'completed_at' => now(),
+                'last_error' => 'Automation stopped by user.',
             ]);
 
-        if ($affected === 0) {
-            return back()->with('error', 'No scheduled or in-progress executions were selected.');
-        }
-        $this->removeQueuedAutomationJobs($executionIds);
-
-        return back()->with('success', $affected.' execution(s) deleted successfully.');
+        return back()->with('success', 'Automation stopped and queued posts cancelled.');
     }
 
-    private function removeQueuedAutomationJobs(\Illuminate\Support\Collection $executionIds): void
+    public function queueNow(AutomationRule $automation): RedirectResponse
     {
-        if ($executionIds->isEmpty()) {
-            return;
-        }
+        $this->authorizeRule($automation);
+        $result = $this->automationService->queueRule($automation, true);
 
-        $query = DB::table('jobs')
-            ->where('payload', 'like', '%RunAutomationJob%')
-            ->where(function ($outer) use ($executionIds): void {
-                foreach ($executionIds as $executionId) {
-                    $outer->orWhere('payload', 'like', '%automationLogId\";i:'.$executionId.';%')
-                        ->orWhere('payload', 'like', '%automationLogId\";s:'.strlen((string) $executionId).':\"'.$executionId.'\";%');
-                }
-            });
-
-        $query->delete();
+        return back()->with('success', "{$result['queued']} post(s) queued. {$result['skipped']} skipped.");
     }
 
-    private function authorizeAutomation(AutomationConfig $automation): void
+    private function formData(): array
     {
-        if (!Auth::user()?->isAdmin() && $automation->user_id !== Auth::id()) {
-            abort(403);
-        }
-    }
-
-    private function authorizeExecution(AutomationPostLog $execution): void
-    {
-        if (!Auth::user()?->isAdmin() && $execution->user_id !== Auth::id()) {
-            abort(403);
-        }
-    }
-
-    private function validateData(Request $request): array
-    {
-        return $request->validate([
-            'name' => 'nullable|string|max:255',
-            'prompt' => 'required|string|max:5000',
-            'drive_link' => 'required|url|max:4096',
-            'drive_api_key_id' => 'required|integer|exists:drive_api_keys,id',
-            'app_id' => 'required|integer|exists:facebook_apps,id',
-            'page_id' => 'nullable|integer|exists:facebook_pages,id',
-            'page_ids' => 'required_without:page_id|array|min:1',
-            'page_ids.*' => 'required|integer|exists:facebook_pages,id',
-            'platforms' => 'required|string|in:facebook,instagram,both',
-            'runs_per_day' => 'required|integer|min:1|max:24',
-            'post_limit_per_day' => 'required|integer|min:1|max:100',
-            'is_active' => 'nullable|boolean',
-        ]) + [
-            'is_active' => $request->boolean('is_active', true),
+        return [
+            'apps' => FacebookApp::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
+            'pages' => FacebookPage::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('page_name')->get(),
+            'driveApiKeys' => DriveApiKey::query()->ownedBy(Auth::user())->where('is_active', true)->orderBy('name')->get(),
         ];
     }
 
-    private function pagesForUser()
+    private function validated(Request $request): array
     {
-        return FacebookPage::query()
-            ->ownedBy(Auth::user())
-            ->where('is_active', true)
-            ->orderBy('page_name')
-            ->get();
-    }
+        $request->merge([
+            'schedule_times' => collect($request->input('schedule_times', []))
+                ->map(fn ($time) => trim((string) $time))
+                ->filter()
+                ->values()
+                ->all(),
+        ]);
 
-    private function assertAuthorizedAppAndPages(int $appId, array $pageIds): void
-    {
-        $validPagesCount = FacebookPage::query()
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'app_id' => ['required', 'integer', 'exists:facebook_apps,id'],
+            'page_ids' => ['required', 'array', 'min:1'],
+            'page_ids.*' => ['required', 'integer', 'exists:facebook_pages,id'],
+            'platforms' => ['required', 'array', 'min:1'],
+            'platforms.*' => ['required', 'string', 'in:facebook,instagram'],
+            'media_source_type' => ['required', 'string', 'in:urls,drive'],
+            'media_urls' => ['nullable', 'string', 'max:60000'],
+            'drive_link' => ['nullable', 'url', 'max:4096'],
+            'drive_api_key_id' => ['nullable', 'integer', 'exists:drive_api_keys,id'],
+            'post_frequency' => ['required', 'integer', 'min:1', 'max:3'],
+            'schedule_times' => ['required', 'array', 'min:1', 'max:3'],
+            'schedule_times.*' => ['required', 'date_format:H:i'],
+            'daily_limit' => ['required', 'integer', 'min:1', 'max:3'],
+            'caption_templates' => ['required', 'string', 'max:60000'],
+            'hashtag_templates' => ['nullable', 'string', 'max:20000'],
+        ]);
+
+        $pageCount = FacebookPage::query()
             ->ownedBy(Auth::user())
-            ->whereIn('id', $pageIds)
-            ->where('facebook_app_id', $appId)
+            ->whereIn('id', $data['page_ids'])
+            ->where('facebook_app_id', (int) $data['app_id'])
+            ->where('is_active', true)
             ->count();
 
-        abort_unless($validPagesCount === count($pageIds), 422, 'Selected app/pages are not authorized for this user.');
+        abort_unless($pageCount === count(array_unique($data['page_ids'])), 422, 'Selected pages are not valid for this app.');
+
+        $payload = $data['media_source_type'] === 'drive'
+            ? [
+                'drive_link' => $data['drive_link'] ?? '',
+                'drive_api_key_id' => (int) ($data['drive_api_key_id'] ?? 0),
+            ]
+            : [
+                'urls' => collect(preg_split('/\R+/', (string) ($data['media_urls'] ?? '')))
+                    ->map(fn (string $url) => trim($url))
+                    ->filter()
+                    ->values()
+                    ->all(),
+            ];
+
+        abort_if($data['media_source_type'] === 'drive' && (empty($payload['drive_link']) || empty($payload['drive_api_key_id'])), 422, 'Drive automations require a Drive link and account.');
+        abort_if($data['media_source_type'] === 'urls' && empty($payload['urls']), 422, 'Add at least one media URL.');
+
+        return [
+            'name' => $data['name'],
+            'app_id' => (int) $data['app_id'],
+            'page_ids' => array_values(array_unique(array_map('intval', $data['page_ids']))),
+            'platforms' => array_values(array_unique($data['platforms'])),
+            'media_source_type' => $data['media_source_type'],
+            'media_source_payload' => $payload,
+            'post_frequency' => (int) $data['post_frequency'],
+            'schedule_times' => array_values($data['schedule_times']),
+            'timezone' => config('app.timezone', 'UTC'),
+            'daily_limit' => (int) $data['daily_limit'],
+            'caption_templates' => $this->lines($data['caption_templates']),
+            'hashtag_templates' => $this->lines($data['hashtag_templates'] ?? ''),
+        ];
     }
 
-    private function assertDriveKeyIsActive(int $driveApiKeyId): void
+    private function lines(string $value): array
     {
-        $active = DriveApiKey::query()
-            ->ownedBy(Auth::user())
-            ->whereKey($driveApiKeyId)
-            ->where('is_active', true)
-            ->exists();
-
-        abort_unless($active, 422, 'Selected Google Drive API key is inactive.');
-    }
-
-    private function resolveInstagramUsernames($configs): array
-    {
-        $usernamesByPageId = [];
-        $pages = $configs
-            ->pluck('page')
+        return collect(preg_split('/\R+/', $value))
+            ->map(fn (string $line) => trim($line))
             ->filter()
-            ->unique('id');
-
-        foreach ($pages as $page) {
-            if (!$page->instagram_business_account_id) {
-                $usernamesByPageId[$page->id] = null;
-                continue;
-            }
-
-            try {
-                $username = $this->instagramService->fetchInstagramUsername(
-                    (string) $page->instagram_business_account_id,
-                    (string) $page->page_access_token
-                );
-                $usernamesByPageId[$page->id] = $username;
-            } catch (Throwable $exception) {
-                $usernamesByPageId[$page->id] = null;
-            }
-        }
-
-        return $usernamesByPageId;
+            ->values()
+            ->all();
     }
 
-    private function resolvePreferredDriveApiKeyId(): int
+    private function authorizeRule(AutomationRule $automation): void
     {
-        if (!$this->supportsDriveOauthColumns()) {
-            return (int) DriveApiKey::query()
-                ->ownedBy(Auth::user())
-                ->where('is_active', true)
-                ->orderByDesc('updated_at')
-                ->value('id');
-        }
-
-        $oauthDriveKeyId = (int) DriveApiKey::query()
-            ->ownedBy(Auth::user())
-            ->where('is_active', true)
-            ->where(function ($query) {
-                $query
-                    ->whereNotNull('oauth_access_token')
-                    ->orWhereNotNull('oauth_refresh_token');
-            })
-            ->orderByDesc('updated_at')
-            ->value('id');
-
-        if ($oauthDriveKeyId > 0) {
-            return $oauthDriveKeyId;
-        }
-
-        return (int) DriveApiKey::query()
-            ->ownedBy(Auth::user())
-            ->where('is_active', true)
-            ->orderByDesc('updated_at')
-            ->value('id');
-    }
-
-    private function supportsDriveOauthColumns(): bool
-    {
-        return Schema::hasColumns('drive_api_keys', [
-            'oauth_access_token',
-            'oauth_refresh_token',
-        ]);
+        abort_if(!Auth::user()?->isAdmin() && $automation->user_id !== Auth::id(), 403);
     }
 }

@@ -17,9 +17,11 @@ class FacebookPage extends Model
         'facebook_app_id',
         'page_id',
         'page_name',
+        'category',
         'page_access_token',
         'instagram_business_account_id',
         'is_active',
+        'last_synced_at',
     ];
 
     protected $hidden = [
@@ -28,6 +30,7 @@ class FacebookPage extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'last_synced_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

@@ -123,7 +123,7 @@ class FacebookGraphService
         $query = [
             'access_token' => $longLivedToken,
             'limit' => 100,
-            'fields' => 'id,name,access_token,tasks',
+            'fields' => 'id,name,category,access_token,tasks',
         ];
         $requestCount = 0;
 
@@ -329,9 +329,11 @@ class FacebookGraphService
                     'user_id' => $account->user_id,
                     'facebook_app_id' => $account->facebook_app_id,
                     'page_name' => $page['name'],
+                    'category' => $page['category'] ?? null,
                     'page_access_token' => $page['access_token'],
                     'instagram_business_account_id' => $instagramBusinessAccountId,
                     'is_active' => true,
+                    'last_synced_at' => now(),
                 ]
             );
         }

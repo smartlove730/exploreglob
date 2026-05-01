@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Notifications\ResetPasswordQueued;
+use App\Notifications\VerifyEmailQueued;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -92,5 +94,15 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(Subscription::class)
             ->where('status', Subscription::STATUS_ACTIVE)
             ->latestOfMany();
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new VerifyEmailQueued());
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordQueued($token));
     }
 }

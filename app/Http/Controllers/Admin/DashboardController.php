@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
-use App\Models\AutomationConfig;
-use App\Models\AutomationPostLog;
+use App\Models\AutomationQueueItem;
+use App\Models\AutomationRule;
 use App\Models\FacebookAccount;
 use App\Models\FacebookPage;
 use App\Models\FacebookPost;
@@ -136,11 +136,11 @@ class DashboardController extends Controller
             ],
             [
                 'label' => 'Running Automations',
-                'value' => AutomationPostLog::query()
+                'value' => AutomationQueueItem::query()
                     ->tap($userScope)
-                    ->whereIn('status', ['scheduled', 'in_progress'])
+                    ->whereIn('status', ['queued', 'processing'])
                     ->count(),
-                'hint' => AutomationConfig::query()->tap($userScope)->where('is_active', true)->count().' active configs',
+                'hint' => AutomationRule::query()->tap($userScope)->where('status', AutomationRule::STATUS_ACTIVE)->count().' active rules',
                 'tone' => 'purple',
             ],
         ];

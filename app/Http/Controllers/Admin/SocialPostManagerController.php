@@ -11,6 +11,7 @@ use App\Services\MetaPostService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -34,38 +35,62 @@ class SocialPostManagerController extends Controller
     public function syncPosts(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'page_ids' => ['required', 'array', 'min:1'],
+            'page_ids' => ['nullable', 'array'],
             'page_ids.*' => ['required', 'integer'],
+            'platform' => ['nullable', 'in:facebook,instagram'],
         ]);
 
         $pages = FacebookPage::query()
             ->ownedBy(Auth::user())
-            ->whereIn('id', $data['page_ids'])
+            ->when(!empty($data['page_ids']), fn ($query) => $query->whereIn('id', $data['page_ids']))
             ->where('is_active', true)
             ->get();
 
-        $syncedCount = 0;
+        if ($pages->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active Facebook pages are available. Connect and sync a page first.',
+            ], 422);
+        }
+
+        $stats = [
+            'loaded' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+        ];
         $errors = [];
+        $platforms = empty($data['platform']) ? ['facebook', 'instagram'] : [$data['platform']];
 
         foreach ($pages as $page) {
-            try {
-                $facebookPosts = $this->metaPostService->fetchFacebookPagePosts($page);
-                $syncedCount += $this->upsertSyncedPosts($page, $facebookPosts);
-            } catch (\Throwable $exception) {
-                $errors[] = "{$page->page_name} (Facebook): {$exception->getMessage()}";
+            if (in_array('facebook', $platforms, true)) {
+                try {
+                    $pageStats = $this->upsertSyncedPosts($page, $this->metaPostService->fetchFacebookPagePosts($page));
+                    $stats = $this->mergeStats($stats, $pageStats);
+                } catch (\Throwable $exception) {
+                    $stats['failed']++;
+                    $errors[] = "{$page->page_name} (Facebook): {$exception->getMessage()}";
+                }
             }
 
-            try {
-                $instagramPosts = $this->metaPostService->fetchInstagramPosts($page);
-                $syncedCount += $this->upsertSyncedPosts($page, $instagramPosts);
-            } catch (\Throwable $exception) {
-                $errors[] = "{$page->page_name} (Instagram): {$exception->getMessage()}";
+            if (in_array('instagram', $platforms, true)) {
+                try {
+                    $pageStats = $this->upsertSyncedPosts($page, $this->metaPostService->fetchInstagramPosts($page));
+                    $stats = $this->mergeStats($stats, $pageStats);
+                } catch (\Throwable $exception) {
+                    $stats['failed']++;
+                    $errors[] = "{$page->page_name} (Instagram): {$exception->getMessage()}";
+                }
             }
         }
 
+        $message = "Loaded {$stats['loaded']} post(s). {$stats['created']} new, {$stats['updated']} updated, {$stats['skipped']} skipped.";
+
         return response()->json([
             'success' => true,
-            'message' => "Sync completed. {$syncedCount} record(s) inserted/updated.",
+            'message' => $message,
+            'stats' => $stats,
             'errors' => $errors,
         ]);
     }
@@ -80,11 +105,15 @@ class SocialPostManagerController extends Controller
             'external_post_id' => ['nullable', 'string', 'max:255'],
             'created_from' => ['nullable', 'date'],
             'created_to' => ['nullable', 'date'],
+            'deletion_status' => ['nullable', 'in:ready,pending,processing,failed,completed'],
         ]);
 
         $query = SyncedSocialPost::query()
             ->where('user_id', Auth::id())
-            ->with('page:id,page_name');
+            ->with([
+                'page:id,page_name',
+                'latestDeletionJob:id,synced_social_post_id,status,error_message,scheduled_for,processed_at,updated_at',
+            ]);
 
         if (!empty($data['page_ids'])) {
             $query->whereIn('facebook_page_id', $data['page_ids']);
@@ -98,7 +127,8 @@ class SocialPostManagerController extends Controller
             $search = trim((string) $data['search']);
             $query->where(function ($inner) use ($search) {
                 $inner->where('content', 'like', "%{$search}%")
-                    ->orWhere('external_post_id', 'like', "%{$search}%");
+                    ->orWhere('external_post_id', 'like', "%{$search}%")
+                    ->orWhereHas('page', fn ($pageQuery) => $pageQuery->where('page_name', 'like', "%{$search}%"));
             });
         }
 
@@ -119,6 +149,14 @@ class SocialPostManagerController extends Controller
             ->limit(1000)
             ->get();
 
+        if (!empty($data['deletion_status'])) {
+            $posts = $posts->filter(function (SyncedSocialPost $post) use ($data) {
+                $status = $post->latestDeletionJob?->status ?? 'ready';
+
+                return $status === $data['deletion_status'];
+            })->values();
+        }
+
         return response()->json([
             'success' => true,
             'posts' => $posts->map(fn (SyncedSocialPost $post) => [
@@ -129,9 +167,14 @@ class SocialPostManagerController extends Controller
                 'page_name' => $post->page?->page_name,
                 'content' => $post->content,
                 'media_preview_url' => $post->media_preview_url,
+                'permalink' => $post->permalink,
                 'created_time' => optional($post->external_created_at)->toDateTimeString(),
-                'created_at' => optional($post->created_at)->toDateTimeString(),
-                'updated_at' => optional($post->updated_at)->toDateTimeString(),
+                'last_synced_at' => optional($post->last_synced_at)->toDateTimeString(),
+                'deletion_status' => $post->latestDeletionJob?->status ?? 'ready',
+                'deletion_job_id' => $post->latestDeletionJob?->id,
+                'deletion_error' => $post->latestDeletionJob?->error_message,
+                'deletion_scheduled_for' => optional($post->latestDeletionJob?->scheduled_for)->toDateTimeString(),
+                'deletion_processed_at' => optional($post->latestDeletionJob?->processed_at)->toDateTimeString(),
             ])->values(),
         ]);
     }
@@ -148,61 +191,43 @@ class SocialPostManagerController extends Controller
             ->whereIn('id', $data['post_ids'])
             ->get();
 
-        $jobs = [];
-
-        DB::transaction(function () use ($posts, &$jobs) {
-            foreach ($posts as $post) {
-                $existing = SocialPostDeletionJob::query()
-                    ->where('synced_social_post_id', $post->id)
-                    ->whereIn('status', [SocialPostDeletionJob::STATUS_PENDING, SocialPostDeletionJob::STATUS_PROCESSING])
-                    ->first();
-
-                if ($existing) {
-                    $jobs[] = $existing;
-                    continue;
-                }
-
-                $latestScheduledAt = SocialPostDeletionJob::query()
-                    ->whereIn('status', [SocialPostDeletionJob::STATUS_PENDING, SocialPostDeletionJob::STATUS_PROCESSING])
-                    ->lockForUpdate()
-                    ->max('scheduled_for');
-
-                $nextRunAt = $latestScheduledAt
-                    ? Carbon::parse($latestScheduledAt)->addMinutes(2)
-                    : now();
-
-                if ($nextRunAt->lt(now())) {
-                    $nextRunAt = now();
-                }
-
-                $job = SocialPostDeletionJob::create([
-                    'user_id' => Auth::id(),
-                    'facebook_page_id' => $post->facebook_page_id,
-                    'synced_social_post_id' => $post->id,
-                    'platform' => $post->platform,
-                    'external_post_id' => $post->external_post_id,
-                    'post_created_at' => $post->external_created_at,
-                    'content_preview' => $post->content,
-                    'media_preview_url' => $post->media_preview_url,
-                    'status' => SocialPostDeletionJob::STATUS_PENDING,
-                    'scheduled_for' => $nextRunAt,
-                    'meta' => [
-                        'synced_social_post_id' => $post->id,
-                    ],
-                ]);
-
-                ProcessSocialPostDeletionJob::dispatch($job->id)
-                    ->onQueue('social-deletions')
-                    ->delay($nextRunAt);
-
-                $jobs[] = $job;
-            }
-        });
+        $result = $this->scheduleDeletionJobs($posts);
 
         return response()->json([
             'success' => true,
-            'message' => count($jobs).' deletion job(s) scheduled.',
-            'jobs' => collect($jobs)->map(fn (SocialPostDeletionJob $job) => [
+            'message' => "{$result['queued']} deletion job(s) queued. {$result['skipped']} skipped.",
+            'queued' => $result['queued'],
+            'skipped' => $result['skipped'],
+            'jobs' => collect($result['jobs'])->map(fn (SocialPostDeletionJob $job) => [
+                'id' => $job->id,
+                'synced_social_post_id' => $job->synced_social_post_id,
+                'status' => $job->status,
+                'scheduled_for' => optional($job->scheduled_for)->toDateTimeString(),
+            ])->values(),
+        ]);
+    }
+
+    public function retryFailed(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'post_ids' => ['nullable', 'array'],
+            'post_ids.*' => ['required', 'integer'],
+        ]);
+
+        $posts = SyncedSocialPost::query()
+            ->where('user_id', Auth::id())
+            ->when(!empty($data['post_ids']), fn ($query) => $query->whereIn('id', $data['post_ids']))
+            ->whereHas('latestDeletionJob', fn ($query) => $query->where('status', SocialPostDeletionJob::STATUS_FAILED))
+            ->get();
+
+        $result = $this->scheduleDeletionJobs($posts, true);
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$result['queued']} failed deletion job(s) queued for retry. {$result['skipped']} skipped.",
+            'queued' => $result['queued'],
+            'skipped' => $result['skipped'],
+            'jobs' => collect($result['jobs'])->map(fn (SocialPostDeletionJob $job) => [
                 'id' => $job->id,
                 'synced_social_post_id' => $job->synced_social_post_id,
                 'status' => $job->status,
@@ -239,30 +264,143 @@ class SocialPostManagerController extends Controller
         ]);
     }
 
-    private function upsertSyncedPosts(FacebookPage $page, \Illuminate\Support\Collection $posts): int
+    private function upsertSyncedPosts(FacebookPage $page, Collection $posts): array
     {
-        $changes = 0;
+        $stats = [
+            'loaded' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+        ];
 
         foreach ($posts as $post) {
-            SyncedSocialPost::updateOrCreate(
+            $record = SyncedSocialPost::firstOrNew(
                 [
                     'facebook_page_id' => $page->id,
                     'platform' => $post['platform'],
                     'external_post_id' => $post['external_post_id'],
-                ],
-                [
-                    'user_id' => Auth::id(),
-                    'content' => $post['content'] ?? null,
-                    'media_preview_url' => $post['media_preview_url'] ?? null,
-                    'permalink' => $post['permalink'] ?? null,
-                    'external_created_at' => $post['created_time'] ?? null,
-                    'last_synced_at' => now(),
                 ]
             );
 
-            $changes++;
+            $record->fill([
+                'user_id' => Auth::id(),
+                'content' => $post['content'] ?? null,
+                'media_preview_url' => $post['media_preview_url'] ?? null,
+                'permalink' => $post['permalink'] ?? null,
+                'external_created_at' => $post['created_time'] ?? null,
+            ]);
+
+            if (!$record->exists) {
+                $stats['created']++;
+            } elseif ($record->isDirty(['content', 'media_preview_url', 'permalink', 'external_created_at'])) {
+                $stats['updated']++;
+            } else {
+                $stats['skipped']++;
+            }
+
+            $record->last_synced_at = now();
+            $record->save();
+            $stats['loaded']++;
         }
 
-        return $changes;
+        return $stats;
+    }
+
+    private function mergeStats(array $base, array $incoming): array
+    {
+        foreach ($incoming as $key => $value) {
+            $base[$key] = ($base[$key] ?? 0) + (int) $value;
+        }
+
+        return $base;
+    }
+
+    private function scheduleDeletionJobs(Collection $posts, bool $failedOnly = false): array
+    {
+        $jobs = [];
+        $queued = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($posts, $failedOnly, &$jobs, &$queued, &$skipped) {
+            foreach ($posts as $post) {
+                $existing = SocialPostDeletionJob::query()
+                    ->where('facebook_page_id', $post->facebook_page_id)
+                    ->where('platform', $post->platform)
+                    ->where('external_post_id', $post->external_post_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing && in_array($existing->status, [SocialPostDeletionJob::STATUS_PENDING, SocialPostDeletionJob::STATUS_PROCESSING], true)) {
+                    $jobs[] = $existing;
+                    $skipped++;
+                    continue;
+                }
+
+                if ($existing && $existing->status === SocialPostDeletionJob::STATUS_COMPLETED) {
+                    $jobs[] = $existing;
+                    $skipped++;
+                    continue;
+                }
+
+                if ($failedOnly && (!$existing || $existing->status !== SocialPostDeletionJob::STATUS_FAILED)) {
+                    $skipped++;
+                    continue;
+                }
+
+                $latestScheduledAt = SocialPostDeletionJob::query()
+                    ->whereIn('status', [SocialPostDeletionJob::STATUS_PENDING, SocialPostDeletionJob::STATUS_PROCESSING])
+                    ->lockForUpdate()
+                    ->max('scheduled_for');
+
+                $nextRunAt = $latestScheduledAt
+                    ? Carbon::parse($latestScheduledAt)->addMinutes(2)
+                    : now();
+
+                if ($nextRunAt->lt(now())) {
+                    $nextRunAt = now();
+                }
+
+                $payload = [
+                    'user_id' => Auth::id(),
+                    'facebook_page_id' => $post->facebook_page_id,
+                    'synced_social_post_id' => $post->id,
+                    'platform' => $post->platform,
+                    'external_post_id' => $post->external_post_id,
+                    'post_created_at' => $post->external_created_at,
+                    'content_preview' => $post->content,
+                    'media_preview_url' => $post->media_preview_url,
+                    'status' => SocialPostDeletionJob::STATUS_PENDING,
+                    'error_message' => null,
+                    'attempts_count' => 0,
+                    'scheduled_for' => $nextRunAt,
+                    'processed_at' => null,
+                    'meta' => [
+                        'synced_social_post_id' => $post->id,
+                        'retry' => (bool) $existing,
+                    ],
+                ];
+
+                if ($existing) {
+                    $existing->update($payload);
+                    $job = $existing->fresh();
+                } else {
+                    $job = SocialPostDeletionJob::create($payload);
+                }
+
+                ProcessSocialPostDeletionJob::dispatch($job->id)
+                    ->onQueue('social-deletions')
+                    ->delay($nextRunAt);
+
+                $jobs[] = $job;
+                $queued++;
+            }
+        });
+
+        return [
+            'jobs' => $jobs,
+            'queued' => $queued,
+            'skipped' => $skipped,
+        ];
     }
 }

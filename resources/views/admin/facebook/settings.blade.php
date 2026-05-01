@@ -9,17 +9,22 @@
 
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('admin.facebook.connect', ['app_id' => $selectedAppId]) }}" class="btn btn-primary">Connect Facebook</a>
-        </div>
 
-        @if($account)
-            <form method="POST" action="{{ route('admin.facebook.sync-pages') }}" class="mt-2">
+            @if($account)
+            <form method="POST" action="{{ route('admin.facebook.refresh-token') }}">
                 @csrf
                 <input type="hidden" name="app_id" value="{{ $selectedAppId }}">
-                <button class="btn btn-outline-secondary">Sync Pages</button>
+                <button class="btn btn-outline-primary">Refresh Token</button>
             </form>
-        @endif
+            <form method="POST" action="{{ route('admin.facebook.sync-pages') }}">
+                @csrf
+                <input type="hidden" name="app_id" value="{{ $selectedAppId }}">
+                <button class="btn btn-outline-secondary">Resync Pages</button>
+            </form>
+            @endif
+        </div>
     </div>
 </div>
 
@@ -47,34 +52,94 @@
     <div class="col-12 col-lg-8">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <h2 class="h5 mb-3">Managed Facebook Pages</h2>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <div>
+                        <h2 class="h5 mb-1">Synced Facebook Pages</h2>
+                        <p class="text-muted mb-0 small">Review access, token health, sync timing, and page management actions.</p>
+                    </div>
+                    @if($account)
+                        <form method="POST" action="{{ route('admin.facebook.sync-pages') }}">
+                            @csrf
+                            <input type="hidden" name="app_id" value="{{ $selectedAppId }}">
+                            <button class="btn btn-sm btn-outline-secondary">Resync Pages</button>
+                        </form>
+                    @endif
+                </div>
 
                 @if($pages->isEmpty())
                     <p class="text-muted mb-0">No pages available yet. Select app, connect, and sync.</p>
                 @else
-                    <x-data-table>
+                    <x-data-table id="facebook-pages-table" order='[[6, "desc"]]' no-export="7">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Page</th>
-                                    <th>Status</th>
-                                    <th>Created At</th>
-                                    <th>Updated At</th>
+                                    <th>Page ID</th>
+                                    <th>Page Name</th>
+                                    <th>Category</th>
+                                    <th>Access Status</th>
+                                    <th>Token Status</th>
+                                    <th>Connected Date</th>
+                                    <th>Last Sync</th>
+                                    <th class="no-export">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($pages as $page)
+                                    @php
+                                        $tokenExpiresAt = $page->facebookAccount?->token_expires_at;
+                                        $tokenIsExpired = $tokenExpiresAt && $tokenExpiresAt->isPast();
+                                        $tokenExpiresSoon = $tokenExpiresAt && $tokenExpiresAt->isFuture() && $tokenExpiresAt->lte(now()->addDays(7));
+                                        $tokenStatus = $page->page_access_token
+                                            ? ($page->facebookAccount?->reauthorization_required || $tokenIsExpired
+                                                ? 'Reconnect Required'
+                                                : ($tokenExpiresSoon ? 'Expiring Soon' : 'Valid'))
+                                            : 'Missing';
+                                        $tokenBadge = match ($tokenStatus) {
+                                            'Valid' => 'success',
+                                            'Expiring Soon' => 'warning',
+                                            default => 'danger',
+                                        };
+                                    @endphp
                                     <tr>
-                                        <td>{{ $page->id }}</td>
-                                        <td>{{ $page->page_name }}<br><small class="text-muted">ID: {{ $page->page_id }}</small></td>
-                                        <td><span class="badge text-bg-success">Active</span></td>
-                                        <td>{{ optional($page->created_at)->format('Y-m-d H:i') }}</td>
-                                        <td>{{ optional($page->updated_at)->format('Y-m-d H:i') }}</td>
+                                        <td><span class="font-monospace small">{{ $page->page_id }}</span></td>
+                                        <td>
+                                            <div class="fw-semibold">{{ $page->page_name }}</div>
+                                            @if($page->instagram_business_account_id)
+                                                <small class="text-muted">Instagram: {{ $page->instagram_business_account_id }}</small>
+                                            @endif
+                                        </td>
+                                        <td>{{ $page->category ?: 'Uncategorized' }}</td>
+                                        <td>
+                                            <span class="badge text-bg-{{ $page->is_active ? 'success' : 'secondary' }}">
+                                                {{ $page->is_active ? 'Active' : 'Inactive' }}
+                                            </span>
+                                        </td>
+                                        <td><span class="badge text-bg-{{ $tokenBadge }}">{{ $tokenStatus }}</span></td>
+                                        <td data-order="{{ optional($page->created_at)->timestamp }}">
+                                            {{ optional($page->created_at)->format('M d, Y H:i') ?? 'Unknown' }}
+                                        </td>
+                                        <td data-order="{{ optional($page->last_synced_at ?? $page->updated_at)->timestamp }}">
+                                            {{ optional($page->last_synced_at ?? $page->updated_at)->format('M d, Y H:i') ?? 'Never' }}
+                                        </td>
+                                        <td class="text-nowrap">
+                                            <div class="btn-group btn-group-sm" role="group" aria-label="Page actions">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-outline-secondary"
+                                                    data-modal-url="{{ route('admin.facebook.pages.details', $page) }}"
+                                                >
+                                                    View Details
+                                                </button>
+                                                <form method="POST" action="{{ route('admin.facebook.pages.destroy', $page) }}" onsubmit="return confirm('Remove this synced Facebook page?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="btn btn-outline-danger rounded-start-0">Remove Page</button>
+                                                </form>
+                                            </div>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                     </x-data-table>
-                    <p class="small text-muted mb-0">All synced pages are marked active and available for posting.</p>
                 @endif
             </div>
         </div>

@@ -40,8 +40,7 @@
     $facebookAppsUrl = Route::has('admin.facebook.apps.index') ? route('admin.facebook.apps.index') : url('/admin/facebook/apps');
     $googleDriveKeysUrl = Route::has('admin.facebook.google-drive-keys.index') ? route('admin.facebook.google-drive-keys.index') : url('/admin/facebook/google-drive-keys');
     $googleDriveFoldersUrl = Route::has('admin.facebook.drive-folders.index') ? route('admin.facebook.drive-folders.index') : url('/admin/facebook/drive-folders');
-    $isFailedAutomationRoute = request()->routeIs('admin.automations.failed-posts.*');
-    $isAutomationRoute = request()->routeIs('admin.automations.*') && !$isFailedAutomationRoute;
+    $isAutomationRoute = request()->routeIs('admin.automations.*');
 @endphp
 @if(auth()->check())
 <div class="d-flex">
@@ -75,10 +74,10 @@
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.manage-posts.*') ? 'active' : '' }}" href="{{ $facebookManagePostsUrl }}">Manage Social Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ $isAutomationRoute ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ $isFailedAutomationRoute ? 'active' : '' }}" href="{{ route('admin.automations.failed-posts.index') }}">Failed Automation Posts</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.billing.*') ? 'active' : '' }}" href="{{ route('app.billing.plans') }}">Subscription</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.settings.*') ? 'active' : '' }}" href="{{ route('app.settings.index') }}">Settings</a></li>
                 @if($isAdmin)
+                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.mail-settings.*') ? 'active' : '' }}" href="{{ route('admin.mail-settings.index') }}">Mail Settings</a></li>
                 <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.saas.*') ? 'active' : '' }}" href="{{ route('admin.saas.overview') }}">SaaS Management</a></li>
                 @endif
             </ul>

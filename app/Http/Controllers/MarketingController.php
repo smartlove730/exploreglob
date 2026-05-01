@@ -53,7 +53,7 @@ class MarketingController extends Controller
 
         $recipient = config('mail.from.address');
         if ($recipient) {
-            Mail::to($recipient)->send(new ContactFormSubmissionMail($data));
+            Mail::to($recipient)->queue(new ContactFormSubmissionMail($data));
         }
         app(ActivityLogService::class)->log('public.contact.submitted', null, [
             'email' => $data['email'],

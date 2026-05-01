@@ -5,10 +5,15 @@ namespace App\Providers;
 use App\Models\Blog;
 use App\Models\Category;
 use App\Models\Country;
+use App\Models\EmailLog;
+use App\Services\DynamicMailConfigService;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
@@ -32,6 +37,33 @@ class AppServiceProvider extends ServiceProvider
    
     public function boot(): void
     {
+        try {
+            if (Schema::hasTable('mail_settings')) {
+                app(DynamicMailConfigService::class)->apply();
+            }
+        } catch (\Throwable) {
+            // Database may not be migrated yet during install, tests, or artisan bootstrap.
+        }
+
+        Event::listen(MessageSent::class, function (MessageSent $event): void {
+            try {
+                $message = $event->message;
+                $recipients = collect($message->getTo())
+                    ->map(fn ($address) => method_exists($address, 'getAddress') ? $address->getAddress() : (string) $address)
+                    ->implode(', ');
+
+                EmailLog::create([
+                    'recipient' => $recipients ?: 'unknown',
+                    'subject' => $message->getSubject(),
+                    'status' => 'sent',
+                    'sent_at' => now(),
+                    'meta' => ['message_id' => method_exists($message, 'getHeaders') ? optional($message->getHeaders()->get('Message-ID'))->getBodyAsString() : null],
+                ]);
+            } catch (\Throwable) {
+                //
+            }
+        });
+
         Paginator::useBootstrapFive();
         RateLimiter::for('contact-form', function (Request $request) {
             return Limit::perMinute(5)->by($request->ip());

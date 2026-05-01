@@ -29,7 +29,7 @@ class FacebookSettingsController extends Controller
             $selectedAppId = (int) ($apps->first()?->id ?? $this->resolveDefaultApp()?->id ?? 0);
         }
 
-        $accountQuery = FacebookAccount::with(['pages', 'app'])
+        $accountQuery = FacebookAccount::with(['pages.facebookAccount', 'app'])
             ->where('user_id', Auth::id());
 
         if ($selectedAppId > 0) {
@@ -42,7 +42,7 @@ class FacebookSettingsController extends Controller
             'apps' => $apps,
             'selectedAppId' => $selectedAppId,
             'account' => $account,
-            'pages' => $account?->pages ?? collect(),
+            'pages' => $account?->pages->sortByDesc('last_synced_at') ?? collect(),
         ]);
     }
 
@@ -154,15 +154,86 @@ class FacebookSettingsController extends Controller
         }
     }
 
+    public function refreshToken(Request $request): RedirectResponse
+    {
+        $appId = (int) $request->integer('app_id');
+
+        if ($appId <= 0) {
+            $appId = (int) ($this->resolveDefaultApp()?->id ?? 0);
+        }
+
+        $account = FacebookAccount::with('app')
+            ->where('user_id', Auth::id())
+            ->where('facebook_app_id', $appId)
+            ->first();
+
+        if (!$account) {
+            return back()->with('error', 'Connect Facebook first.');
+        }
+
+        try {
+            $tokenData = $this->facebookGraphService->refreshLongLivedToken($account);
+
+            $account->update([
+                'long_lived_user_token' => $tokenData['access_token'],
+                'token_expires_at' => now()->addSeconds($tokenData['expires_in']),
+                'token_last_refreshed_at' => now(),
+                'reauthorization_required' => false,
+                'reauthorization_reason' => null,
+            ]);
+
+            return back()->with('success', 'Facebook token refreshed successfully.');
+        } catch (ReauthorizationRequiredException $exception) {
+            $account->update([
+                'reauthorization_required' => true,
+                'reauthorization_reason' => $exception->getMessage(),
+            ]);
+
+            return back()->with('error', $exception->getMessage());
+        } catch (Throwable $exception) {
+            Log::error('Facebook token refresh failed', [
+                'facebook_account_id' => $account->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return back()->with('error', 'Unable to refresh Facebook token right now.');
+        }
+    }
+
+    public function pageDetails(FacebookPage $page)
+    {
+        $this->authorizeOwnedPage($page);
+
+        return view('admin.facebook.partials.page-details', [
+            'page' => $page->load(['facebookAccount.app']),
+        ]);
+    }
+
+    public function removePage(FacebookPage $page): RedirectResponse
+    {
+        $this->authorizeOwnedPage($page);
+
+        $pageName = $page->page_name;
+        $page->delete();
+
+        return back()->with('success', "{$pageName} was removed from synced pages.");
+    }
+
     public function activatePage(FacebookPage $page): RedirectResponse
     {
-        $account = FacebookAccount::where('id', $page->facebook_account_id)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $this->authorizeOwnedPage($page);
 
         $page->update(['is_active' => true]);
 
         return back()->with('success', 'Page marked as active.');
+    }
+
+    private function authorizeOwnedPage(FacebookPage $page): void
+    {
+        FacebookPage::query()
+            ->ownedBy(Auth::user())
+            ->whereKey($page->id)
+            ->firstOrFail();
     }
 
     private function resolveConnectApp(int $appId = 0): ?FacebookApp
