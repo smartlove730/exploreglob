@@ -25,25 +25,36 @@
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <h2 class="h5 mb-3">Recent Subscriptions</h2>
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead><tr><th>ID</th><th>User</th><th>Plan</th><th>Status</th><th>Usage</th><th>Period End</th></tr></thead>
-                <tbody>
-                @forelse($recentSubscriptions as $subscription)
-                    <tr>
-                        <td>#{{ $subscription->id }}</td>
-                        <td>{{ $subscription->user?->name }}<br><small class="text-muted">{{ $subscription->user?->email }}</small></td>
-                        <td>{{ $subscription->plan?->name ?? '—' }}</td>
-                        <td>{{ $subscription->status }}</td>
-                        <td>{{ $subscription->posts_used }}</td>
-                        <td>{{ optional($subscription->current_period_end)->format('Y-m-d') ?? '—' }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="6" class="text-muted">No subscriptions found.</td></tr>
-                @endforelse
-                </tbody>
-            </table>
-        </div>
+        <x-data-table class="table-sm">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Plan</th>
+                    <th>Status</th>
+                    <th>Usage</th>
+                    <th>Period End</th>
+                    <th>Created At</th>
+                    <th>Updated At</th>
+                </tr>
+            </thead>
+            <tbody>
+            @forelse($recentSubscriptions as $subscription)
+                <tr>
+                    <td>#{{ $subscription->id }}</td>
+                    <td>{{ $subscription->user?->name }}<br><small class="text-muted">{{ $subscription->user?->email }}</small></td>
+                    <td>{{ $subscription->plan?->name ?? '-' }}</td>
+                    <td>{{ $subscription->status }}</td>
+                    <td>{{ $subscription->posts_used }}</td>
+                    <td>{{ optional($subscription->current_period_end)->format('Y-m-d') ?? '-' }}</td>
+                    <td>{{ optional($subscription->created_at)->format('Y-m-d H:i') }}</td>
+                    <td>{{ optional($subscription->updated_at)->format('Y-m-d H:i') }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="8" class="text-muted">No subscriptions found.</td></tr>
+            @endforelse
+            </tbody>
+        </x-data-table>
     </div>
 </div>
 @endsection

@@ -10,10 +10,9 @@
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped align-middle">
+        <x-data-table class="table-striped" no-export="6">
                 <thead>
-                    <tr><th>ID</th><th>Name</th><th>Status</th><th class="text-end">Actions</th></tr>
+                    <tr><th>ID</th><th>Name</th><th>Status</th><th>Created At</th><th>Updated At</th><th>Read</th><th class="text-end no-export">Actions</th></tr>
                 </thead>
                 <tbody>
                     @forelse($categories as $c)
@@ -21,19 +20,21 @@
                             <td>{{ $c->id }}</td>
                             <td>{{ $c->name }}</td>
                             <td>{{ $c->status ? 'Active' : 'Inactive' }}</td>
-                            <td class="text-end">
+                            <td>{{ optional($c->created_at)->format('Y-m-d H:i') }}</td>
+                            <td>{{ optional($c->updated_at)->format('Y-m-d H:i') }}</td>
+                            <td><a href="{{ route('travel.category', $c->slug) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">View</a></td>
+                            <td class="text-end no-export">
                                 <button class="btn btn-sm btn-primary" data-modal-url="{{ route('admin.categories.editModal', $c) }}">Edit</button>
                                 <form action="{{ route('admin.categories.destroy', $c) }}" method="POST" class="d-inline">@csrf @method('DELETE')<button class="btn btn-sm btn-danger" onclick="return confirm('Delete this category?')">Delete</button></form>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="text-center text-muted">No categories found.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted">No categories found.</td></tr>
                     @endforelse
                 </tbody>
-            </table>
-        </div>
+        </x-data-table>
 
-        {{ $categories->links() }}
+        <div class="mt-3">{{ $categories->links() }}</div>
     </div>
 </div>
 @endsection

@@ -52,24 +52,28 @@
                 @if($pages->isEmpty())
                     <p class="text-muted mb-0">No pages available yet. Select app, connect, and sync.</p>
                 @else
-                    <div class="table-responsive">
-                        <table class="table align-middle">
+                    <x-data-table>
                             <thead>
                                 <tr>
+                                    <th>ID</th>
                                     <th>Page</th>
                                     <th>Status</th>
+                                    <th>Created At</th>
+                                    <th>Updated At</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($pages as $page)
                                     <tr>
+                                        <td>{{ $page->id }}</td>
                                         <td>{{ $page->page_name }}<br><small class="text-muted">ID: {{ $page->page_id }}</small></td>
                                         <td><span class="badge text-bg-success">Active</span></td>
+                                        <td>{{ optional($page->created_at)->format('Y-m-d H:i') }}</td>
+                                        <td>{{ optional($page->updated_at)->format('Y-m-d H:i') }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
-                        </table>
-                    </div>
+                    </x-data-table>
                     <p class="small text-muted mb-0">All synced pages are marked active and available for posting.</p>
                 @endif
             </div>

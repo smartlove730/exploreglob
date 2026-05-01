@@ -10,20 +10,23 @@
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
-        <div class="table-responsive">
-            <table class="table align-middle">
+        <x-data-table no-export="7">
                 <thead>
                     <tr>
+                        <th>ID</th>
                         <th>Name</th>
                         <th>App ID</th>
                         <th>Redirect URI</th>
                         <th>Status</th>
-                        <th class="text-end">Actions</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                        <th class="text-end no-export">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($apps as $app)
                         <tr>
+                            <td>{{ $app->id }}</td>
                             <td>{{ $app->name }}</td>
                             <td><code>{{ $app->app_id }}</code></td>
                             <td><small>{{ $app->redirect_uri }}</small></td>
@@ -32,7 +35,9 @@
                                     {{ $app->is_active ? 'Active' : 'Inactive' }}
                                 </span>
                             </td>
-                            <td class="text-end">
+                            <td>{{ optional($app->created_at)->format('Y-m-d H:i') }}</td>
+                            <td>{{ optional($app->updated_at)->format('Y-m-d H:i') }}</td>
+                            <td class="text-end no-export">
                                 <a href="{{ route('admin.facebook.apps.edit', $app) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                 <form action="{{ route('admin.facebook.apps.destroy', $app) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this app?')">
                                     @csrf
@@ -42,13 +47,12 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-muted text-center">No Facebook apps found.</td></tr>
+                        <tr><td colspan="8" class="text-muted text-center">No Facebook apps found.</td></tr>
                     @endforelse
                 </tbody>
-            </table>
-        </div>
+        </x-data-table>
 
-        {{ $apps->links() }}
+        <div class="mt-3">{{ $apps->links() }}</div>
     </div>
 </div>
 @endsection

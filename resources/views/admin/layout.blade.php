@@ -6,6 +6,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Control Panel - @yield('title', 'Dashboard')</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet">
     @vite(['resources/css/app.css'])
     <style>
         body { background-color: #f8fafc; }
@@ -18,7 +21,15 @@
         .admin-sidebar-nav {
             min-height: 0;
         }
+        .dataTables_wrapper .dt-buttons .btn {
+            margin-right: .35rem;
+            margin-bottom: .5rem;
+        }
+        table.dataTable > tbody > tr.child ul.dtr-details {
+            width: 100%;
+        }
     </style>
+    @stack('styles')
 </head>
 <body>
 @php
@@ -98,6 +109,57 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    if (!window.jQuery?.fn?.DataTable) return;
+
+    window.jQuery('table.data-table').each(function () {
+        const table = window.jQuery(this);
+        if (window.jQuery.fn.DataTable.isDataTable(this)) return;
+        const firstBodyRow = table.find('tbody tr:first');
+        if (firstBodyRow.length && firstBodyRow.children('td,th').length === 1 && firstBodyRow.children('[colspan]').length) {
+            return;
+        }
+
+        const noExport = String(table.data('no-export') || '')
+            .split(',')
+            .map(value => Number(value.trim()))
+            .filter(Number.isInteger);
+        const order = table.data('order') || [[0, 'desc']];
+
+        table.DataTable({
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+            order,
+            responsive: true,
+            dom: "<'row g-2 align-items-center mb-2'<'col-md-6'B><'col-md-6'f>>" +
+                "<'row'<'col-12'tr>>" +
+                "<'row g-2 align-items-center mt-2'<'col-md-5'i><'col-md-7'p>>",
+            buttons: [
+                { extend: 'copy', className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible:not(.no-export)' } },
+                { extend: 'csv', className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible:not(.no-export)' } },
+                { extend: 'excel', className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible:not(.no-export)' } },
+                { extend: 'print', className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible:not(.no-export)' } },
+            ],
+            columnDefs: noExport.length ? [{ targets: noExport, orderable: false, searchable: false, className: 'no-export' }] : [],
+            language: {
+                search: '',
+                searchPlaceholder: 'Search table...',
+            },
+        });
+    });
+});
+</script>
 <script>
 document.addEventListener('click', async (e) => {
     const trigger = e.target.closest('[data-modal-url]');

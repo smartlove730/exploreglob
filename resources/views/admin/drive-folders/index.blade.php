@@ -23,29 +23,32 @@
             <button type="submit" class="btn btn-outline-primary">Apply</button>
         </form>
 
-        <div class="table-responsive">
-            <table class="table align-middle" id="driveFoldersTable">
+        <x-data-table id="driveFoldersTable" no-export="0,8">
                 <thead>
                     <tr>
-                        <th><input type="checkbox" id="select-all-folders"></th>
+                        <th class="no-export"><input type="checkbox" id="select-all-folders"></th>
                         <th>ID</th>
                         <th>Name</th>
                         <th>From Account</th>
                         <th>Connected Time</th>
                         <th>Status</th>
-                        <th class="text-end">Actions</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                        <th class="text-end no-export">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($folders as $folder)
                         <tr>
-                            <td><input type="checkbox" class="folder-select" name="folder_ids[]" value="{{ $folder->id }}" form="bulk-status-form"></td>
+                            <td class="no-export"><input type="checkbox" class="folder-select" name="folder_ids[]" value="{{ $folder->id }}" form="bulk-status-form"></td>
                             <td>{{ $folder->id }}</td>
                             <td>{{ $folder->name }}</td>
                             <td>{{ $folder->driveApiKey?->name ?? '-' }}</td>
                             <td>{{ optional($folder->created_at)->format('Y-m-d H:i') }}</td>
                             <td><span class="badge text-bg-{{ $folder->is_active ? 'success' : 'secondary' }}">{{ $folder->is_active ? 'Active' : 'Inactive' }}</span></td>
-                            <td class="text-end">
+                            <td>{{ optional($folder->created_at)->format('Y-m-d H:i') }}</td>
+                            <td>{{ optional($folder->updated_at)->format('Y-m-d H:i') }}</td>
+                            <td class="text-end no-export">
                                 <a href="{{ route('admin.facebook.drive-folders.edit', $folder) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                 <form action="{{ route('admin.facebook.drive-folders.destroy', $folder) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this folder?')">
                                     @csrf
@@ -55,33 +58,18 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-center text-muted">No saved folders found.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted">No saved folders found.</td></tr>
                     @endforelse
                 </tbody>
-            </table>
-        </div>
+        </x-data-table>
 
     </div>
 </div>
 @endsection
 
-@push('styles')
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" />
-@endpush
-
 @push('scripts')
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.jQuery?.fn?.DataTable) {
-        window.jQuery('#driveFoldersTable').DataTable({
-            pageLength: 25,
-            order: [[1, 'desc']],
-            columnDefs: [{ targets: [0, 6], orderable: false }],
-        });
-    }
-
     const selectAll = document.getElementById('select-all-folders');
     selectAll?.addEventListener('change', () => {
         document.querySelectorAll('.folder-select').forEach((checkbox) => {

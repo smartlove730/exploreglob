@@ -130,6 +130,8 @@ class SocialPostManagerController extends Controller
                 'content' => $post->content,
                 'media_preview_url' => $post->media_preview_url,
                 'created_time' => optional($post->external_created_at)->toDateTimeString(),
+                'created_at' => optional($post->created_at)->toDateTimeString(),
+                'updated_at' => optional($post->updated_at)->toDateTimeString(),
             ])->values(),
         ]);
     }

@@ -6,6 +6,9 @@
     <title>Content Calendar</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet">
     <style>
         body { background: #f7f8fb; }
         .calendar-wrap { max-width: 1100px; margin: 24px auto; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
@@ -61,8 +64,8 @@
             <div class="card-body">
                 <h6 class="mb-2">Recent CSV imports</h6>
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead><tr><th>ID</th><th>Status</th><th>Rows</th><th>Success</th><th>Failed</th><th>Errors</th><th>Updated</th></tr></thead>
+                    <table class="table table-sm align-middle mb-0 data-table">
+                        <thead><tr><th>ID</th><th>Status</th><th>Rows</th><th>Success</th><th>Failed</th><th>Errors</th><th>Created At</th><th>Updated At</th></tr></thead>
                         <tbody>
                         @foreach($imports as $import)
                             <tr>
@@ -78,7 +81,8 @@
                                         —
                                     @endif
                                 </td>
-                                <td>{{ optional($import->updated_at)->diffForHumans() }}</td>
+                                <td>{{ optional($import->created_at)->format('Y-m-d H:i') }}</td>
+                                <td>{{ optional($import->updated_at)->format('Y-m-d H:i') }}</td>
                             </tr>
                         @endforeach
                         </tbody>
@@ -121,7 +125,35 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.jQuery?.fn?.DataTable) {
+        const table = window.jQuery('table.data-table');
+        const firstBodyRow = table.find('tbody tr:first');
+        if (firstBodyRow.length && firstBodyRow.children('td,th').length === 1 && firstBodyRow.children('[colspan]').length) return;
+
+        table.DataTable({
+            pageLength: 10,
+            order: [[0, 'desc']],
+            responsive: true,
+            dom: "<'row g-2 align-items-center mb-2'<'col-md-6'B><'col-md-6'f>>" +
+                "<'row'<'col-12'tr>>" +
+                "<'row g-2 align-items-center mt-2'<'col-md-5'i><'col-md-7'p>>",
+            buttons: ['copy', 'csv', 'excel', 'print'],
+        });
+    }
+});
+
 const statusColors = { pending:'#0d6efd', processing:'#fd7e14', published:'#198754', failed:'#dc3545', cancelled:'#6c757d' };
 const editModal = new bootstrap.Modal(document.getElementById('editModal'));
 const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {

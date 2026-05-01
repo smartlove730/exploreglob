@@ -56,21 +56,24 @@
         <div id="alerts" class="mb-2"></div>
 
         <div class="table-responsive">
-            <table class="table table-hover align-middle" id="postsTable">
+            <table class="table table-hover align-middle data-table" id="postsTable" data-no-export="0,10">
                 <thead>
                     <tr>
-                        <th><input type="checkbox" id="selectAllPosts"></th>
+                        <th class="no-export"><input type="checkbox" id="selectAllPosts"></th>
+                        <th>ID</th>
                         <th>Post ID</th>
                         <th>Platform</th>
                         <th>Page Name</th>
                         <th>Content</th>
                         <th>Created</th>
+                        <th>Synced At</th>
+                        <th>Updated At</th>
                         <th>Status</th>
-                        <th>Actions</th>
+                        <th class="no-export">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="postsTableBody">
-                    <tr><td colspan="8" class="text-center text-muted">Sync and load posts to start managing them.</td></tr>
+                    <tr><td colspan="11" class="text-center text-muted">Sync and load posts to start managing them.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -79,10 +82,6 @@
 @endsection
 
 @push('scripts')
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" />
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -129,10 +128,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         dataTable = window.jQuery('#postsTable').DataTable({
-            order: [[5, 'desc']],
+            order: [[6, 'desc']],
             pageLength: 25,
+            responsive: true,
+            dom: "<'row g-2 align-items-center mb-2'<'col-md-6'B><'col-md-6'f>>" +
+                "<'row'<'col-12'tr>>" +
+                "<'row g-2 align-items-center mt-2'<'col-md-5'i><'col-md-7'p>>",
+            buttons: [
+                { extend: 'copy', className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible:not(.no-export)' } },
+                { extend: 'csv', className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible:not(.no-export)' } },
+                { extend: 'excel', className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible:not(.no-export)' } },
+                { extend: 'print', className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible:not(.no-export)' } },
+            ],
             columnDefs: [
-                { orderable: false, targets: [0, 6, 7] },
+                { orderable: false, searchable: false, className: 'no-export', targets: [0, 10] },
+                { orderable: false, targets: [9] },
             ],
         });
     };
@@ -144,21 +154,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataTable = null;
             }
 
-            tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No posts found in database.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No posts found in database.</td></tr>';
             return;
         }
 
         tableBody.innerHTML = posts.map((post) => `
             <tr data-post-id="${post.id}">
-                <td><input type="checkbox" class="post-checkbox" value="${post.id}"></td>
+                <td class="no-export"><input type="checkbox" class="post-checkbox" value="${post.id}"></td>
+                <td>${post.id}</td>
                 <td class="small">${post.external_post_id}</td>
                 <td><span class="badge text-bg-info text-capitalize">${post.platform}</span></td>
                 <td>${post.page_name || '-'}</td>
-                <td>
+                <td class="no-export">
                     ${post.content ? `<div>${post.content.substring(0, 120)}</div>` : '<span class="text-muted">No text</span>'}
                     ${post.media_preview_url ? `<div class="mt-1"><img src="${post.media_preview_url}" alt="preview" style="max-width:70px; max-height:70px; border-radius:6px;"></div>` : ''}
                 </td>
                 <td>${post.created_time || '-'}</td>
+                <td>${post.created_at || '-'}</td>
+                <td>${post.updated_at || '-'}</td>
                 <td class="deletion-status">${statusLabel('none')}</td>
                 <td>
                     <button class="btn btn-sm btn-outline-danger single-delete-btn" data-post-id="${post.id}">Delete</button>

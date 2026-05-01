@@ -29,10 +29,10 @@
             for manual production runs.
         </p>
         @endif
-        <div class="table-responsive">
-            <table class="table align-middle">
+        <x-data-table no-export="11">
                 <thead>
                     <tr>
+                        <th>ID</th>
                         <th>Name</th>
                         <th>App / Page</th>
                         <th>Google Account</th>
@@ -41,12 +41,15 @@
                         <th>Daily Limit</th>
                         <th>Last Run</th>
                         <th>Status</th>
-                        <th class="text-end">Actions</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                        <th class="text-end no-export">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse($configs as $config)
                     <tr>
+                        <td>{{ $config->id }}</td>
                         <td>{{ $config->name ?: 'Automation #'.$config->id }}</td>
                         <td>
                             <div>{{ $config->app?->name ?? '-' }}</div>
@@ -62,7 +65,9 @@
                         <td>{{ $config->post_limit_per_day }}</td>
                         <td>{{ $config->last_run_at?->diffForHumans() ?? 'Never' }}</td>
                         <td><span class="badge text-bg-{{ $config->is_active ? 'success' : 'secondary' }}">{{ $config->is_active ? 'Active' : 'Inactive' }}</span></td>
-                        <td class="text-end">
+                        <td>{{ optional($config->created_at)->format('Y-m-d H:i') }}</td>
+                        <td>{{ optional($config->updated_at)->format('Y-m-d H:i') }}</td>
+                        <td class="text-end no-export">
                             <form action="{{ route('admin.automations.toggle', $config) }}" method="POST" class="d-inline">
                                 @csrf
                                 <button class="btn btn-sm btn-outline-warning">{{ $config->is_active ? 'Pause' : 'Activate' }}</button>
@@ -76,13 +81,12 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="text-center text-muted">No automation configs found.</td></tr>
+                    <tr><td colspan="12" class="text-center text-muted">No automation configs found.</td></tr>
                 @endforelse
                 </tbody>
-            </table>
-        </div>
+        </x-data-table>
 
-        {{ $configs->links() }}
+        <div class="mt-3">{{ $configs->links() }}</div>
     </div>
 </div>
 
@@ -102,13 +106,13 @@
                 </form>
             </div>
         </div>
-        <div class="table-responsive">
-            <table class="table align-middle">
+        <x-data-table no-export="0,11">
                 <thead>
                     <tr>
-                        <th style="width: 36px;">
+                        <th class="no-export" style="width: 36px;">
                             <input type="checkbox" id="executions-select-all" aria-label="Select all executions">
                         </th>
+                        <th>ID</th>
                         <th>Automation</th>
                         <th>Page</th>
                         <th>Execution Time</th>
@@ -116,13 +120,15 @@
                         <th>Caption</th>
                         <th>Image</th>
                         <th>Details</th>
-                        <th class="text-end">Actions</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                        <th class="text-end no-export">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($inProgressLogs as $log)
                         <tr>
-                            <td>
+                            <td class="no-export">
                                 <input
                                     type="checkbox"
                                     class="execution-checkbox"
@@ -131,6 +137,7 @@
                                     aria-label="Select execution {{ $log->id }}"
                                 >
                             </td>
+                            <td>{{ $log->id }}</td>
                             <td>{{ $log->automationConfig?->name ?: 'Automation #'.$log->automation_config_id }}</td>
                             <td>{{ $log->page?->page_name ?? '-' }}</td>
                             <td>{{ $log->scheduled_for?->toDateTimeString() ?? $log->created_at?->toDateTimeString() }}</td>
@@ -144,7 +151,9 @@
                                 @endif
                             </td>
                             <td class="small text-muted">{{ $log->message ?? '-' }}</td>
-                            <td class="text-end">
+                            <td>{{ optional($log->created_at)->format('Y-m-d H:i') }}</td>
+                            <td>{{ optional($log->updated_at)->format('Y-m-d H:i') }}</td>
+                            <td class="text-end no-export">
                                 @if($log->status === 'scheduled')
                                     <form action="{{ route('admin.automations.executions.run-now', $log) }}" method="POST" class="d-inline">
                                         @csrf
@@ -160,12 +169,11 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center text-muted">No scheduled or in-progress automations.</td>
+                            <td colspan="12" class="text-center text-muted">No scheduled or in-progress automations.</td>
                         </tr>
                     @endforelse
                 </tbody>
-            </table>
-        </div>
+        </x-data-table>
     </div>
 </div>
 

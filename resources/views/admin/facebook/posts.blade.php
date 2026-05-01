@@ -84,12 +84,13 @@
         </form>
 
         <div class="table-responsive">
-            <table class="table align-middle table-hover" id="postHistoryTable">
+            <table class="table align-middle table-hover data-table" id="postHistoryTable" data-no-export="0,12">
                 <thead>
                     <tr>
-                        <th>
+                        <th class="no-export">
                             <input type="checkbox" id="selectAllPosts" aria-label="Select all posts">
                         </th>
+                        <th>ID</th>
                         <th>App</th>
                         <th>Page</th>
                         <th>Message</th>
@@ -98,15 +99,18 @@
                         <th>Images</th>
                         <th>Status</th>
                         <th>Posted</th>
-                        <th>Actions</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                        <th class="no-export">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($posts as $post)
                         <tr id="post-row-{{ $post->id }}" data-post-id="{{ $post->id }}">
-                            <td>
+                            <td class="no-export">
                                 <input type="checkbox" class="post-checkbox" data-status="{{ $post->status }}" value="{{ $post->id }}" aria-label="Select post {{ $post->id }}">
                             </td>
+                            <td>{{ $post->id }}</td>
                             <td>{{ $post->page?->facebookAccount?->app?->name ?? '-' }}</td>
                             <td>{{ $post->page?->page_name }}</td>
                             <td>{{ \Illuminate\Support\Str::limit($post->message, 100) }}</td>
@@ -133,7 +137,9 @@
                             <td>{{ $post->images->count() }}</td>
                             <td><span class="badge text-bg-{{ $post->status === 'published' ? 'success' : 'secondary' }}">{{ ucfirst($post->status) }}</span></td>
                             <td>{{ optional($post->posted_at)->format('M d, Y H:i') ?? '-' }}</td>
-                            <td class="d-flex gap-1">
+                            <td>{{ optional($post->created_at)->format('Y-m-d H:i') }}</td>
+                            <td>{{ optional($post->updated_at)->format('Y-m-d H:i') }}</td>
+                            <td class="d-flex gap-1 no-export">
                                 @if($post->status !== 'published')
                                     <form method="POST" action="{{ route('admin.posts.execute-now', $post->id) }}" class="d-inline">
                                         @csrf
@@ -232,7 +238,7 @@
                             </div>
                         </div>
                     @empty
-                        <tr><td colspan="10" class="text-center text-muted">No posts yet.</td></tr>
+                        <tr><td colspan="13" class="text-center text-muted">No posts yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
