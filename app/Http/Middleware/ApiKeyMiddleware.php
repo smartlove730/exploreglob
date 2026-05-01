@@ -15,7 +15,7 @@ class ApiKeyMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $apiKey = $request->header('X-API-Key') ?? $request->input('api_key');
+        $apiKey = (string) $request->header('X-API-Key', '');
         $validApiKey = config('app.api_key') ?? env('API_KEY');
 
         if (!$validApiKey) {
@@ -25,7 +25,7 @@ class ApiKeyMiddleware
             ], 500);
         }
 
-        if (!$apiKey || $apiKey !== $validApiKey) {
+        if ($apiKey === '' || !hash_equals((string) $validApiKey, $apiKey)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or missing API key'

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\DeletePostJob;
 use App\Jobs\PublishPostJob;
 use App\Models\DriveApiKey;
 use App\Models\DriveFolder;
@@ -312,7 +313,7 @@ class PostController extends Controller
             'last_error' => null,
         ])->save();
 
-        $this->dispatchDeletePostClosure($post->id);
+        $this->dispatchDeletePostJob($post->id);
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -355,7 +356,7 @@ class PostController extends Controller
                 'last_error' => null,
             ])->save();
 
-            $this->dispatchDeletePostClosure($post->id);
+            $this->dispatchDeletePostJob($post->id);
 
             $accepted[] = $post->id;
         }
@@ -381,89 +382,9 @@ class PostController extends Controller
         return redirect()->route('admin.posts.index')->with('error', 'Deletion is already queued for this post.');
     }
 
-    private function dispatchDeletePostClosure(int $postId): void
+    private function dispatchDeletePostJob(int $postId): void
     {
-        dispatch(function () use ($postId) {
-            $post = \App\Models\FacebookPost::query()->with('page.facebookAccount')->find($postId);
-
-            if (!$post || !$post->page) {
-                return;
-            }
-
-            if ($post->deletion_status === \App\Models\FacebookPost::DELETION_STATUS_SUCCESS || $post->deleted_at !== null) {
-                return;
-            }
-
-            $post->forceFill([
-                'deletion_status' => \App\Models\FacebookPost::DELETION_STATUS_PENDING,
-                'last_error' => null,
-            ])->save();
-
-            $isMissingObjectError = static function (string $message): bool {
-                $normalized = mb_strtolower($message);
-
-                return str_contains($normalized, 'does not exist')
-                    || str_contains($normalized, 'unknown object')
-                    || str_contains($normalized, 'cannot be loaded due to missing permissions')
-                    || str_contains($normalized, 'unsupported delete request');
-            };
-
-            $result = [
-                'facebook' => ['status' => 'skipped', 'reason' => 'missing_facebook_post_id'],
-                'instagram' => ['status' => 'skipped', 'reason' => 'missing_instagram_media_id'],
-            ];
-
-            $metaPostService = app(\App\Services\MetaPostService::class);
-
-            if ($post->facebook_post_id) {
-                try {
-                    $metaPostService->deleteFacebookPost($post->page, $post->facebook_post_id);
-                    $result['facebook'] = ['status' => 'success'];
-                } catch (\Throwable $exception) {
-                    $result['facebook'] = $isMissingObjectError($exception->getMessage())
-                        ? ['status' => 'success', 'reason' => 'already_deleted']
-                        : ['status' => 'failed', 'error' => $exception->getMessage()];
-                }
-            }
-
-            if ($post->instagram_media_id) {
-                try {
-                    $metaPostService->deleteInstagramMedia($post->page, $post->instagram_media_id);
-                    $result['instagram'] = ['status' => 'success'];
-                } catch (\Throwable $exception) {
-                    $result['instagram'] = $isMissingObjectError($exception->getMessage())
-                        ? ['status' => 'success', 'reason' => 'already_deleted']
-                        : ['status' => 'failed', 'error' => $exception->getMessage()];
-                }
-            }
-
-            $responses = is_array($post->response_json) ? $post->response_json : [];
-            $responses['deletion'] = $result;
-
-            $hasFailure = collect($result)->contains(fn (array $platformResult) => $platformResult['status'] === 'failed');
-
-            if ($hasFailure) {
-                $post->forceFill([
-                    'deletion_status' => \App\Models\FacebookPost::DELETION_STATUS_FAILED,
-                    'last_error' => collect($result)->pluck('error')->filter()->implode(' | ') ?: 'One or more delete requests failed.',
-                    'response_json' => $responses,
-                ])->save();
-
-                \Illuminate\Support\Facades\Log::error('Queued closure post deletion failed', [
-                    'facebook_post_id' => $postId,
-                    'result' => $result,
-                ]);
-
-                return;
-            }
-
-            $post->forceFill([
-                'deletion_status' => \App\Models\FacebookPost::DELETION_STATUS_SUCCESS,
-                'deleted_at' => now(),
-                'last_error' => null,
-                'response_json' => $responses,
-            ])->save();
-        })->onQueue('default');
+        DeletePostJob::dispatch($postId)->onQueue('default');
     }
 
     public function fetchDriveImages(Request $request): JsonResponse

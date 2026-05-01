@@ -21,6 +21,10 @@ class FacebookAccount extends Model
         'reauthorization_reason',
     ];
 
+    protected $hidden = [
+        'long_lived_user_token',
+    ];
+
     protected $casts = [
         'token_expires_at' => 'datetime',
         'token_last_refreshed_at' => 'datetime',

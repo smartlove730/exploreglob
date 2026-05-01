@@ -182,7 +182,7 @@ class GoogleService
         }
 
         if (!$driveApiKey->oauth_refresh_token) {
-            throw new RuntimeException('Google Drive OAuth token is missing. Connect a Google account from Drive Keys.');
+            throw new RuntimeException('Google Drive OAuth token is missing. Connect a Google account from Connect Google Accounts.');
         }
 
         try {
@@ -191,9 +191,9 @@ class GoogleService
             if ($this->isInvalidGrant($exception)) {
                 $driveApiKey->update([
                     'oauth_reauthorization_required' => true,
-                    'oauth_reauthorization_reason' => 'Google Drive authorization expired. Reconnect Google from Drive Keys.',
+                    'oauth_reauthorization_reason' => 'Google Drive authorization expired. Reconnect Google from Connect Google Accounts.',
                 ]);
-                throw new ReauthorizationRequiredException('Google Drive authorization expired. Reconnect Google from Drive Keys.');
+                throw new ReauthorizationRequiredException('Google Drive authorization expired. Reconnect Google from Connect Google Accounts.');
             }
 
             throw $exception;

@@ -22,6 +22,10 @@ class FacebookPage extends Model
         'is_active',
     ];
 
+    protected $hidden = [
+        'page_access_token',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
     ];

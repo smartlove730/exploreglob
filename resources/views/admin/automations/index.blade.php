@@ -24,9 +24,9 @@
     <div class="card-body">
         @if($isAdmin)
         <p class="small text-muted">
-            Run all for one user: <code>{{ url('/run-automations/{userId}') }}</code> |
-            Run one config for one user: <code>{{ url('/run-automations/{userId}/{id}') }}</code> |
-            Force run (ignore schedule/limit): <code>{{ url('/run-automations/{userId}/{id}?force=1') }}</code>
+            Automation runs are POST-only for CSRF protection. Use the Artisan command
+            <code>php artisan automations:run {userId} {automationConfigId?} --force</code>
+            for manual production runs.
         </p>
         @endif
         <div class="table-responsive">
@@ -35,7 +35,7 @@
                     <tr>
                         <th>Name</th>
                         <th>App / Page</th>
-                        <th>Drive Key</th>
+                        <th>Google Account</th>
                         <th>Platforms</th>
                         <th>Runs/Day</th>
                         <th>Daily Limit</th>

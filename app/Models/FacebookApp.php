@@ -20,6 +20,10 @@ class FacebookApp extends Model
         'is_active',
     ];
 
+    protected $hidden = [
+        'app_secret',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
     ];

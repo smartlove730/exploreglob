@@ -69,7 +69,7 @@ class ContentCalendarController extends Controller
         $events = $query->orderBy('scheduled_for')->get()->map(function (ScheduledPost $post) {
             return [
                 'id' => $post->id,
-                'title' => mb_strimwidth($post->message, 0, 50, '…'),
+                'title' => mb_strimwidth($post->message, 0, 50, '...'),
                 'start' => optional($post->scheduled_for)->toIso8601String(),
                 'allDay' => false,
                 'extendedProps' => [

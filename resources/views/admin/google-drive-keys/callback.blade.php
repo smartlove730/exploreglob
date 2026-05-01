@@ -1,11 +1,11 @@
 @extends('admin.layout')
 
-@section('title', 'Google Drive Callback')
+@section('title', 'Google Account Callback')
 
 @section('content')
 <div class="card border-0 shadow-sm">
     <div class="card-body">
-        <h1 class="h4 mb-3">Google Drive Callback</h1>
+        <h1 class="h4 mb-3">Google Account Callback</h1>
 
         @if($error)
             <div class="alert alert-danger">Google returned an error: {{ $error }}</div>

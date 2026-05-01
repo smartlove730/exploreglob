@@ -17,6 +17,7 @@ class MetaVideoServiceTest extends TestCase
             'https://cdn.example.com/*' => Http::sequence()
                 ->push('', 200, ['Content-Type' => 'video/mp4'])
                 ->push(['id' => 'video_123'], 200),
+            'https://graph.facebook.com/*' => Http::response(['id' => 'video_123'], 200),
         ]);
 
         $service = new MetaVideoService($this->createMock(InstagramService::class));

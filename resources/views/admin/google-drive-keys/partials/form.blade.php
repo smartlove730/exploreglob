@@ -9,9 +9,9 @@
 </div>
 
 <div class="mb-3">
-    <label class="form-label">Drive API Key</label>
+    <label class="form-label">Google Drive API Key</label>
     <input type="text" name="api_key" class="form-control" value="{{ old('api_key', $isEdit ? $driveKey->api_key : '') }}">
-    <small class="text-muted">Optional when using OAuth connect flow.</small>
+    <small class="text-muted">Optional when using the recommended OAuth account connection.</small>
 </div>
 
 <div class="mb-3">
@@ -32,8 +32,8 @@
 
 <div class="form-check mb-3">
     <input class="form-check-input" type="checkbox" name="is_active" value="1" id="driveKeyActive" @checked(old('is_active', $isEdit ? $driveKey->is_active : true))>
-    <label class="form-check-label" for="driveKeyActive">Active</label>
+    <label class="form-check-label" for="driveKeyActive">Connection active</label>
 </div>
 
-<button class="btn btn-primary">{{ $isEdit ? 'Update Key' : 'Create Key' }}</button>
+<button class="btn btn-primary">{{ $isEdit ? 'Update Connection' : 'Create Connection' }}</button>
 <a href="{{ route('admin.facebook.google-drive-keys.index') }}" class="btn btn-outline-secondary">Cancel</a>

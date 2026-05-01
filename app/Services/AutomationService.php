@@ -125,7 +125,7 @@ class AutomationService
 
             try {
             if (!$config->driveApiKey || !$config->driveApiKey->is_active) {
-                $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), 'No active Google Drive key selected.', $automationLogId);
+                $this->logFailed($config, null, $this->normalizePlatforms($config->platforms), 'No active Google account connection selected.', $automationLogId);
 
                 return;
             }

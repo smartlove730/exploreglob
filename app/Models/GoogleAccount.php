@@ -22,6 +22,11 @@ class GoogleAccount extends Model
         'reauthorization_reason',
     ];
 
+    protected $hidden = [
+        'access_token',
+        'refresh_token',
+    ];
+
     protected $casts = [
         'expires_at' => 'datetime',
         'token_last_refreshed_at' => 'datetime',

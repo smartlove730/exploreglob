@@ -14,7 +14,7 @@
         <p class="text-muted mb-3">Paste a shared Google Drive folder URL, fetch images/videos, preview them, then post one or many with generated captions.</p>
         @if($driveApiKeys->isEmpty())
             <div class="alert alert-warning">
-                No connected Google Drive account found. <a href="{{ route('admin.google-drive.connect') }}">Connect via OAuth</a> (recommended) or <a href="{{ route('admin.facebook.google-drive-keys.create') }}">add manually</a>.
+                No connected Google account found. <a href="{{ route('admin.google-drive.connect') }}">Connect via OAuth</a> (recommended) or <a href="{{ route('admin.facebook.google-drive-keys.create') }}">add an API key manually</a>.
             </div>
         @endif
 

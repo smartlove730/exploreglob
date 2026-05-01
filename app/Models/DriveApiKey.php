@@ -26,6 +26,12 @@ class DriveApiKey extends Model
         'oauth_reauthorization_reason',
     ];
 
+    protected $hidden = [
+        'api_key',
+        'oauth_access_token',
+        'oauth_refresh_token',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
         'oauth_expires_at' => 'datetime',

@@ -6,6 +6,7 @@ use App\Http\Controllers\App\BillingController;
 use App\Http\Controllers\App\ContentCalendarController;
 use App\Http\Controllers\App\MediaLibraryController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\AutomationConfigController;
 use App\Http\Controllers\Admin\AutomationFailedPostController;
 use App\Http\Controllers\Admin\BlogController as AdminBlogController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Admin\ScheduledPostController;
 use App\Http\Controllers\Admin\SocialPostManagerController;
 use App\Http\Controllers\AutomationController;
 use App\Http\Controllers\MarketingController;
+use App\Http\Controllers\RedirectController;
 
 use App\Http\Controllers\{
     HomeController,
@@ -45,15 +47,13 @@ Route::get('/explore', [HomeController::class, 'index'])->name('home');
 Route::get('/home/categories/load', [HomeController::class, 'loadCategories'])->name('home.categories.load');
 Route::get('/search', [HomeController::class, 'search'])->name('home.search');
 
-Route::middleware(['auth', 'verified'])->get('/dashboard', function () {
-    return redirect()->route('admin.dashboard');
-})->name('dashboard');
+Route::middleware(['auth', 'verified'])->get('/dashboard', [RedirectController::class, 'dashboard'])->name('dashboard');
 
 Route::prefix('app')
     ->name('app.')
     ->middleware(['auth', 'verified', 'role:customer,admin'])
     ->group(function () {
-        Route::get('/', fn () => redirect()->route('admin.dashboard'))->name('dashboard');
+        Route::get('/', [RedirectController::class, 'appDashboard'])->name('dashboard');
 
         Route::get('/billing/plans', [BillingController::class, 'index'])->name('billing.plans');
         Route::post('/billing/subscribe', [BillingController::class, 'startCheckout'])->middleware('throttle:billing-checkout')->name('billing.subscribe');
@@ -84,12 +84,8 @@ Route::get('/country/{code}', [CountryController::class, 'setCountry'])->name('c
 // Categories
 Route::get('/travel', [CategoryController::class, 'index'])->name('travel.index');
 Route::get('/travel/{subcategory}', [CategoryController::class, 'show'])->name('travel.category');
-Route::get('/categories', function () {
-    return redirect('/travel', 301);
-})->name('categories.index');
-Route::get('/category/{slug}', function ($slug) {
-    return redirect('/travel/' . $slug, 301);
-})->name('category.show');
+Route::get('/categories', [RedirectController::class, 'categories'])->name('categories.index');
+Route::get('/category/{slug}', [RedirectController::class, 'category'])->name('category.show');
 
 // Blogs
 Route::get('/blogs/{id}', [BlogController::class, 'index'])->name('blogs.index');
@@ -97,7 +93,9 @@ Route::get('/travel/{subcategory}/{slug}', [BlogController::class, 'showByCatego
 Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'store'])->name('newsletter.subscribe');
 
-Route::get('/tools/convert-category-images', [ImageConversionController::class, 'convertCategoryImages'])->name('tools.convert-category-images');
+Route::middleware(['auth', 'admin'])
+    ->post('/tools/convert-category-images', [ImageConversionController::class, 'convertCategoryImages'])
+    ->name('tools.convert-category-images');
 
 // Legacy aliases for existing public pages
 Route::redirect('/policy', '/privacy-policy', 301)->name('policy');
@@ -110,7 +108,9 @@ Route::post('/genimage', [BlogController::class, 'genImage'])->name('genImage');
 // Admin routes (simple Blade-based admin)
 
 Route::middleware(['auth', 'admin'])->post('/synccategoryimages', [CategoryController::class, 'syncCategoryImages'])->name('syncCategoryImages');
-Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])->get('/run-automations/{userId}/{automationConfigId?}', [AutomationController::class, 'run'])->name('automations.run');
+Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
+    ->post('/run-automations/{userId}/{automationConfigId?}', [AutomationController::class, 'run'])
+    ->name('automations.run');
 
 Route::middleware(['auth'])->get('/auth/facebook/callback', [FacebookSettingsController::class, 'callback'])->name('oauth.facebook.callback');
 Route::middleware(['auth', 'role:customer,admin'])->get('/auth/google/drive/connect', [DriveApiKeyController::class, 'redirectToGoogleOauth'])->name('admin.google-drive.connect');
@@ -207,7 +207,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('logout', [AdminAuthController::class, 'logout'])->name('logout');
 
     Route::middleware(['auth', 'role:customer,admin'])->group(function () {
-        Route::get('/', function () { return view('admin.dashboard'); })->name('dashboard');
+        Route::get('/', AdminDashboardController::class)->name('dashboard');
         Route::middleware('admin')->group(function () {
             // Modal endpoints for dynamic forms
             Route::get('blogs/create-modal', [AdminBlogController::class, 'createModal'])->name('blogs.createModal');
