@@ -8,6 +8,7 @@ use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -148,25 +149,23 @@ class FacebookGraphService
 
     public function publishToPage(FacebookPage $page, string $message, ?string $imageUrl = null): array
     {
-        $endpoint = $imageUrl ? 'photos' : 'feed';
-        $payload = [
-            'access_token' => $page->page_access_token,
-        ];
+        if (!$imageUrl) {
+            $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/feed", [
+                'access_token' => $page->page_access_token,
+                'message' => $message,
+            ]);
 
-        if ($imageUrl) {
-            $payload['url'] = $imageUrl;
-            $payload['caption'] = $message;
-        } else {
-            $payload['message'] = $message;
+            if (!$response->ok()) {
+                $this->throwRefreshException($response->json(), 'Facebook posting API call failed.');
+            }
+
+            return $response->json();
         }
 
-        $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/{$endpoint}", $payload);
-
-        if (!$response->ok()) {
-            $this->throwRefreshException($response->json(), 'Facebook posting API call failed.');
-        }
-
-        return $response->json();
+        return $this->uploadPhotoToPage($page, $imageUrl, [
+            'caption' => $message,
+            'published' => 'true',
+        ], 'Facebook posting API call failed.');
     }
 
     public function publishMultiImagePost(FacebookPage $page, string $message, array $imageUrls): array
@@ -178,14 +177,12 @@ class FacebookGraphService
         $mediaIds = [];
 
         foreach ($imageUrls as $imageUrl) {
-            $uploadResponse = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/photos", [
-                'access_token' => $page->page_access_token,
-                'url' => $imageUrl,
+            $uploadResponse = $this->uploadPhotoToPage($page, $imageUrl, [
                 'published' => 'false',
-            ]);
+            ], 'Facebook multi-image upload failed.');
 
-            if (!$uploadResponse->ok() || !isset($uploadResponse['id'])) {
-                $this->throwRefreshException($uploadResponse->json(), 'Facebook multi-image upload failed.');
+            if (!isset($uploadResponse['id'])) {
+                throw new RuntimeException('Facebook multi-image upload failed. Missing media id in response.');
             }
 
             $mediaIds[] = (string) $uploadResponse['id'];
@@ -207,6 +204,101 @@ class FacebookGraphService
         }
 
         return $publishResponse->json();
+    }
+
+
+    private function uploadPhotoToPage(FacebookPage $page, string $imageUrl, array $extraPayload, string $fallbackError): array
+    {
+        $payload = array_merge([
+            'access_token' => $page->page_access_token,
+            'url' => $imageUrl,
+        ], $extraPayload);
+
+        $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/photos", $payload);
+
+        if ($response->ok()) {
+            return $response->json();
+        }
+
+        if (!$this->shouldRetryImageUploadAsBinary($response->json())) {
+            $this->throwRefreshException($response->json(), $fallbackError);
+        }
+
+        $imageBinary = $this->resolveImageBinary($imageUrl);
+        if ($imageBinary === null) {
+            $this->throwRefreshException($response->json(), $fallbackError);
+        }
+
+        $binaryPayload = array_merge([
+            'access_token' => $page->page_access_token,
+        ], $extraPayload);
+
+        $binaryUploadResponse = Http::attach('source', $imageBinary, basename(parse_url($imageUrl, PHP_URL_PATH) ?: 'image.jpg'))
+            ->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/photos", $binaryPayload);
+
+        if (!$binaryUploadResponse->ok()) {
+            $this->throwRefreshException($binaryUploadResponse->json(), $fallbackError);
+        }
+
+        return $binaryUploadResponse->json();
+    }
+
+
+    private function resolveImageBinary(string $imageUrl): ?string
+    {
+        $candidates = [
+            $imageUrl,
+            preg_replace('#(?<!:)/{2,}#', '/', $imageUrl) ?: $imageUrl,
+        ];
+
+        foreach (array_unique($candidates) as $candidateUrl) {
+            $imageResponse = Http::timeout(30)->get($candidateUrl);
+            if ($imageResponse->ok() && $imageResponse->body() !== '') {
+                return $imageResponse->body();
+            }
+        }
+
+        $storagePath = $this->extractPublicStoragePathFromUrl($imageUrl);
+        if (!$storagePath || !Storage::disk('public')->exists($storagePath)) {
+            return null;
+        }
+
+        $binary = Storage::disk('public')->get($storagePath);
+
+        return $binary !== '' ? $binary : null;
+    }
+
+    private function extractPublicStoragePathFromUrl(string $url): ?string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        if ($path === '') {
+            return null;
+        }
+
+        $segments = preg_split('#/+#', $path, -1, PREG_SPLIT_NO_EMPTY);
+        if (!$segments) {
+            return null;
+        }
+
+        $storageIndex = array_search('storage', $segments, true);
+        if ($storageIndex === false) {
+            return null;
+        }
+
+        $relativeSegments = array_slice($segments, $storageIndex + 1);
+        if (empty($relativeSegments)) {
+            return null;
+        }
+
+        return implode('/', $relativeSegments);
+    }
+
+    private function shouldRetryImageUploadAsBinary(?array $payload): bool
+    {
+        $errorCode = (int) data_get($payload, 'error.code', 0);
+        $message = mb_strtolower((string) data_get($payload, 'error.message', ''));
+
+        return $errorCode === 324 || str_contains($message, 'invalid image') || str_contains($message, 'missing image file');
     }
 
     public function upsertPages(FacebookAccount $account, array $pages): void
