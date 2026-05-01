@@ -112,7 +112,7 @@ class SocialPostManagerController extends Controller
             ->where('user_id', Auth::id())
             ->with([
                 'page:id,page_name',
-                'latestDeletionJob:id,synced_social_post_id,status,error_message,scheduled_for,processed_at,updated_at',
+                'latestDeletionJob:social_post_deletion_jobs.id,social_post_deletion_jobs.synced_social_post_id,social_post_deletion_jobs.status,social_post_deletion_jobs.error_message,social_post_deletion_jobs.scheduled_for,social_post_deletion_jobs.processed_at,social_post_deletion_jobs.updated_at',
             ]);
 
         if (!empty($data['page_ids'])) {
