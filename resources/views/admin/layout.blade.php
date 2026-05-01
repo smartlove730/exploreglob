@@ -5,33 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Control Panel - @yield('title', 'Dashboard')</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('/css/admin-panel.css') }}">
     @vite(['resources/css/app.css'])
-    <style>
-        body { background-color: #f8fafc; }
-        .sidebar-link.active { background: rgba(255,255,255,.15); }
-        .admin-sidebar-body {
-            height: 100dvh;
-            max-height: 100dvh;
-            overflow-y: auto;
-        }
-        .admin-sidebar-nav {
-            min-height: 0;
-        }
-        .dataTables_wrapper .dt-buttons .btn {
-            margin-right: .35rem;
-            margin-bottom: .5rem;
-        }
-        table.dataTable > tbody > tr.child ul.dtr-details {
-            width: 100%;
-        }
-    </style>
     @stack('styles')
 </head>
-<body>
+<body class="admin-body">
 @php
     $isAdmin = auth()->user()?->isAdmin();
     $facebookSettingsUrl = Route::has('admin.facebook.settings') ? route('admin.facebook.settings') : url('/admin/facebook/settings');
@@ -42,58 +30,148 @@
     $googleDriveFoldersUrl = Route::has('admin.facebook.drive-folders.index') ? route('admin.facebook.drive-folders.index') : url('/admin/facebook/drive-folders');
     $isAutomationRoute = request()->routeIs('admin.automations.*');
 @endphp
+
 @if(auth()->check())
-<div class="d-flex">
-    <nav class="navbar navbar-dark bg-dark d-lg-none w-100 position-fixed top-0 z-3">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ route('admin.dashboard') }}">Panel</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-        </div>
-    </nav>
 
-    <div class="offcanvas-lg offcanvas-start text-bg-dark" tabindex="-1" id="adminSidebar" style="width: 260px;">
-        <div class="offcanvas-header border-bottom border-secondary">
-            <h5 class="offcanvas-title">{{ $isAdmin ? 'Admin Panel' : 'User Panel' }}</h5>
-            <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas"></button>
+<!-- Mobile Top Navbar -->
+<div class="admin-mobile-nav">
+    <a href="{{ route('admin.dashboard') }}" class="admin-mobile-brand">
+        <div class="admin-sidebar-brand-icon" style="width:32px;height:32px;border-radius:8px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
         </div>
-        <div class="offcanvas-body admin-sidebar-body d-flex flex-column p-3">
-            <ul class="nav nav-pills flex-column gap-2 flex-grow-1 admin-sidebar-nav">
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">Dashboard</a></li>
-                @if($isAdmin)
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.blogs.*') ? 'active' : '' }}" href="{{ route('admin.blogs.index') }}">Blogs</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}">Categories</a></li>
-                @endif
-                @if($isAdmin)
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.apps.*') ? 'active' : '' }}" href="{{ $facebookAppsUrl }}">Facebook Apps</a></li>
-                @endif
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.google-drive-keys.*') ? 'active' : '' }}" href="{{ $googleDriveKeysUrl }}">Connect Google Accounts</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.drive-folders.*') ? 'active' : '' }}" href="{{ $googleDriveFoldersUrl }}">Google Drive Folders</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.settings') ? 'active' : '' }}" href="{{ $facebookSettingsUrl }}">Facebook Settings</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">Social Posts</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.facebook.manage-posts.*') ? 'active' : '' }}" href="{{ $facebookManagePostsUrl }}">Manage Social Posts</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ $isAutomationRoute ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">Automations</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.billing.*') ? 'active' : '' }}" href="{{ route('app.billing.plans') }}">Subscription</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('app.settings.*') ? 'active' : '' }}" href="{{ route('app.settings.index') }}">Settings</a></li>
-                @if($isAdmin)
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.mail-settings.*') ? 'active' : '' }}" href="{{ route('admin.mail-settings.index') }}">Mail Settings</a></li>
-                <li><a class="nav-link text-white sidebar-link {{ request()->routeIs('admin.saas.*') ? 'active' : '' }}" href="{{ route('admin.saas.overview') }}">SaaS Management</a></li>
-                @endif
-            </ul>
+        <span class="admin-mobile-brand-text">Postzy</span>
+    </a>
+    <button class="admin-mobile-toggle" onclick="toggleAdminSidebar()" aria-label="Toggle sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+</div>
 
-            <form method="POST" action="{{ route('admin.logout') }}" class="mt-auto pt-3 border-top border-secondary">
-                @csrf
-                <button class="btn btn-outline-light btn-sm w-100">Logout</button>
-            </form>
+<!-- Sidebar Overlay -->
+<div class="admin-sidebar-overlay" id="adminSidebarOverlay" onclick="toggleAdminSidebar()"></div>
+
+<!-- Sidebar -->
+<aside class="admin-sidebar" id="adminSidebar">
+    <!-- Brand -->
+    <a href="{{ route('admin.dashboard') }}" class="admin-sidebar-brand">
+        <div class="admin-sidebar-brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <span class="admin-sidebar-brand-text">Postzy</span>
+        <span class="admin-sidebar-brand-badge">{{ $isAdmin ? 'Admin' : 'User' }}</span>
+    </a>
+
+    <!-- User Info -->
+    <div class="admin-sidebar-user">
+        <div class="admin-sidebar-user-info">
+            <div class="admin-sidebar-avatar">{{ strtoupper(mb_substr(auth()->user()->name ?? 'U', 0, 1)) }}</div>
+            <div>
+                <div class="admin-sidebar-user-name">{{ auth()->user()->name ?? 'User' }}</div>
+                <div class="admin-sidebar-user-role">{{ $isAdmin ? 'Administrator' : 'Member' }}</div>
+            </div>
         </div>
     </div>
 
-    <main class="flex-grow-1 p-3 p-lg-4" style="margin-top: 56px;">
-        @include('admin.partials.alerts')
-        @yield('content')
-    </main>
-</div>
+    <!-- Navigation -->
+    <nav class="admin-sidebar-nav">
+        <!-- Overview -->
+        <div class="admin-nav-section">Overview</div>
+        <a class="admin-nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Dashboard
+        </a>
+
+        @if($isAdmin)
+        <!-- Content -->
+        <div class="admin-nav-section">Content</div>
+        <a class="admin-nav-link {{ request()->routeIs('admin.blogs.*') ? 'active' : '' }}" href="{{ route('admin.blogs.index') }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Blogs
+        </a>
+        <a class="admin-nav-link {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}" href="{{ route('admin.categories.index') }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Categories
+        </a>
+        @endif
+
+        <!-- Social & Publishing -->
+        <div class="admin-nav-section">Social & Publishing</div>
+        @if($isAdmin)
+        <a class="admin-nav-link {{ request()->routeIs('admin.facebook.apps.*') ? 'active' : '' }}" href="{{ $facebookAppsUrl }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-2a4 4 0 0 0-4 4v8"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+            Facebook Apps
+        </a>
+        @endif
+        <a class="admin-nav-link {{ request()->routeIs('admin.facebook.google-drive-keys.*') ? 'active' : '' }}" href="{{ $googleDriveKeysUrl }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            Google Accounts
+        </a>
+        <a class="admin-nav-link {{ request()->routeIs('admin.facebook.drive-folders.*') ? 'active' : '' }}" href="{{ $googleDriveFoldersUrl }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+            Drive Folders
+        </a>
+        <a class="admin-nav-link {{ request()->routeIs('admin.facebook.settings') ? 'active' : '' }}" href="{{ $facebookSettingsUrl }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Facebook Settings
+        </a>
+        <a class="admin-nav-link {{ request()->routeIs('admin.posts.*') ? 'active' : '' }}" href="{{ $facebookPostsUrl }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Social Posts
+        </a>
+        <a class="admin-nav-link {{ request()->routeIs('admin.facebook.manage-posts.*') ? 'active' : '' }}" href="{{ $facebookManagePostsUrl }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Manage Posts
+        </a>
+
+        <!-- Automation -->
+        <div class="admin-nav-section">Automation</div>
+        <a class="admin-nav-link {{ $isAutomationRoute ? 'active' : '' }}" href="{{ route('admin.automations.index') }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6"/><path d="M1 12h6m6 0h6"/><path d="M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24"/><path d="M19.78 4.22l-4.24 4.24m-7.08 7.08l-4.24 4.24"/></svg>
+            Automations
+        </a>
+
+        <!-- Account -->
+        <div class="admin-nav-section">Account</div>
+        <a class="admin-nav-link {{ request()->routeIs('app.billing.*') ? 'active' : '' }}" href="{{ route('app.billing.plans') }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            Subscription
+        </a>
+        <a class="admin-nav-link {{ request()->routeIs('app.settings.*') ? 'active' : '' }}" href="{{ route('app.settings.index') }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Settings
+        </a>
+
+        @if($isAdmin)
+        <!-- System -->
+        <div class="admin-nav-section">System</div>
+        <a class="admin-nav-link {{ request()->routeIs('admin.mail-settings.*') ? 'active' : '' }}" href="{{ route('admin.mail-settings.index') }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Mail Settings
+        </a>
+        <a class="admin-nav-link {{ request()->routeIs('admin.saas.*') ? 'active' : '' }}" href="{{ route('admin.saas.overview') }}">
+            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            SaaS Management
+        </a>
+        @endif
+    </nav>
+
+    <!-- Logout -->
+    <div class="admin-sidebar-footer">
+        <form method="POST" action="{{ route('admin.logout') }}">
+            @csrf
+            <button type="submit" class="admin-logout-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Sign out
+            </button>
+        </form>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="admin-main">
+    @include('admin.partials.alerts')
+    @yield('content')
+</main>
+
 @else
 <main class="container py-5">
     @include('admin.partials.alerts')
@@ -118,6 +196,46 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+
+<script>
+// Sidebar Toggle
+function toggleAdminSidebar() {
+    const sidebar = document.getElementById('adminSidebar');
+    const overlay = document.getElementById('adminSidebarOverlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('active');
+    document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+}
+
+// Auto-dismiss alerts
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.admin-alert-dismiss').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const alert = btn.closest('.admin-alert');
+            alert.style.transition = 'all 0.3s ease';
+            alert.style.opacity = '0';
+            alert.style.transform = 'translateX(-12px)';
+            setTimeout(() => alert.remove(), 300);
+        });
+    });
+
+    // Close sidebar on nav link click (mobile)
+    if (window.innerWidth < 992) {
+        document.querySelectorAll('.admin-nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                const sidebar = document.getElementById('adminSidebar');
+                const overlay = document.getElementById('adminSidebarOverlay');
+                if (sidebar.classList.contains('open')) {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+        });
+    }
+});
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.jQuery?.fn?.DataTable) return;
