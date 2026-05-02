@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Notifications\ResetPasswordQueued;
 use App\Notifications\VerifyEmailQueued;
+use Illuminate\Support\Facades\Log;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -31,6 +32,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'is_admin',
         'google_id',
+        'email_verification_otp',
+        'email_verification_otp_expires_at',
     ];
 
     /**
@@ -52,6 +55,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'email_verification_otp_expires_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
         ];
@@ -99,6 +103,14 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function sendEmailVerificationNotification(): void
     {
+        if (! $this->email_verification_otp_expires_at || now()->greaterThan($this->email_verification_otp_expires_at)) {
+            $this->forceFill([
+                'email_verification_otp' => (string) random_int(100000, 999999),
+                'email_verification_otp_expires_at' => now()->addMinutes(10),
+            ])->save();
+        }
+
+        Log::info('Dispatching email verification OTP notification.', ['user_id' => $this->id, 'email' => $this->email]);
         $this->notify(new VerifyEmailQueued());
     }
 
