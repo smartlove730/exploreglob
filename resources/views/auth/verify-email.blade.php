@@ -218,21 +218,42 @@
         <h1 class="verify-title">Verify Your Email</h1>
 
         <p class="verify-text">
-            We've sent a verification link to
+            We've sent a 6-digit verification OTP to
             <span class="verify-email-address">{{ Auth::user()->email ?? 'your email' }}</span>.
-            Please check your inbox and click the link to activate your account.
+            Please enter it below. The OTP is valid for 10 minutes.
         </p>
 
-        @if (session('status') === 'verification-link-sent')
+        @if (session('status') === 'verification-otp-sent')
             <div class="alert-verify">
-                ✅ A fresh verification link has been sent to your email address.
+                ✅ A fresh verification OTP has been sent to your email address.
             </div>
         @endif
+
+        <form method="POST" action="{{ route('verification.verify') }}" class="mb-3">
+            @csrf
+            <input
+                type="text"
+                name="otp"
+                value="{{ old('otp') }}"
+                inputmode="numeric"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                class="form-control mb-2 @error('otp') is-invalid @enderror"
+                placeholder="Enter 6-digit OTP"
+                required
+            >
+            @error('otp')
+                <div class="invalid-feedback d-block text-start mb-2">{{ $message }}</div>
+            @enderror
+            <button type="submit" class="btn-verify">
+                Verify OTP
+            </button>
+        </form>
 
         <form method="POST" action="{{ route('verification.send') }}">
             @csrf
             <button type="submit" class="btn-verify">
-                Resend Verification Email
+                Resend OTP
             </button>
         </form>
 
