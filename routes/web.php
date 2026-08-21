@@ -182,6 +182,8 @@ Route::middleware(['auth', 'role:customer,admin', 'subscription.active'])
         Route::post('automations/{automation}/resume', [AutomationConfigController::class, 'resume'])->name('resume');
         Route::post('automations/{automation}/stop', [AutomationConfigController::class, 'stop'])->name('stop');
         Route::post('automations/{automation}/queue-now', [AutomationConfigController::class, 'queueNow'])->name('queue-now');
+        Route::delete('automations/queue-item/{queueItem}', [AutomationConfigController::class, 'deleteQueueItem'])->name('queue-item.delete');
+        Route::post('automations/queue-item/{queueItem}/execute', [AutomationConfigController::class, 'executeQueueItemNow'])->name('queue-item.execute');
     });
 
 Route::middleware(['auth', 'admin'])
@@ -190,7 +192,12 @@ Route::middleware(['auth', 'admin'])
     ->group(function () {
         Route::get('/overview', [SaasManagementController::class, 'overview'])->name('overview');
         Route::get('/users', [SaasManagementController::class, 'users'])->name('users');
+        Route::get('/plans/create', [SaasManagementController::class, 'createPlan'])->name('plans.create');
         Route::get('/plans', [SaasManagementController::class, 'plans'])->name('plans');
+        Route::post('/plans', [SaasManagementController::class, 'storePlan'])->name('plans.store');
+        Route::get('/plans/{plan}/edit', [SaasManagementController::class, 'editPlan'])->name('plans.edit');
+        Route::put('/plans/{plan}', [SaasManagementController::class, 'updatePlan'])->name('plans.update');
+        Route::delete('/plans/{plan}', [SaasManagementController::class, 'destroyPlan'])->name('plans.destroy');
         Route::post('/plans/{plan}/toggle', [SaasManagementController::class, 'togglePlan'])->name('plans.toggle');
         Route::get('/subscriptions', [SaasManagementController::class, 'subscriptions'])->name('subscriptions');
         Route::post('/subscriptions/{subscription}/toggle', [SaasManagementController::class, 'toggleSubscription'])->name('subscriptions.toggle');
@@ -225,4 +232,42 @@ Route::prefix('admin')->name('admin.')->group(function () {
     });
 });
 
+// WhatsApp Business API (frontend-only for now)
+Route::middleware(['auth', 'role:customer,admin'])
+    ->prefix('admin/whatsapp')
+    ->name('admin.whatsapp.')
+    ->group(function () {
+        Route::view('/dashboard', 'admin.whatsapp.dashboard')->name('dashboard');
+        
+        // Phone Numbers - Meta Embedded Signup (1 account = 1 number)
+        Route::get('/phone-numbers', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'index'])->name('phone-numbers');
+        Route::post('/phone-numbers/embedded-signup', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'embeddedSignup'])->name('phone-numbers.embedded-signup');
+        Route::post('/phone-numbers/sync', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'syncStatus'])->name('phone-numbers.sync');
+        Route::post('/phone-numbers/disconnect', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'disconnect'])->name('phone-numbers.disconnect');
+        Route::put('/phone-numbers/profile', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'updateProfile'])->name('phone-numbers.profile.update');
+        
+        // Manual Registration Routes
+        Route::post('/phone-numbers/register', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'register'])->name('phone-numbers.register');
+        Route::post('/phone-numbers/request-code', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'requestCode'])->name('phone-numbers.request-code');
+        Route::post('/phone-numbers/verify-code', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'verifyCode'])->name('phone-numbers.verify-code');
+
+        Route::get('/templates', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'index'])->name('templates');
+        Route::post('/templates', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'store'])->name('templates.store');
+        Route::delete('/templates/{template}', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'destroy'])->name('templates.destroy');
+        Route::get('/contacts', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'index'])->name('contacts');
+        Route::view('/conversations', 'admin.whatsapp.conversations')->name('conversations');
+        Route::get('/settings', [\App\Http\Controllers\Admin\WhatsappSettingsController::class, 'index'])->name('settings');
+        Route::put('/settings', [\App\Http\Controllers\Admin\WhatsappSettingsController::class, 'update'])->name('settings.update');
+        
+        // API routes for real-time chat frontend
+        Route::get('/api/conversations/updates', [\App\Http\Controllers\Admin\WhatsappFrontendController::class, 'checkUpdates'])->name('api.conversations.updates');
+        Route::get('/api/conversations', [\App\Http\Controllers\Admin\WhatsappFrontendController::class, 'getConversations'])->name('api.conversations.index');
+        Route::get('/api/conversations/{conversation}/messages', [\App\Http\Controllers\Admin\WhatsappFrontendController::class, 'getMessages'])->name('api.conversations.messages');
+        Route::post('/api/conversations/{conversation}/messages', [\App\Http\Controllers\Admin\WhatsappFrontendController::class, 'sendMessage'])->name('api.conversations.send');
+    });
+
 require __DIR__.'/auth.php';
+
+// Webhook endpoints for WhatsApp message received
+Route::get('/whatsapp/message/recieved', [\App\Http\Controllers\WhatsappController::class, 'verify']);
+Route::post('/whatsapp/message/recieved', [\App\Http\Controllers\WhatsappController::class, 'handleWebhook']);

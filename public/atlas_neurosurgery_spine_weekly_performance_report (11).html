@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atlas Neurosurgery & Spine - Weekly Performance Report</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            /* Light theme colors based on Atlas Neurosurgery website */
+            --primary-blue: #1B4E8C; /* Deep Atlas Blue */
+            --light-blue: #f0f6ff;
+            --text-main: #334155; /* Slate 700 */
+            --text-muted: #64748b; /* Slate 500 */
+            --white: #ffffff;
+            --border-color: #e2e8f0;
+            --bg-gray: #f8fafc;
+            --highlight-green: #10b981;
+            --highlight-red: #ef4444;
+            --accent-blue: #3b82f6; /* Brighter blue for bold text */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0; /* Gray background behind slides */
+            color: var(--text-main);
+            line-height: 1.4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            gap: 25px; 
+            /* Increased base font size since screenshots are removed */
+            font-size: 14px; 
+        }
+
+        .slide-container {
+            background-color: var(--white);
+            width: 100%;
+            max-width: 1100px;
+            aspect-ratio: 16 / 9;
+            padding: 30px 40px; /* Increased padding */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            page-break-after: always;
+        }
+
+        .slide-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 3px solid var(--primary-blue);
+            padding-bottom: 8px; 
+            margin-bottom: 20px; 
+        }
+
+        .slide-title {
+            color: var(--primary-blue);
+            font-size: 26px; /* Increased size */
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .slide-subtitle {
+            color: var(--text-muted);
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .content-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px; 
+            font-size: 15px; /* Increased base text size */
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px; /* Increased gap */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: var(--white);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 10px 14px; /* Increased padding */
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px; /* Increased table font */
+        }
+
+        th {
+            background-color: var(--primary-blue);
+            color: var(--white);
+            font-weight: 600;
+            font-size: 15px; /* Increased header font */
+        }
+
+        tr:nth-child(even) {
+            background-color: var(--bg-gray);
+        }
+
+        .positive-change { color: var(--highlight-green); font-weight: 700; }
+        .negative-change { color: var(--highlight-red); font-weight: 700; }
+        .bold-val { font-weight: 700; color: var(--accent-blue); }
+
+        .highlight-box {
+            background-color: var(--light-blue);
+            border-left: 5px solid var(--primary-blue);
+            padding: 15px 20px; 
+            border-radius: 0 8px 8px 0;
+        }
+
+        .info-card {
+            background-color: var(--bg-gray);
+            border: 1px solid var(--border-color);
+            padding: 15px 20px; 
+            border-radius: 8px;
+        }
+
+        .title-slide {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f6ff 100%);
+        }
+
+        .title-slide h1 {
+            font-size: 42px; 
+            color: var(--primary-blue);
+            margin-bottom: 20px;
+        }
+
+        .logo-container {
+            margin-bottom: 30px;
+        }
+
+        .logo-container img {
+            max-width: 280px;
+            height: auto;
+        }
+
+        .note-special {
+            background-color: #fffbeb;
+            border: 3px solid #f59e0b;
+            padding: 30px; 
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        ul {
+            padding-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        li { margin-bottom: 6px; }
+        p { margin-bottom: 10px; }
+        p:last-child { margin-bottom: 0; }
+
+        h3 { font-size: 18px; margin-bottom: 10px; color: var(--primary-blue); }
+        h4 { font-size: 16px; margin-bottom: 8px; color: var(--primary-blue); }
+        
+        .screenshot-full {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        @media print {
+            body { background: none; padding: 0; }
+            .slide-container { 
+                box-shadow: none; 
+                border-radius: 0; 
+                margin: 0; 
+                width: 100vw; 
+                height: 100vh;
+                page-break-after: always;
+            }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="slide-container title-slide">
+        <div class="logo-container">
+            <img src="Atlas-Logo-7.png" alt="Atlas Neurosurgery & Spine Logo" onerror="this.src='https://placehold.co/400x120/1B4E8C/FFFFFF?text=Atlas+Neurosurgery+%26+Spine';">
+        </div>
+        <h1>Paid Ads Weekly Performance Report</h1>
+        <div style="width: 120px; height: 6px; background-color: var(--primary-blue); margin: 0 auto 25px auto;"></div>
+        <p style="font-size: 20px; color: var(--text-muted); font-weight: 500;">Reporting Period: 7–13 August 2026</p>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Executive Summary</h2>
+        </div>
+        <div class="content-area grid-2">
+            <div>
+                <h3>Google Ads Changes</h3>
+                <ul>
+                    <li>PMax ad copies were updated.</li>
+                    <li><span class="bold-val">New Customer Acquisition</span> was enabled in PMax.</li>
+                    <li>Search ad copies were updated.</li>
+                    <li>New image and video assets were added to the Search campaign.</li>
+                    <li><em>Objective:</em> Test whether new messaging and creative could improve engagement and conversion performance.</li>
+                </ul>
+
+                <h3 style="margin-top: 20px;">Facebook Ads Changes</h3>
+                <ul>
+                    <li>New ads were launched in the Facebook lead-generation campaign.</li>
+                    <li>Previous ads were paused so the new ads could receive delivery and be evaluated separately.</li>
+                </ul>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="info-card">
+                    <h3>Overall Performance</h3>
+                    <p><strong>Google</strong> spent <span class="bold-val">$295.15</span> and generated <span class="bold-val">35 conversions</span> at an average cost of <span class="bold-val">$8.43</span> per conversion.</p>
+                    <p style="margin-top: 10px;"><strong>Facebook</strong> spent <span class="bold-val">$71.40</span> and generated <span class="bold-val">13 leads</span> at a cost of <span class="bold-val">$5.49</span> per lead.</p>
+                </div>
+                
+                <div class="highlight-box">
+                    <p>The main observation this week is that <strong>engagement improved</strong> in several areas, but this has not yet translated into a similar improvement in conversion/lead volume.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Campaign Performance – Main View</h2>
+        </div>
+        <div class="content-area">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Campaign</th>
+                        <th>Spend</th>
+                        <th>Conversions / Leads</th>
+                        <th>Cost / Conv. / Lead</th>
+                        <th>Conv. / Lead Rate</th>
+                        <th>Main Observation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Google Search</strong></td>
+                        <td>$159.05</td>
+                        <td class="bold-val">19</td>
+                        <td class="bold-val">$8.37</td>
+                        <td>22.35%</td>
+                        <td>Stronger conversion rate and slightly lower CPA than PMax</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Google PMax</strong></td>
+                        <td>$136.09</td>
+                        <td class="bold-val">16</td>
+                        <td class="bold-val">$8.51</td>
+                        <td>3.23%</td>
+                        <td>CTR improved significantly, but conversion rate remains low</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Facebook FB Form Leads</strong></td>
+                        <td>$71.40</td>
+                        <td class="bold-val">13</td>
+                        <td class="bold-val">$5.49</td>
+                        <td>—</td>
+                        <td>More clicks at similar spend, but lead volume unchanged</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="highlight-box" style="margin-top: 15px;">
+                <h4>What this means</h4>
+                <p><strong>Google Search</strong> is currently producing the strongest conversion rate among the Google campaigns.</p>
+                <p><strong>PMax</strong> is generating a similar number of conversions at almost the same cost per conversion, but its conversion rate is much lower.</p>
+                <p><strong>Facebook</strong> currently has the lowest acquisition cost at $5.49 per lead, but we do not yet have qualified-lead or sales data to determine whether these leads are stronger than Google leads.</p>
+                <p style="font-weight: 700; color: var(--primary-blue); margin-top: 8px;">Therefore, budget decisions should not be based on CPL/CPA alone.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Google Ads Dashboard</h2>
+        </div>
+        <div class="content-area" style="align-items: center; justify-content: center; background-color: var(--bg-gray); border-radius: 8px; border: 1px solid var(--border-color); padding: 10px;">
+            <img src="gads.png" alt="Google Ads Dashboard" class="screenshot-full" onerror="this.src='https://placehold.co/1000x500/1B4E8C/FFFFFF?text=Google+Ads+Screenshot+(gads.png)';">
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Google Ads – Account Performance</h2>
+        </div>
+        <div class="content-area grid-2">
+            <div>
+                 <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Last Week</th>
+                            <th>This Week</th>
+                            <th>Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Spend</td>
+                            <td>$179.75</td>
+                            <td class="bold-val">$295.15</td>
+                            <td>+64.20%</td>
+                        </tr>
+                        <tr>
+                            <td>Impressions</td>
+                            <td>32,690</td>
+                            <td>5,327</td>
+                            <td>-83.71%</td>
+                        </tr>
+                        <tr>
+                            <td>Clicks</td>
+                            <td>136</td>
+                            <td class="bold-val">149</td>
+                            <td class="positive-change">+9.56%</td>
+                        </tr>
+                        <tr>
+                            <td>CTR</td>
+                            <td>0.42%</td>
+                            <td class="bold-val">2.80%</td>
+                            <td class="positive-change">+566.67%</td>
+                        </tr>
+                        <tr>
+                            <td>Avg. CPC</td>
+                            <td>$1.32</td>
+                            <td>$1.98</td>
+                            <td class="negative-change">+50.00%</td>
+                        </tr>
+                        <tr>
+                            <td>Conversions</td>
+                            <td>65</td>
+                            <td class="bold-val">35</td>
+                            <td class="negative-change">-46.15%</td>
+                        </tr>
+                        <tr>
+                            <td>Conversion Rate</td>
+                            <td>47.79%</td>
+                            <td>6.02%</td>
+                            <td class="negative-change">-87.40%</td>
+                        </tr>
+                        <tr>
+                            <td>Cost / Conv.</td>
+                            <td>$2.77</td>
+                            <td class="bold-val">$8.43</td>
+                            <td class="negative-change">+204.33%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="info-card">
+                    <h4>What changed</h4>
+                    <p>This week's Google account included major changes to both PMax and Search. The new setup has produced a significant increase in CTR, while total clicks have also increased slightly. However, conversion volume has fallen from 65 to 35.</p>
+                </div>
+                
+                <div class="highlight-box">
+                    <h4>Derived finding</h4>
+                    <p>The account is receiving more clicks but fewer conversions. This means the improvement in engagement is not currently carrying through to the conversion stage.</p>
+                    <p style="margin-top: 8px;">The key change is: <span class="bold-val">136 clicks &rarr; 149 clicks</span> but <span class="bold-val">65 conversions &rarr; 35 conversions</span>.</p>
+                    <p style="margin-top: 8px;">Therefore, the main area to investigate is <strong>conversion efficiency after the click</strong>, rather than simply trying to generate more traffic.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Google Search Campaign Performance</h2>
+        </div>
+        <div class="content-area grid-2">
+            <div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Last Week</th>
+                            <th>This Week</th>
+                            <th>Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Spend</td>
+                            <td>$117.00</td>
+                            <td class="bold-val">$159.05</td>
+                            <td>+35.94%</td>
+                        </tr>
+                        <tr>
+                            <td>Impressions</td>
+                            <td>1,378</td>
+                            <td>1,933</td>
+                            <td>+40.28%</td>
+                        </tr>
+                        <tr>
+                            <td>Clicks</td>
+                            <td>73</td>
+                            <td class="bold-val">85</td>
+                            <td class="positive-change">+16.44%</td>
+                        </tr>
+                        <tr>
+                            <td>CTR</td>
+                            <td>5.30%</td>
+                            <td>4.40%</td>
+                            <td>-16.98%</td>
+                        </tr>
+                        <tr>
+                            <td>Avg. CPC</td>
+                            <td>$1.60</td>
+                            <td>$1.87</td>
+                            <td class="negative-change">+16.88%</td>
+                        </tr>
+                        <tr>
+                            <td>Conversions</td>
+                            <td>28</td>
+                            <td class="bold-val">19</td>
+                            <td class="negative-change">-32.14%</td>
+                        </tr>
+                        <tr>
+                            <td>Conv. Rate</td>
+                            <td>38.36%</td>
+                            <td>22.35%</td>
+                            <td class="negative-change">-41.74%</td>
+                        </tr>
+                        <tr>
+                            <td>Cost / Conv.</td>
+                            <td>$4.18</td>
+                            <td class="bold-val">$8.37</td>
+                            <td class="negative-change">+100.24%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="info-card">
+                    <h4>Changes & Traffic Impact</h4>
+                    <p>Introduced new ad copy variations along with new image and video assets to test different messaging and creative combinations.</p>
+                    <p style="margin-top: 8px;">Impressions increased from 1,378 to <span class="bold-val">1,933</span>, while clicks increased from 73 to <span class="bold-val">85</span>.</p>
+                </div>
+                
+                <div class="highlight-box">
+                    <h4>Conversion Impact & Next Steps</h4>
+                    <p>Despite the increase in traffic, conversions decreased from 28 to <span class="negative-change">19</span>, and conversion rate moved from 38.36% to <span class="negative-change">22.35%</span>.</p>
+                    <p style="margin-top: 8px;">The result shows that the new creative approach is helping generate more traffic, but the additional traffic is currently converting at a lower rate.</p>
+                    <p style="margin-top: 8px; font-weight: 600; color: var(--primary-blue);">Next, the new variations will be evaluated based on actual conversion contribution to identify which messaging and creative combinations are bringing stronger results.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Google Performance Max Performance</h2>
+        </div>
+        <div class="content-area grid-2">
+            <div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Last Week</th>
+                            <th>This Week</th>
+                            <th>Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Spend</td>
+                            <td>$62.75</td>
+                            <td class="bold-val">$136.09</td>
+                            <td>+116.88%</td>
+                        </tr>
+                        <tr>
+                            <td>Impressions</td>
+                            <td>31,312</td>
+                            <td>3,394</td>
+                            <td>-89.16%</td>
+                        </tr>
+                        <tr>
+                            <td>Clicks</td>
+                            <td>63</td>
+                            <td>64</td>
+                            <td>+1.59%</td>
+                        </tr>
+                        <tr>
+                            <td>CTR</td>
+                            <td>0.20%</td>
+                            <td class="bold-val">1.89%</td>
+                            <td class="positive-change">+845.00%</td>
+                        </tr>
+                        <tr>
+                            <td>Conversions</td>
+                            <td>37</td>
+                            <td class="bold-val">16</td>
+                            <td class="negative-change">-56.76%</td>
+                        </tr>
+                        <tr>
+                            <td>Conv. Rate</td>
+                            <td>56.92%</td>
+                            <td>3.23%</td>
+                            <td class="negative-change">-94.32%</td>
+                        </tr>
+                        <tr>
+                            <td>Cost / Conv.</td>
+                            <td>$1.70</td>
+                            <td class="bold-val">$8.51</td>
+                            <td class="negative-change">+400.59%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="info-card">
+                    <h4>Changes & Traffic Impact</h4>
+                    <p>Updated the PMax ad copies to test new messaging and enabled the <span class="bold-val">New Customer Acquisition</span> option.</p>
+                    <p style="margin-top: 8px;">Following the changes, CTR increased from 0.20% to <span class="positive-change">1.89%</span>, while clicks remained almost stable at 63 &rarr; <span class="bold-val">64</span>.</p>
+                </div>
+                
+                <div class="highlight-box">
+                    <h4>Conversion Impact & Next Steps</h4>
+                    <p>However, conversions decreased from 37 to <span class="negative-change">16</span>, and conversion rate moved from 56.92% to <span class="negative-change">3.23%</span>.</p>
+                    <p style="margin-top: 8px;">This indicates that the new setup is generating stronger initial engagement, but the improvement in CTR has not yet translated into higher conversion volume.</p>
+                    <p style="margin-top: 8px; font-weight: 600; color: var(--primary-blue);">We will continue monitoring the new setup based on conversion performance rather than CTR alone.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Google Conversion Action Analysis</h2>
+        </div>
+        <div class="content-area">
+            <p style="margin-bottom: 15px;">This section is important because the total "Conversions" number does not tell us exactly what type of action users took.</p>
+            
+            <table style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Conversion Action</th>
+                        <th>Search</th>
+                        <th>PMax</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="font-weight: 700; background-color: var(--light-blue);">
+                        <td>Total Conversions</td>
+                        <td>19</td>
+                        <td>16</td>
+                        <td style="color: var(--primary-blue);">35</td>
+                    </tr>
+                    <tr>
+                        <td>Contact</td>
+                        <td>20</td>
+                        <td>13</td>
+                        <td class="bold-val">33</td>
+                    </tr>
+                    <tr>
+                        <td>Phone Call Lead</td>
+                        <td>4</td>
+                        <td>3</td>
+                        <td class="bold-val">7</td>
+                    </tr>
+                    <tr>
+                        <td>Phone Calls</td>
+                        <td>8</td>
+                        <td>3</td>
+                        <td class="bold-val">11</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box" style="margin-top: 20px;">
+                <h4 style="margin-bottom: 10px;">Important interpretation</h4>
+                <p>Reviewed the individual conversion actions instead of treating all Google conversions as the same result. This gives us a clearer view of the type of response generated by each campaign and will help us evaluate performance beyond the overall conversion count.</p>
+                <ul style="margin-top: 10px;">
+                    <li>This week, Google recorded <span class="bold-val">33 Contact actions</span>, <span class="bold-val">7 Phone Call Leads</span> and <span class="bold-val">11 Phone Calls</span> across Search and PMax.</li>
+                    <li><strong>Search</strong> contributed 20 Contacts, 4 Phone Call Leads and 8 Phone Calls.</li>
+                    <li><strong>PMax</strong> contributed 13 Contacts, 3 Phone Call Leads and 3 Phone Calls.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Facebook Ads – Overall Performance</h2>
+            <p class="slide-subtitle">Cold Audiences – FB Form Leads</p>
+        </div>
+        <div class="content-area grid-2">
+            <div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Last Week</th>
+                            <th>This Week</th>
+                            <th>Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Spend</td>
+                            <td>$68.44</td>
+                            <td class="bold-val">$71.40</td>
+                            <td>+4.32%</td>
+                        </tr>
+                        <tr>
+                            <td>Clicks</td>
+                            <td>181</td>
+                            <td class="bold-val">220</td>
+                            <td class="positive-change">+21.55%</td>
+                        </tr>
+                        <tr>
+                            <td>CTR</td>
+                            <td>5.78%</td>
+                            <td class="bold-val">6.67%</td>
+                            <td class="positive-change">+15.40%</td>
+                        </tr>
+                        <tr>
+                            <td>CPC</td>
+                            <td>$0.38</td>
+                            <td>$0.32</td>
+                            <td class="positive-change">-15.79%</td>
+                        </tr>
+                        <tr>
+                            <td>Leads</td>
+                            <td>13</td>
+                            <td class="bold-val">13</td>
+                            <td>No change</td>
+                        </tr>
+                        <tr>
+                            <td>CPL</td>
+                            <td>$5.26</td>
+                            <td class="bold-val">$5.49</td>
+                            <td class="negative-change">+4.37%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="info-card">
+                    <h4>Changes & Traffic Impact</h4>
+                    <p>Launched new Facebook ads and paused the previous ads to give the new creatives a clear testing environment.</p>
+                    <p style="margin-top: 8px;">Clicks increased from 181 to <span class="positive-change">220</span>, CTR improved from 5.78% to <span class="positive-change">6.67%</span>, and CPC decreased from $0.38 to <span class="positive-change">$0.32</span>.</p>
+                </div>
+
+                <div class="highlight-box">
+                     <h4>Conversion Impact & Next Steps</h4>
+                     <p>However, lead volume remained at 13, with CPL moving from $5.26 to $5.49.</p>
+                     <p style="margin-top: 8px;">This shows that the new ads are generating better engagement and more efficient traffic, but the additional clicks have not yet resulted in additional leads.</p>
+                     <p style="margin-top: 8px; font-weight: 600; color: var(--primary-blue);">The next focus will be to identify which new ads are able to convert the improved engagement into actual lead volume.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Facebook Ads Dashboard</h2>
+        </div>
+        <div class="content-area" style="align-items: center; justify-content: center; background-color: var(--bg-gray); border-radius: 8px; border: 1px solid var(--border-color); padding: 10px;">
+            <img src="fbads.png" alt="Facebook Ads Dashboard" class="screenshot-full" onerror="this.src='https://placehold.co/1000x500/1B4E8C/FFFFFF?text=Facebook+Ads+Screenshot+(fbads.png)';">
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Facebook Lead Funnel</h2>
+        </div>
+        <div class="content-area grid-2">
+            <div class="info-card">
+                <h3>Last Week</h3>
+                <p>181 clicks &rarr; 13 leads</p>
+                <p>Click-to-lead rate: <strong>7.18%</strong></p>
+            </div>
+            
+            <div class="info-card">
+                <h3>This Week</h3>
+                <p>220 clicks &rarr; 13 leads</p>
+                <p>Click-to-lead rate: <strong>5.91%</strong></p>
+            </div>
+        </div>
+        
+        <div class="content-area grid-2" style="margin-top: 20px;">
+            <div class="highlight-box">
+                <h3>Derived Finding</h3>
+                <p>The campaign generated 39 additional clicks, but lead volume remained unchanged. This means the additional traffic is currently converting into leads at a lower rate.</p>
+                <p style="margin-top: 10px;">The new ads have improved the first part of the funnel (More clicks + higher CTR + lower CPC) but not yet the second part (No increase in leads).</p>
+            </div>
+
+            <div class="info-card">
+                <h3>Next Focus</h3>
+                <p>The next test should focus on whether the new creatives can maintain the improved engagement while increasing the percentage of users who complete the lead form.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Marketing Funnel & Budget Efficiency</h2>
+        </div>
+        <div class="content-area grid-2">
+            <div>
+                <h3 style="margin-bottom: 15px;">Marketing Funnel From Current Data</h3>
+                <div class="info-card" style="margin-bottom: 15px;">
+                    <h4 style="margin-bottom: 8px;">Google Ads</h4>
+                    <p>5,327 impressions &rarr; 149 clicks &rarr; 35 Google conversions &rarr; 33 Contact actions &rarr; 7 Phone Call Leads &rarr; 11 Phone Calls</p>
+                </div>
+                <div class="info-card">
+                    <h4 style="margin-bottom: 8px;">Facebook Meta lead form Ad</h4>
+                    <p>3,298 impressions &rarr; 220 clicks &rarr; 13 leads &rarr; 8 Landing Page Views</p>
+                </div>
+            </div>
+
+            <div>
+                <h3 style="margin-bottom: 15px;">Budget Efficiency</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Campaign</th>
+                            <th>Spend</th>
+                            <th>Result</th>
+                            <th>Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Google Search</td>
+                            <td>$159.05</td>
+                            <td>19 conversions</td>
+                            <td class="bold-val">$8.37</td>
+                        </tr>
+                        <tr>
+                            <td>Google PMax</td>
+                            <td>$136.09</td>
+                            <td>16 conversions</td>
+                            <td class="bold-val">$8.51</td>
+                        </tr>
+                        <tr>
+                            <td>Facebook</td>
+                            <td>$71.40</td>
+                            <td>13 leads</td>
+                            <td class="bold-val">$5.49</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="highlight-box" style="margin-top: 20px;">
+                    <p>Facebook currently has the lowest reported acquisition cost. However, its result is a Facebook lead, while Google's result is a Google conversion, so these should <strong>not automatically be treated as equal-quality outcomes.</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">What Changed This Week & What We Learned</h2>
+        </div>
+        <div class="content-area">
+            <div class="grid-2">
+                <div class="info-card">
+                    <h3>Google PMax</h3>
+                    <p><strong>Change:</strong> New ad copies + New Customer Acquisition enabled.</p>
+                    <p><strong>Result:</strong> CTR (0.20% &rarr; 1.89%), Clicks (63 &rarr; 64), Conversions (37 &rarr; 16), Cost/Conv ($1.70 &rarr; $8.51).</p>
+                    <p><strong>Finding:</strong> Stronger engagement, but conversion efficiency declined.</p>
+                    <p><strong>Action:</strong> Continue monitoring setup and evaluate conversion quality.</p>
+                </div>
+
+                <div class="info-card">
+                    <h3>Google Search</h3>
+                    <p><strong>Change:</strong> New ad copies + new images + video ads.</p>
+                    <p><strong>Result:</strong> Clicks (73 &rarr; 85), Impressions (1,378 &rarr; 1,933), Conversions (28 &rarr; 19), Cost/Conv ($4.18 &rarr; $8.37).</p>
+                    <p><strong>Finding:</strong> Generating more traffic, but converting at a lower rate.</p>
+                    <p><strong>Action:</strong> Compare ad variations based on actual conversions.</p>
+                </div>
+            </div>
+
+            <div class="info-card" style="margin-top: 15px;">
+                <h3>Facebook</h3>
+                <p><strong>Change:</strong> New ads launched + old ads paused.</p>
+                <p><strong>Result:</strong> Clicks (181 &rarr; 220), CTR (5.78% &rarr; 6.67%), CPC ($0.38 &rarr; $0.32), Leads (13 &rarr; 13).</p>
+                <p><strong>Finding:</strong> Improved engagement and click efficiency but no increased lead volume.</p>
+                <p><strong>Action:</strong> Continue testing and focus on whether higher engagement converts into leads.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Key Decisions From This Week</h2>
+        </div>
+        <div class="content-area">
+            <div class="info-card" style="margin-bottom: 20px; border-left: 6px solid var(--primary-blue);">
+                <h3>Google Search</h3>
+                <p><strong>Continue testing.</strong> Search currently has the strongest conversion rate and slightly lower cost per conversion than PMax.</p>
+            </div>
+            
+            <div class="info-card" style="margin-bottom: 20px; border-left: 6px solid var(--primary-blue);">
+                <h3>Google PMax</h3>
+                <p><strong>Continue monitoring the new setup.</strong> The large CTR improvement is positive, but the fall in conversion rate means the campaign should be evaluated on conversion performance rather than CTR alone.</p>
+            </div>
+            
+            <div class="info-card" style="border-left: 6px solid var(--primary-blue);">
+                <h3>Facebook</h3>
+                <p><strong>Continue the new ads.</strong> The new ads are producing stronger engagement and cheaper clicks, but lead volume needs to improve before the change can be considered a clear lead-generation improvement.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Next Week's Action Plan</h2>
+        </div>
+        <div class="content-area">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Priority</th>
+                        <th style="width: 40%;">Action</th>
+                        <th style="width: 45%;">Why</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span style="background-color: #fee2e2; color: #b91c1c; padding: 6px 10px; border-radius: 4px; font-weight: 600;">High</span></td>
+                        <td><strong>Review Search ad variations based on conversions</strong></td>
+                        <td>Traffic increased but conversion rate decreased</td>
+                    </tr>
+                    <tr>
+                        <td><span style="background-color: #fee2e2; color: #b91c1c; padding: 6px 10px; border-radius: 4px; font-weight: 600;">High</span></td>
+                        <td><strong>Monitor PMax after New Customer Acquisition change</strong></td>
+                        <td>CTR improved but conversion efficiency declined</td>
+                    </tr>
+                    <tr>
+                        <td><span style="background-color: #fee2e2; color: #b91c1c; padding: 6px 10px; border-radius: 4px; font-weight: 600;">High</span></td>
+                        <td><strong>Continue Facebook new ads</strong></td>
+                        <td>Engagement improved and CPC decreased</td>
+                    </tr>
+                    <tr>
+                        <td><span style="background-color: #fee2e2; color: #b91c1c; padding: 6px 10px; border-radius: 4px; font-weight: 600;">High</span></td>
+                        <td><strong>Monitor Facebook lead rate</strong></td>
+                        <td>Clicks increased but leads stayed flat</td>
+                    </tr>
+                    <tr>
+                        <td><span style="background-color: #fef3c7; color: #b45309; padding: 6px 10px; border-radius: 4px; font-weight: 600;">Medium</span></td>
+                        <td><strong>Review Google conversion actions</strong></td>
+                        <td>Contact, phone calls and other actions need to be evaluated separately</td>
+                    </tr>
+                    <tr>
+                        <td><span style="background-color: #fef3c7; color: #b45309; padding: 6px 10px; border-radius: 4px; font-weight: 600;">Medium</span></td>
+                        <td><strong>Bring CRM data into reporting</strong></td>
+                        <td>Needed for qualified leads, quotes, customers and revenue</td>
+                    </tr>
+                    <tr>
+                        <td><span style="background-color: #fef3c7; color: #b45309; padding: 6px 10px; border-radius: 4px; font-weight: 600;">Medium</span></td>
+                        <td><strong>Build service/postcode analysis</strong></td>
+                        <td>Required for budget allocation based on downstream results</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <div class="slide-header">
+            <h2 class="slide-title">Final Weekly Conclusion</h2>
+        </div>
+        <div class="content-area">
+            <p style="font-size: 16px; margin-bottom: 15px;">This week's changes have produced different results across the platforms:</p>
+            
+            <div class="info-card" style="margin-bottom: 15px;">
+                <h3>Google PMax</h3>
+                <p>The new ad copies and New Customer Acquisition setup significantly improved CTR, but conversion rate and conversion volume declined.</p>
+            </div>
+            
+            <div class="info-card" style="margin-bottom: 15px;">
+                <h3>Google Search</h3>
+                <p>The new copies, images and videos increased impressions and clicks, but conversions decreased and cost per conversion increased.</p>
+            </div>
+
+            <div class="info-card" style="margin-bottom: 20px;">
+                <h3>Facebook</h3>
+                <p>The new ads generated more clicks, higher CTR and lower CPC, but lead volume remained unchanged.</p>
+            </div>
+
+            <div class="highlight-box">
+                <p style="font-size: 16px; font-weight: 700; text-align: center; color: var(--primary-blue);">
+                    The most important next step is therefore not simply increasing or reducing spend based on clicks, CTR or CPL.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container" style="justify-content: center;">
+        <div class="note-special" style="background-color: #fef2f2; border-color: #ef4444;">
+            <h2 style="color: #dc2626; font-size: 32px; margin-bottom: 20px; font-weight: bold;">Note - CRITICAL</h2>
+            <p style="font-size: 18px; color: #dc2626; line-height: 1.6; font-weight: 500;">
+                Please provide me the <strong>CRM outcomes</strong> so that we can identify:
+            </p>
+            <p style="font-size: 20px; color: #b91c1c; font-weight: 800; margin: 30px 0;">
+                Which campaign generated qualified leads &rarr; which generated quotes &rarr; which generated customers &rarr; which generated revenue and gross profit.
+            </p>
+            <p style="font-size: 18px; color: #dc2626; font-weight: 500;">
+                That will give us the information needed to make actual budget and campaign decisions.
+            </p>
+        </div>
+    </div>
+
+    <button onclick="toggleEdit()" class="no-print" style="position: fixed; bottom: 20px; right: 20px; background: #1B4E8C; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); z-index: 1000; transition: background 0.2s;">Enable Live Editing</button>
+    <script>
+        function toggleEdit() {
+            const body = document.body;
+            const isEditable = body.getAttribute('contenteditable') === 'true';
+            body.setAttribute('contenteditable', !isEditable);
+            
+            const btn = event.target;
+            if (!isEditable) {
+                btn.innerText = 'Disable Editing (Ready to Print)';
+                btn.style.background = '#10b981'; // Green when active
+            } else {
+                btn.innerText = 'Enable Live Editing';
+                btn.style.background = '#1B4E8C'; // Blue when inactive
+            }
+        }
+    </script>
+</body>
+</html>

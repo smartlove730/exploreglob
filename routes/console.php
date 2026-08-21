@@ -52,7 +52,7 @@ Schedule::command('google:refresh-tokens')
 
 // Automation runner. Per-rule limits are enforced inside AutomationService and queue jobs.
 Schedule::command('automations:dispatch-due')
-    ->everyThirtyMinutes()
+    ->daily()
     ->withoutOverlapping();
 
 // Dispatch due scheduled social posts every minute.

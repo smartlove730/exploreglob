@@ -36,9 +36,19 @@ return [
     ],
 
     'facebook' => [
+        'client_id' => env('WHATSAPP_APP_ID'),
+        'client_secret' => env('WHATSAPP_APP_SECRET'),
+        'redirect' => 'https://postzy.webzy.co.in/auth/facebook/login/callback',
         'app_id' => env('FACEBOOK_APP_ID'),
         'app_secret' => env('FACEBOOK_APP_SECRET'),
         'redirect_uri' => env('FACEBOOK_REDIRECT_URI'),
+    ],
+
+    'whatsapp' => [
+        'app_id' => env('WHATSAPP_APP_ID'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+        'client_token' => env('WHATSAPP_CLIENT_TOKEN'),
+        'config_id' => env('WHATSAPP_CONFIG_ID'),
     ],
 
 

@@ -141,7 +141,7 @@ class FacebookPostController extends Controller
         }
 
         try {
-            $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
+            $apiKey = config('gemini.api_key') ?? env('AIAPIKEY');
 
             if (!$apiKey) {
                 return response()->json([

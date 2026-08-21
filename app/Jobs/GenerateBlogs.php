@@ -65,11 +65,11 @@ class GenerateBlogs implements ShouldQueue
         // }";
 
         //  // Call Gemini API to generate prompt
-        //     $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
-            
+        //     $apiKey = config('gemini.api_key') ?? env('AIAPIKEY');
+        //     
         //     if (!$apiKey) {
         //         Log::error('Gemini API key not configured');
-        //         throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
+        //         throw new \Exception('Gemini API key is not configured. Please set AIAPIKEY in your .env file.');
         //     }
 
         //     $model = config('gemini.model', 'gemma-3-27b');
@@ -148,11 +148,11 @@ Format your response strictly as JSON using this exact schema:
 The content should sound insightful, helpful, and written by a human. Use realistic and educational examples, not overly generic text.";
           
             // Get API key from config/environment
-            $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
+            $apiKey = config('gemini.api_key') ?? env('AIAPIKEY');
               
             if (!$apiKey) {
                 Log::error('Gemini API key not configured');
-                throw new \Exception('Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.');
+                throw new \Exception('Gemini API key is not configured. Please set AIAPIKEY in your .env file.');
             }
 
               $model = config('gemini.model', 'gemma-3-27b');

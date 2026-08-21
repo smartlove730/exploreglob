@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessAutomationQueueItemJob;
 use App\Models\AutomationQueueItem;
 use App\Models\AutomationRule;
 use App\Models\DriveApiKey;
@@ -10,10 +11,13 @@ use App\Models\DriveFolder;
 use App\Models\FacebookApp;
 use App\Models\FacebookPage;
 use App\Services\AutomationService;
+use App\Services\GoogleDriveService;
+use App\Services\GoogleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class AutomationConfigController extends Controller
 {
@@ -38,8 +42,7 @@ class AutomationConfigController extends Controller
         $queueItems = AutomationQueueItem::query()
             ->ownedBy(Auth::user())
             ->with(['rule:id,name', 'page:id,page_name'])
-            ->latest()
-            ->limit(40)
+            ->orderBy('scheduled_for', 'asc')
             ->get();
 
         return view('admin.automations.index', compact('rules', 'pages', 'queueItems'));
@@ -143,6 +146,83 @@ class AutomationConfigController extends Controller
         $result = $this->automationService->queueRule($automation, true);
 
         return back()->with('success', "{$result['queued']} post(s) queued. {$result['skipped']} skipped.");
+    }
+
+    public function deleteQueueItem(AutomationQueueItem $queueItem): RedirectResponse
+    {
+        $this->authorizeQueueItem($queueItem);
+
+        // Only allow deletion of items that are not currently being processed or already published
+        abort_unless(
+            in_array($queueItem->status, [
+                AutomationQueueItem::STATUS_QUEUED,
+                AutomationQueueItem::STATUS_FAILED,
+                AutomationQueueItem::STATUS_SKIPPED,
+            ]),
+            422,
+            'This queue item cannot be deleted in its current state.'
+        );
+
+        // If the automation rule uses Drive as media source, move the file to DeletedPosts folder
+        $rule = $queueItem->rule;
+        if ($rule && $rule->media_source_type === 'drive') {
+            $driveFileId = $queueItem->source_id;
+            $driveApiKeyId = (int) ($rule->media_source_payload['drive_api_key_id'] ?? 0);
+            $driveApiKey = DriveApiKey::query()->whereKey($driveApiKeyId)->where('is_active', true)->first();
+
+            if ($driveApiKey && $driveFileId) {
+                try {
+                    $googleService = app(GoogleService::class);
+                    $googleDriveService = app(GoogleDriveService::class);
+
+                    // Ensure we have a valid access token
+                    if ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token) {
+                        $driveApiKey = $googleService->ensureValidDriveToken($driveApiKey);
+                    }
+
+                    $accessToken = $driveApiKey->oauth_access_token;
+
+                    if ($accessToken) {
+                        // Find or create DeletedPosts folder and move the file there
+                        $deletedFolderId = $googleDriveService->findFolderByName('DeletedPosts', $accessToken)
+                            ?? $googleDriveService->createFolder('DeletedPosts', $accessToken);
+
+                        $googleDriveService->moveFileToFolder($driveFileId, $deletedFolderId, 'deleted', $accessToken);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to move Drive file to DeletedPosts folder during queue item deletion.', [
+                        'queue_item_id' => $queueItem->id,
+                        'source_id' => $driveFileId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        $queueItem->delete();
+
+        return back()->with('success', 'Queue item deleted successfully.');
+    }
+
+    public function executeQueueItemNow(AutomationQueueItem $queueItem): RedirectResponse
+    {
+        $this->authorizeQueueItem($queueItem);
+
+        abort_unless(
+            $queueItem->status === AutomationQueueItem::STATUS_QUEUED,
+            422,
+            'Only queued items can be executed immediately.'
+        );
+
+        // Update scheduled_for to now so it processes immediately
+        $queueItem->update([
+            'scheduled_for' => now(),
+        ]);
+
+        // Dispatch the job with no delay for immediate execution
+        ProcessAutomationQueueItemJob::dispatch($queueItem->id);
+
+        return back()->with('success', 'Queue item dispatched for immediate execution.');
     }
 
     private function formData(): array
@@ -253,5 +333,10 @@ class AutomationConfigController extends Controller
     private function authorizeRule(AutomationRule $automation): void
     {
         abort_if(!Auth::user()?->isAdmin() && $automation->user_id !== Auth::id(), 403);
+    }
+
+    private function authorizeQueueItem(AutomationQueueItem $queueItem): void
+    {
+        abort_if(!Auth::user()?->isAdmin() && $queueItem->user_id !== Auth::id(), 403);
     }
 }

@@ -9,7 +9,7 @@ class AiCaptionService
 {
     public function generateCaption(string $prompt, string $imageUrl): string
     {
-        $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
+        $apiKey = config('gemini.api_key') ?? env('AIAPIKEY');
 
         if (!$apiKey) {
             throw new RuntimeException('Gemini API key is not configured.');

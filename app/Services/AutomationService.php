@@ -52,16 +52,27 @@ class AutomationService
             $failed = 0;
 
             foreach ($pages as $page) {
-                $remainingToday = $this->remainingDailyCapacity($rule, $page);
-                if ($remainingToday <= 0) {
+                $postedSourceIds = AutomationQueueItem::query()
+                    ->where('automation_rule_id', $rule->id)
+                    ->where('page_id', $page->id)
+                    ->pluck('source_id')
+                    ->toArray();
+
+                $availableMedia = $mediaItems->reject(fn ($media) => in_array($media['source_id'], $postedSourceIds))->values();
+
+                $availableSlots = $this->getAvailableScheduleTimes($rule, $page, max(1, count($availableMedia)));
+                $remainingSlots = count($availableSlots);
+                
+                if ($remainingSlots <= 0 || $availableMedia->isEmpty()) {
                     $skipped++;
-                    $this->log($rule, null, $page->id, 'skipped', 'Daily limit reached for this page.');
+                    $this->log($rule, null, $page->id, 'skipped', 'No available schedule slots or media for this page right now.');
                     continue;
                 }
 
-                foreach ($mediaItems->take($remainingToday) as $media) {
+                $slotIndex = 0;
+                foreach ($availableMedia->take($remainingSlots) as $media) {
                     try {
-                        $scheduledFor = $this->nextScheduleTime($rule, $queued);
+                        $scheduledFor = $availableSlots[$slotIndex++];
                         $caption = $this->buildCaption($rule, $media);
 
                         $item = AutomationQueueItem::query()->firstOrCreate(
@@ -112,12 +123,9 @@ class AutomationService
 
         AutomationRule::query()
             ->where('status', AutomationRule::STATUS_ACTIVE)
-            ->where(function ($query) {
-                $query->whereNull('next_run_at')->orWhere('next_run_at', '<=', now());
-            })
             ->chunkById(50, function (Collection $rules) use (&$count): void {
                 foreach ($rules as $rule) {
-                    $result = $this->queueRule($rule);
+                    $result = $this->queueRule($rule, true);
                     $count += $result['queued'];
                 }
             });
@@ -125,19 +133,68 @@ class AutomationService
         return $count;
     }
 
-    public function remainingDailyCapacity(AutomationRule $rule, FacebookPage $page): int
+    public function getAvailableScheduleTimes(AutomationRule $rule, FacebookPage $page, int $limit): array
     {
-        $limit = min(self::MAX_DAILY_POSTS_PER_PAGE, max(1, (int) $rule->daily_limit));
-        $used = AutomationQueueItem::query()
+        $timezone = $rule->timezone ?: config('app.timezone', 'UTC');
+        $times = collect($rule->schedule_times ?: [now($timezone)->format('H:i')])->filter()->values();
+        if ($times->isEmpty()) {
+            return [];
+        }
+
+        $existingDates = AutomationQueueItem::query()
+            ->where('automation_rule_id', $rule->id)
             ->where('page_id', $page->id)
             ->whereIn('status', [
+                AutomationQueueItem::STATUS_QUEUED,
                 AutomationQueueItem::STATUS_PROCESSING,
                 AutomationQueueItem::STATUS_PUBLISHED,
             ])
-            ->whereDate('scheduled_for', now($rule->timezone ?: 'UTC')->toDateString())
-            ->count();
+            ->where('scheduled_for', '>=', now()->startOfDay())
+            ->pluck('scheduled_for')
+            ->map(fn($date) => Carbon::parse($date)->timezone($timezone)->format('Y-m-d H:i'))
+            ->toArray();
 
-        return max(0, $limit - $used);
+        $usedPerDay = [];
+        foreach ($existingDates as $ed) {
+            $date = substr($ed, 0, 10);
+            $usedPerDay[$date] = ($usedPerDay[$date] ?? 0) + 1;
+        }
+
+        $availableSlots = [];
+        $candidateDay = now($timezone)->startOfDay();
+        $dailyLimit = min(self::MAX_DAILY_POSTS_PER_PAGE, max(1, (int)$rule->daily_limit));
+
+        while (count($availableSlots) < $limit) {
+            $dateStr = $candidateDay->format('Y-m-d');
+            $usedToday = $usedPerDay[$dateStr] ?? 0;
+
+            if ($usedToday < $dailyLimit) {
+                foreach ($times as $timeStr) {
+                    [$hour, $minute] = array_map('intval', explode(':', $timeStr) + [0, 0]);
+                    $slot = $candidateDay->copy()->setTime($hour, $minute);
+
+                    if ($slot->isFuture()) {
+                        $slotStr = $slot->format('Y-m-d H:i');
+                        if (!in_array($slotStr, $existingDates)) {
+                            $availableSlots[] = $slot->timezone(config('app.timezone', 'UTC'));
+                            $usedToday++;
+                            $existingDates[] = $slotStr;
+
+                            if ($usedToday >= $dailyLimit || count($availableSlots) >= $limit) {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            $candidateDay->addDay();
+            if ($candidateDay->diffInDays(now($timezone)) > 365) {
+                break;
+            }
+        }
+
+        return $availableSlots;
     }
 
     private function resolveMediaItems(AutomationRule $rule): Collection
@@ -191,20 +248,7 @@ class AutomationService
         return trim($caption."\n\n".$hashtag);
     }
 
-    private function nextScheduleTime(AutomationRule $rule, int $offset): Carbon
-    {
-        $timezone = $rule->timezone ?: config('app.timezone', 'UTC');
-        $times = collect($rule->schedule_times ?: [now($timezone)->format('H:i')])->filter()->values();
-        $time = (string) $times->get($offset % max(1, $times->count()), now($timezone)->format('H:i'));
-        [$hour, $minute] = array_map('intval', explode(':', $time) + [0, 0]);
-        $candidate = now($timezone)->setTime($hour, $minute)->addDays(intdiv($offset, max(1, $times->count())));
 
-        if ($candidate->isPast()) {
-            $candidate->addDay();
-        }
-
-        return $candidate->timezone(config('app.timezone', 'UTC'));
-    }
 
     private function nextRuleRunAt(AutomationRule $rule): Carbon
     {

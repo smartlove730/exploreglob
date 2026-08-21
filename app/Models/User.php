@@ -32,6 +32,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'is_admin',
         'google_id',
+        'facebook_id',
         'email_verification_otp',
         'email_verification_otp_expires_at',
     ];
@@ -87,6 +88,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function googleAccounts(): HasMany
     {
         return $this->hasMany(GoogleAccount::class);
+    }
+
+    public function whatsappAccount(): HasOne
+    {
+        return $this->hasOne(WhatsappAccount::class);
     }
 
     public function subscriptions(): HasMany

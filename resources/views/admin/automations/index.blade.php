@@ -76,7 +76,7 @@
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <h2 class="h5 mb-3">Queue Management</h2>
-        <x-data-table no-export="" order='[[5, "desc"]]'>
+        <x-data-table no-export="7" order='[[4, "asc"]]'>
             <thead>
                 <tr>
                     <th>Automation</th>
@@ -86,6 +86,7 @@
                     <th>Scheduled</th>
                     <th>Updated</th>
                     <th>Message</th>
+                    <th class="no-export">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -98,9 +99,30 @@
                         <td>{{ optional($item->scheduled_for)->format('M d, Y H:i') }}</td>
                         <td>{{ optional($item->updated_at)->format('M d, Y H:i') }}</td>
                         <td class="small text-muted">{{ $item->last_error ?: 'Ready' }}</td>
+                        <td class="text-nowrap">
+                            @if($item->status === 'queued' && auth()->user()?->email === 'cellsswag@gmail.com')
+                                <form method="POST" action="{{ route('admin.automations.queue-item.execute', $item) }}" class="d-inline">
+                                    @csrf
+                                    <button class="btn btn-sm btn-outline-success" title="Execute this post immediately" onclick="return confirm('Execute this queue item immediately?')">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                        Execute
+                                    </button>
+                                </form>
+                            @endif
+                            @if(in_array($item->status, ['queued', 'failed', 'skipped']))
+                                <form method="POST" action="{{ route('admin.automations.queue-item.delete', $item) }}" class="d-inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete this queue item and move media" onclick="return confirm('Delete this queue item? The media will be moved to a DeletedPosts folder in Drive (if applicable).')">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                        Delete
+                                    </button>
+                                </form>
+                            @endif
+                        </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center text-muted">Queue is empty.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted">Queue is empty.</td></tr>
                 @endforelse
             </tbody>
         </x-data-table>

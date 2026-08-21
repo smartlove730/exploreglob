@@ -34,6 +34,11 @@ class DriveService
     {
         $folderId = $this->googleDriveService->extractFolderId($driveLink);
         $folderResourceKey = $this->googleDriveService->extractFolderResourceKey($driveLink);
+        
+        if ($driveApiKey && ($driveApiKey->oauth_access_token || $driveApiKey->oauth_refresh_token)) {
+            $driveApiKey = $this->googleService->ensureValidDriveToken($driveApiKey);
+        }
+
         $media = $this->googleDriveService->listPublicFolderMedia(
             $folderId,
             $driveApiKey?->api_key,

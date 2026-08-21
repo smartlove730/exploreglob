@@ -14,7 +14,7 @@ return [
     | on Google AI Studio, at https://aistudio.google.com/app/apikey.
     */
 
-    'api_key' => env('GEMINI_API_KEY'),
+    'api_key' => env('AIAPIKEY'),
 
     /*
     |--------------------------------------------------------------------------

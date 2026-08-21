@@ -64,6 +64,12 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        // Auto-send email verification notification when a user registers
+        Event::listen(
+            \Illuminate\Auth\Events\Registered::class,
+            \Illuminate\Auth\Listeners\SendEmailVerificationNotification::class
+        );
+
         Paginator::useBootstrapFive();
         RateLimiter::for('contact-form', function (Request $request) {
             return Limit::perMinute(5)->by($request->ip());

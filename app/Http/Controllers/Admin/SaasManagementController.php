@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class SaasManagementController extends Controller
 {
@@ -134,5 +135,111 @@ class SaasManagementController extends Controller
         ]);
 
         return back()->with('success', "Email verified for {$user->name} ({$user->email}).");
+    }
+
+    // ── Plan CRUD ────────────────────────────────────────────────────
+
+    public function createPlan()
+    {
+        return view('admin.saas.plans.create');
+    }
+
+    public function storePlan(Request $request): RedirectResponse
+    {
+        $data = $request->validate($this->planRules());
+
+        $data['slug'] = Str::slug($data['name']);
+
+        // Ensure unique slug
+        $originalSlug = $data['slug'];
+        $counter = 1;
+        while (Plan::query()->where('slug', $data['slug'])->exists()) {
+            $data['slug'] = $originalSlug . '-' . $counter++;
+        }
+
+        $data['facebook_enabled'] = $request->boolean('facebook_enabled');
+        $data['instagram_enabled'] = $request->boolean('instagram_enabled');
+        $data['google_business_enabled'] = $request->boolean('google_business_enabled');
+        $data['is_active'] = $request->boolean('is_active');
+
+        $plan = Plan::create($data);
+
+        app(ActivityLogService::class)->log('admin.plan.created', $request->user(), [
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+        ]);
+
+        return redirect()->route('admin.saas.plans')->with('success', "Plan \"{$plan->name}\" created.");
+    }
+
+    public function editPlan(Plan $plan)
+    {
+        return view('admin.saas.plans.edit', compact('plan'));
+    }
+
+    public function updatePlan(Request $request, Plan $plan): RedirectResponse
+    {
+        $data = $request->validate($this->planRules());
+
+        $data['facebook_enabled'] = $request->boolean('facebook_enabled');
+        $data['instagram_enabled'] = $request->boolean('instagram_enabled');
+        $data['google_business_enabled'] = $request->boolean('google_business_enabled');
+        $data['is_active'] = $request->boolean('is_active');
+
+        // Update slug only if name changed
+        if ($plan->name !== $data['name']) {
+            $data['slug'] = Str::slug($data['name']);
+            $originalSlug = $data['slug'];
+            $counter = 1;
+            while (Plan::query()->where('slug', $data['slug'])->where('id', '!=', $plan->id)->exists()) {
+                $data['slug'] = $originalSlug . '-' . $counter++;
+            }
+        }
+
+        $plan->update($data);
+
+        app(ActivityLogService::class)->log('admin.plan.updated', $request->user(), [
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+        ]);
+
+        return redirect()->route('admin.saas.plans')->with('success', "Plan \"{$plan->name}\" updated.");
+    }
+
+    public function destroyPlan(Request $request, Plan $plan): RedirectResponse
+    {
+        if ($plan->subscriptions()->exists()) {
+            return back()->with('error', "Cannot delete plan \"{$plan->name}\" because it has active subscriptions.");
+        }
+
+        $planName = $plan->name;
+        $planId = $plan->id;
+        $plan->delete();
+
+        app(ActivityLogService::class)->log('admin.plan.deleted', $request->user(), [
+            'plan_id' => $planId,
+            'plan_name' => $planName,
+        ]);
+
+        return redirect()->route('admin.saas.plans')->with('success', "Plan \"{$planName}\" deleted.");
+    }
+
+    private function planRules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'price' => ['required', 'numeric', 'min:0'],
+            'currency' => ['required', 'string', 'in:INR,USD'],
+            'interval' => ['required', 'string', 'in:monthly,yearly'],
+            'post_limit' => ['required', 'integer', 'min:0'],
+            'posts_per_day_limit' => ['nullable', 'integer', 'min:0'],
+            'posts_per_week_limit' => ['nullable', 'integer', 'min:0'],
+            'posts_per_month_limit' => ['nullable', 'integer', 'min:0'],
+            'automation_limit' => ['nullable', 'integer', 'min:0'],
+            'connected_apps_limit' => ['nullable', 'integer', 'min:0'],
+            'synced_pages_limit' => ['nullable', 'integer', 'min:0'],
+            'razorpay_plan_id' => ['nullable', 'string', 'max:255'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+        ];
     }
 }

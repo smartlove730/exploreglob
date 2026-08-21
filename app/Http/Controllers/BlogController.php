@@ -124,7 +124,7 @@ class BlogController extends Controller
     {
         $prompt = 'Abstract futuristic cityscape with glowing data streams connecting various technological elements like AI brains, IoT devices, and cloud servers, symbolizing interconnectedness and innovation.';
 
-        $apiKey = config('gemini.api_key') ?? env('GEMINI_API_KEY');
+        $apiKey = config('gemini.api_key') ?? env('AIAPIKEY');
 
         if (! $apiKey) {
             return response()->json(['error' => 'API key not configured'], 500);
