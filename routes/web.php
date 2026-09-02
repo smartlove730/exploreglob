@@ -202,8 +202,8 @@ Route::middleware(['auth', 'admin'])
         Route::get('/subscriptions', [SaasManagementController::class, 'subscriptions'])->name('subscriptions');
         Route::post('/subscriptions/{subscription}/toggle', [SaasManagementController::class, 'toggleSubscription'])->name('subscriptions.toggle');
         Route::post('/users/{user}/verify-email', [SaasManagementController::class, 'verifyEmail'])->name('users.verify-email');
+        Route::post('/users/{user}/toggle-whatsapp', [SaasManagementController::class, 'toggleWhatsappAccess'])->name('users.toggle-whatsapp');
     });
-
 // Admin auth
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');
@@ -237,7 +237,7 @@ Route::middleware(['auth', 'role:customer,admin'])
     ->prefix('admin/whatsapp')
     ->name('admin.whatsapp.')
     ->group(function () {
-        Route::view('/dashboard', 'admin.whatsapp.dashboard')->name('dashboard');
+        Route::get('/dashboard', [\App\Http\Controllers\Admin\WhatsappDashboardController::class, 'index'])->name('dashboard');
         
         // Phone Numbers - Meta Embedded Signup (1 account = 1 number)
         Route::get('/phone-numbers', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'index'])->name('phone-numbers');
@@ -252,9 +252,29 @@ Route::middleware(['auth', 'role:customer,admin'])
         Route::post('/phone-numbers/verify-code', [\App\Http\Controllers\Admin\WhatsappPhoneNumberController::class, 'verifyCode'])->name('phone-numbers.verify-code');
 
         Route::get('/templates', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'index'])->name('templates');
+        Route::get('/templates/create', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'create'])->name('templates.create');
         Route::post('/templates', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'store'])->name('templates.store');
+        Route::post('/templates/send', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'send'])->name('templates.send');
+        Route::get('/reports', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'reports'])->name('reports');
+        
+        Route::get('/campaigns', [\App\Http\Controllers\Admin\WhatsappCampaignController::class, 'index'])->name('campaigns.index');
+        Route::get('/campaigns/create', [\App\Http\Controllers\Admin\WhatsappCampaignController::class, 'create'])->name('campaigns.create');
+        Route::post('/campaigns', [\App\Http\Controllers\Admin\WhatsappCampaignController::class, 'store'])->name('campaigns.store');
+        Route::get('/campaigns/{campaign}/export', [\App\Http\Controllers\Admin\WhatsappCampaignController::class, 'export'])->name('campaigns.export');
+        
         Route::delete('/templates/{template}', [\App\Http\Controllers\Admin\WhatsappTemplateController::class, 'destroy'])->name('templates.destroy');
         Route::get('/contacts', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'index'])->name('contacts');
+        Route::post('/contacts', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'store'])->name('contacts.store');
+        Route::get('/contacts/sample', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'downloadSample'])->name('contacts.sample');
+        Route::post('/contacts/groups', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'storeGroup'])->name('contacts.groups.store');
+        Route::put('/contacts/groups/{group}', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'updateGroup'])->name('contacts.groups.update');
+        Route::delete('/contacts/groups/{group}', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'destroyGroup'])->name('contacts.groups.destroy');
+        Route::get('/contacts/groups/{group}/export', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'exportGroup'])->name('contacts.groups.export');
+        Route::post('/contacts/bulk-groups', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'bulkAddGroups'])->name('contacts.bulk-groups');
+        Route::put('/contacts/{contact}', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'update'])->name('contacts.update');
+        Route::delete('/contacts/{contact}', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'destroy'])->name('contacts.destroy');
+        Route::post('/contacts/{id}/restore', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'restoreContact'])->name('contacts.restore');
+        Route::delete('/contacts/{id}/force', [\App\Http\Controllers\Admin\WhatsappContactController::class, 'forceDeleteContact'])->name('contacts.forceDelete');
         Route::view('/conversations', 'admin.whatsapp.conversations')->name('conversations');
         Route::get('/settings', [\App\Http\Controllers\Admin\WhatsappSettingsController::class, 'index'])->name('settings');
         Route::put('/settings', [\App\Http\Controllers\Admin\WhatsappSettingsController::class, 'update'])->name('settings.update');

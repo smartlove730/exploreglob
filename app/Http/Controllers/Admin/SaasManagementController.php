@@ -137,6 +137,20 @@ class SaasManagementController extends Controller
         return back()->with('success', "Email verified for {$user->name} ({$user->email}).");
     }
 
+    public function toggleWhatsappAccess(Request $request, User $user): RedirectResponse
+    {
+        $hasAccess = $request->boolean('has_whatsapp_access');
+        $user->update(['has_whatsapp_access' => $hasAccess]);
+
+        app(ActivityLogService::class)->log('admin.user.whatsapp_toggled', $request->user(), [
+            'target_user_id' => $user->id,
+            'has_whatsapp_access' => $hasAccess,
+        ]);
+
+        $status = $hasAccess ? 'enabled' : 'disabled';
+        return back()->with('success', "WhatsApp module {$status} for {$user->name}.");
+    }
+
     // ── Plan CRUD ────────────────────────────────────────────────────
 
     public function createPlan()

@@ -345,8 +345,8 @@ class FacebookGraphService
         $subCode = (int) data_get($payload, 'error.error_subcode', 0);
         $message = (string) data_get($payload, 'error.message', $fallback);
 
-        if ($errorCode === 190 || in_array($subCode, [458, 459, 460, 463, 464, 467], true)) {
-            throw new ReauthorizationRequiredException('Facebook connection expired or was revoked. Please reconnect your Facebook account.');
+        if ($errorCode === 190 || $errorCode === 200 || in_array($subCode, [458, 459, 460, 463, 464, 467], true)) {
+            throw new ReauthorizationRequiredException('Facebook connection expired, revoked, or requires re-authentication. Please reconnect your Facebook account.');
         }
 
         throw new RuntimeException($fallback.' '.$message);

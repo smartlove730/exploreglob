@@ -73,6 +73,7 @@
 
     <!-- Navigation -->
     <nav class="admin-sidebar-nav">
+        @if($isAdmin)
         <!-- Overview -->
         <div class="admin-nav-section">Overview</div>
         <a class="admin-nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
@@ -80,7 +81,6 @@
             Dashboard
         </a>
 
-        @if($isAdmin)
         <!-- Content -->
         <div class="admin-nav-section">Content</div>
         <a class="admin-nav-link {{ request()->routeIs('admin.blogs.*') ? 'active' : '' }}" href="{{ route('admin.blogs.index') }}">
@@ -93,14 +93,13 @@
         </a>
         @endif
 
+        @if($isAdmin)
         <!-- Social & Publishing -->
         <div class="admin-nav-section">Social & Publishing</div>
-        @if($isAdmin)
         <a class="admin-nav-link {{ request()->routeIs('admin.facebook.apps.*') ? 'active' : '' }}" href="{{ $facebookAppsUrl }}">
             <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-2a4 4 0 0 0-4 4v8"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
             Facebook Apps
         </a>
-        @endif
         <a class="admin-nav-link {{ request()->routeIs('admin.facebook.google-drive-keys.*') ? 'active' : '' }}" href="{{ $googleDriveKeysUrl }}">
             <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
             Google Accounts
@@ -128,9 +127,10 @@
             <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6"/><path d="M1 12h6m6 0h6"/><path d="M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24"/><path d="M19.78 4.22l-4.24 4.24m-7.08 7.08l-4.24 4.24"/></svg>
             Automations
         </a>
+        @endif
 
         <!-- WhatsApp Business -->
-        @if(auth()->check() && auth()->user()->email === 'cellsswag@gmail.com')
+        @if(auth()->check())
         <div class="admin-nav-section">WhatsApp Business</div>
         <a class="admin-nav-link {{ request()->is('admin/whatsapp') || request()->is('admin/whatsapp/dashboard') ? 'active' : '' }}" href="{{ url('/admin/whatsapp/dashboard') }}">
             <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -141,8 +141,16 @@
             Phone Numbers
         </a>
         <a class="admin-nav-link {{ request()->is('admin/whatsapp/templates*') ? 'active' : '' }}" href="{{ url('/admin/whatsapp/templates') }}">
-            <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-layout"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
             Templates
+        </a>
+        <a class="admin-nav-link {{ request()->is('admin/whatsapp/campaigns*') ? 'active' : '' }}" href="{{ route('admin.whatsapp.campaigns.index') }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            Campaigns
+        </a>
+        <a class="admin-nav-link {{ request()->is('admin/whatsapp/reports*') ? 'active' : '' }}" href="{{ url('/admin/whatsapp/reports') }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-bar-chart-2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            Template Reports
         </a>
         <a class="admin-nav-link {{ request()->is('admin/whatsapp/contacts*') ? 'active' : '' }}" href="{{ url('/admin/whatsapp/contacts') }}">
             <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -152,12 +160,15 @@
             <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             Conversations
         </a>
+        @if($isAdmin)
         <a class="admin-nav-link {{ request()->is('admin/whatsapp/settings*') ? 'active' : '' }}" href="{{ url('/admin/whatsapp/settings') }}">
             <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             API Settings
         </a>
         @endif
+        @endif
 
+        @if($isAdmin)
         <!-- Account -->
         <div class="admin-nav-section">Account</div>
         <a class="admin-nav-link {{ request()->routeIs('app.billing.*') ? 'active' : '' }}" href="{{ route('app.billing.plans') }}">
@@ -168,6 +179,7 @@
             <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Settings
         </a>
+        @endif
 
         @if($isAdmin)
         <!-- System -->
@@ -238,6 +250,18 @@ function toggleAdminSidebar() {
 
 // Auto-dismiss alerts
 document.addEventListener('DOMContentLoaded', () => {
+    // Preserve sidebar scroll position
+    const sidebarNav = document.querySelector('.admin-sidebar-nav');
+    if (sidebarNav) {
+        const scrollPos = localStorage.getItem('adminSidebarScroll');
+        if (scrollPos) {
+            sidebarNav.scrollTop = parseInt(scrollPos, 10);
+        }
+        sidebarNav.addEventListener('scroll', () => {
+            localStorage.setItem('adminSidebarScroll', sidebarNav.scrollTop);
+        }, { passive: true });
+    }
+
     document.querySelectorAll('.admin-alert-dismiss').forEach(btn => {
         btn.addEventListener('click', () => {
             const alert = btn.closest('.admin-alert');

@@ -51,11 +51,15 @@
         <p class="text-muted mb-0">Manage your WhatsApp contacts, group them into audiences, and track their opt-in status.</p>
     </div>
     <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#createContactModal">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+            Add Contact
+        </button>
         <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importModal">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
             Import Contacts
         </button>
-        <button class="btn wa-btn">
+        <button class="btn wa-btn" data-bs-toggle="modal" data-bs-target="#createGroupModal">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Create Group
         </button>
@@ -126,6 +130,9 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link fw-medium" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups-tab-pane" type="button" role="tab" aria-controls="groups-tab-pane" aria-selected="false">Groups</button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-medium text-danger" id="trash-tab" data-bs-toggle="tab" data-bs-target="#trash-tab-pane" type="button" role="tab" aria-controls="trash-tab-pane" aria-selected="false">Trash</button>
+            </li>
         </ul>
     </div>
     
@@ -151,13 +158,22 @@
                         <option value="0" @selected(request('opted_in') === '0')>Opted Out</option>
                     </select>
                     <noscript><button type="submit" class="btn btn-sm btn-primary">Filter</button></noscript>
+                    
+                    <div class="ms-auto">
+                        <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            Bulk Actions
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li><button type="button" class="dropdown-item" onclick="openBulkGroupModal()">Add to Group</button></li>
+                        </ul>
+                    </div>
                 </form>
                 
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light text-muted small">
                             <tr>
-                                <th class="ps-3" style="width: 40px;"><input class="form-check-input" type="checkbox"></th>
+                                <th class="ps-3" style="width: 40px;"><input class="form-check-input" type="checkbox" id="selectAllContacts"></th>
                                 <th>Name</th>
                                 <th>Phone Number</th>
                                 <th>Groups</th>
@@ -169,7 +185,7 @@
                         <tbody>
                             @forelse($contacts as $contact)
                             <tr>
-                                <td class="ps-3"><input class="form-check-input" type="checkbox" value="{{ $contact->id }}"></td>
+                                <td class="ps-3"><input class="form-check-input contact-checkbox" type="checkbox" value="{{ $contact->id }}"></td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         @php
@@ -200,8 +216,14 @@
                                     {{ $contact->last_message_at ? $contact->last_message_at->diffForHumans() : 'Never' }}
                                 </td>
                                 <td class="text-end pe-3 text-nowrap">
-                                    <button class="btn btn-sm btn-light rounded-circle p-1 me-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                                    <button class="btn btn-sm btn-light rounded-circle p-1 text-danger"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                                    <button class="btn btn-sm btn-light rounded-circle p-1 me-1" onclick="openEditModal({{ $contact->id }}, '{{ addslashes($contact->name ?? '') }}', '{{ addslashes($contact->phone_number) }}', {{ $contact->opted_in ? 'true' : 'false' }}, {{ json_encode($contact->groups->pluck('id')) }})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                    </button>
+                                    <form action="{{ route('admin.whatsapp.contacts.destroy', $contact->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to move this contact to trash?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-light rounded-circle p-1 text-danger"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                                    </form>
                                 </td>
                             </tr>
                             @empty
@@ -257,10 +279,10 @@
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                                            <li><a class="dropdown-item" href="#">Edit Group</a></li>
-                                            <li><a class="dropdown-item" href="#">Export Members</a></li>
+                                            <li><button type="button" class="dropdown-item" onclick="openEditGroupModal({{ $group->id }}, '{{ addslashes($group->name) }}', '{{ addslashes($group->description ?? '') }}')">Edit Group</button></li>
+                                            <li><a class="dropdown-item" href="{{ route('admin.whatsapp.contacts.groups.export', $group) }}">Export Members</a></li>
                                             <li><hr class="dropdown-divider"></li>
-                                            <li><a class="dropdown-item text-danger" href="#">Delete Group</a></li>
+                                            <li><button type="button" class="dropdown-item text-danger" onclick="openDeleteGroupModal({{ $group->id }}, '{{ addslashes($group->name) }}')">Delete Group</button></li>
                                         </ul>
                                     </div>
                                 </div>
@@ -282,6 +304,79 @@
                 </div>
             </div>
             
+            <!-- Trash Tab -->
+            <div class="tab-pane fade" id="trash-tab-pane" role="tabpanel" aria-labelledby="trash-tab" tabindex="0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-muted small">
+                            <tr>
+                                <th class="ps-3">Name</th>
+                                <th>Phone Number</th>
+                                <th>Deleted At</th>
+                                <th class="text-end pe-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($trashedContacts as $contact)
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        @php
+                                            $initials = collect(explode(' ', $contact->name ?? 'U'))->map(function($segment) {
+                                                return strtoupper(substr($segment, 0, 1));
+                                            })->take(2)->join('');
+                                        @endphp
+                                        <div class="avatar-circle bg-danger bg-opacity-10 text-danger fw-bold small rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                            {{ $initials }}
+                                        </div>
+                                        <div>
+                                            <div class="fw-semibold text-dark">{{ $contact->name ?? 'Unknown' }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="text-secondary">{{ $contact->phone_number }}</span></td>
+                                <td class="text-secondary small">
+                                    {{ $contact->deleted_at ? $contact->deleted_at->diffForHumans() : 'Unknown' }}
+                                </td>
+                                <td class="text-end pe-3 text-nowrap">
+                                    <form action="{{ route('admin.whatsapp.contacts.restore', $contact->id) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-light rounded-circle p-1 me-1 text-success" title="Restore">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                                        </button>
+                                    </form>
+                                    <form action="{{ route('admin.whatsapp.contacts.forceDelete', $contact->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to permanently delete this contact? This action cannot be undone.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-light rounded-circle p-1 text-danger" title="Permanently Delete">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="4" class="text-center py-5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-3 text-muted opacity-50"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    <h5 class="text-muted mb-1">Trash is empty</h5>
+                                    <p class="text-muted small">No deleted contacts found.</p>
+                                </td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                    <div class="text-muted small">
+                        Showing {{ $trashedContacts->firstItem() ?? 0 }} to {{ $trashedContacts->lastItem() ?? 0 }} of {{ $trashedContacts->total() }} entries
+                    </div>
+                    <div>
+                        {{ $trashedContacts->links() }}
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -295,7 +390,13 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted small mb-4">Upload a CSV or Excel file containing your contacts. Ensure you have a 'Phone Number' column.</p>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <p class="text-muted small mb-0">Upload a CSV or Excel file containing your contacts. Ensure you have a 'Phone Number' column.</p>
+                    <a href="{{ route('admin.whatsapp.contacts.sample') }}" class="btn btn-sm btn-outline-secondary text-nowrap ms-3 d-flex align-items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Sample CSV
+                    </a>
+                </div>
                 
                 <div class="upload-area mb-4">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="upload-area-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
@@ -327,4 +428,292 @@
         </div>
     </div>
 </div>
+<!-- Create Group Modal -->
+<div class="modal fade" id="createGroupModal" tabindex="-1" aria-labelledby="createGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="createGroupModalLabel">Create New Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('admin.whatsapp.contacts.groups.store') }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Group Name</label>
+                        <input type="text" name="name" class="form-control shadow-none border-light bg-light" required placeholder="e.g. VIP Customers">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Description <span class="text-muted fw-normal">(Optional)</span></label>
+                        <textarea name="description" class="form-control shadow-none border-light bg-light" rows="3" placeholder="What is this group for?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn wa-btn px-4">Create Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Edit Group Modal -->
+<div class="modal fade" id="editGroupModal" tabindex="-1" aria-labelledby="editGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="editGroupModalLabel">Edit Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editGroupForm" method="POST">
+                @csrf
+                @method('PUT')
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Group Name</label>
+                        <input type="text" name="name" id="editGroupName" class="form-control shadow-none border-light bg-light" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Description <span class="text-muted fw-normal">(Optional)</span></label>
+                        <textarea name="description" id="editGroupDescription" class="form-control shadow-none border-light bg-light" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn wa-btn px-4">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Group Modal -->
+<div class="modal fade" id="deleteGroupModal" tabindex="-1" aria-labelledby="deleteGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger" id="deleteGroupModalLabel">Delete Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="deleteGroupForm" method="POST">
+                @csrf
+                @method('DELETE')
+                <div class="modal-body p-4">
+                    <p>Are you sure you want to delete the group <strong id="deleteGroupName"></strong>?</p>
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" name="delete_contacts" id="deleteGroupContacts" value="1">
+                        <label class="form-check-label text-danger fw-medium" for="deleteGroupContacts">
+                            Also delete all contacts within this group (Moves them to trash)
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">Delete Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Create Contact Modal -->
+<div class="modal fade" id="createContactModal" tabindex="-1" aria-labelledby="createContactModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="createContactModalLabel">Add Contact</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('admin.whatsapp.contacts.store') }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Name</label>
+                        <input type="text" name="name" class="form-control shadow-none border-light bg-light" placeholder="e.g. John Doe">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Phone Number</label>
+                        <input type="text" name="phone_number" class="form-control shadow-none border-light bg-light" placeholder="e.g. +1234567890" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Assign to Groups</label>
+                        <select name="group_ids[]" class="form-select shadow-none border-light bg-light" multiple size="3">
+                            @foreach($groups as $group)
+                                <option value="{{ $group->id }}">{{ $group->name }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text small">Hold Ctrl/Cmd to select multiple groups.</div>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input mt-1" type="checkbox" name="opted_in" id="createContactOptedIn" value="1" checked>
+                        <label class="form-check-label fw-medium text-dark ms-1" for="createContactOptedIn">
+                            Opted In
+                        </label>
+                        <div class="form-text small">Users must opt-in to receive template messages.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn wa-btn px-4">Add Contact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Add to Group Modal -->
+<div class="modal fade" id="bulkAddGroupModal" tabindex="-1" aria-labelledby="bulkAddGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="bulkAddGroupModalLabel">Add Contacts to Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('admin.whatsapp.contacts.bulk-groups') }}" method="POST" id="bulkAddGroupForm">
+                @csrf
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">Select a group to add the <strong id="bulkSelectedCount">0</strong> selected contacts to.</p>
+                    
+                    <div id="bulkContactIdsContainer"></div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Group</label>
+                        <select name="group_id" class="form-select shadow-none border-light bg-light" required>
+                            <option value="">Select a group...</option>
+                            @foreach($groups as $group)
+                                <option value="{{ $group->id }}">{{ $group->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn wa-btn px-4">Add to Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Contact Modal -->
+<div class="modal fade" id="editContactModal" tabindex="-1" aria-labelledby="editContactModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="editContactModalLabel">Edit Contact</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editContactForm" method="POST">
+                @csrf
+                @method('PUT')
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Name</label>
+                        <input type="text" name="name" id="editContactName" class="form-control shadow-none border-light bg-light">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Phone Number</label>
+                        <input type="text" name="phone_number" id="editContactPhone" class="form-control shadow-none border-light bg-light" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Assign to Groups</label>
+                        <select name="group_ids[]" id="editContactGroups" class="form-select shadow-none border-light bg-light" multiple size="3">
+                            @foreach($groups as $group)
+                                <option value="{{ $group->id }}">{{ $group->name }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text small">Hold Ctrl/Cmd to select multiple groups.</div>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input mt-1" type="checkbox" name="opted_in" id="editContactOptedIn" value="1">
+                        <label class="form-check-label fw-medium text-dark ms-1" for="editContactOptedIn">
+                            Opted In
+                        </label>
+                        <div class="form-text small">Users must opt-in to receive template messages.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn wa-btn px-4">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+    function openEditModal(id, name, phone, optedIn, groupIds = []) {
+        document.getElementById('editContactName').value = name;
+        document.getElementById('editContactPhone').value = phone;
+        document.getElementById('editContactOptedIn').checked = optedIn;
+        
+        const groupSelect = document.getElementById('editContactGroups');
+        Array.from(groupSelect.options).forEach(option => {
+            option.selected = groupIds.includes(parseInt(option.value));
+        });
+
+        const form = document.getElementById('editContactForm');
+        form.action = `{{ url('admin/whatsapp/contacts') }}/${id}`;
+        
+        new bootstrap.Modal(document.getElementById('editContactModal')).show();
+    }
+
+    // Handle "Select All" checkbox
+    const selectAllCheckbox = document.getElementById('selectAllContacts');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            document.querySelectorAll('.contact-checkbox').forEach(cb => {
+                cb.checked = selectAllCheckbox.checked;
+            });
+        });
+    }
+
+    function openBulkGroupModal() {
+        const selectedIds = Array.from(document.querySelectorAll('.contact-checkbox:checked')).map(cb => cb.value);
+        if (selectedIds.length === 0) {
+            alert('Please select at least one contact.');
+            return;
+        }
+
+        document.getElementById('bulkSelectedCount').innerText = selectedIds.length;
+        
+        const container = document.getElementById('bulkContactIdsContainer');
+        container.innerHTML = '';
+        selectedIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'contact_ids[]';
+            input.value = id;
+            container.appendChild(input);
+        });
+
+        new bootstrap.Modal(document.getElementById('bulkAddGroupModal')).show();
+    }
+
+    function openEditGroupModal(id, name, description) {
+        document.getElementById('editGroupName').value = name;
+        document.getElementById('editGroupDescription').value = description;
+        
+        const form = document.getElementById('editGroupForm');
+        form.action = `{{ url('admin/whatsapp/contacts/groups') }}/${id}`;
+        
+        new bootstrap.Modal(document.getElementById('editGroupModal')).show();
+    }
+
+    function openDeleteGroupModal(id, name) {
+        document.getElementById('deleteGroupName').innerText = name;
+        document.getElementById('deleteGroupContacts').checked = false;
+        
+        const form = document.getElementById('deleteGroupForm');
+        form.action = `{{ url('admin/whatsapp/contacts/groups') }}/${id}`;
+        
+        new bootstrap.Modal(document.getElementById('deleteGroupModal')).show();
+    }
+</script>
+@endpush

@@ -55,7 +55,7 @@ class GoogleService
             'redirect_uri' => $resolvedRedirectUri,
             'response_type' => 'code',
             'scope' => implode(' ', [
-                'https://www.googleapis.com/auth/drive.readonly',
+                'https://www.googleapis.com/auth/drive',
                 'openid',
                 'email',
                 'profile',

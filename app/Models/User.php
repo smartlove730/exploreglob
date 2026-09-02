@@ -31,6 +31,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'role',
         'is_admin',
+        'has_whatsapp_access',
         'google_id',
         'facebook_id',
         'email_verification_otp',
@@ -59,6 +60,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verification_otp_expires_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'has_whatsapp_access' => 'boolean',
         ];
     }
 

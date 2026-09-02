@@ -103,6 +103,32 @@ class WhatsappController extends Controller
                             ['name' => $contactName, 'opted_in' => true, 'last_message_at' => now()]
                         );
                         
+                        // Check for Opt-in / Opt-out keywords
+                        $msgTextLower = trim(strtolower($msgBody));
+                        $optOutKeywords = ['stop', 'unsubscribe', 'cancel', 'quit'];
+                        $optInKeywords = ['start', 'unstop', 'subscribe'];
+                        
+                        $optStatusChanged = false;
+                        if (in_array($msgTextLower, $optOutKeywords)) {
+                            $contact->opted_in = false;
+                            $optStatusChanged = true;
+                            Log::info('Contact opted OUT', ['contact_id' => $contact->id, 'phone' => $from]);
+                        } elseif (in_array($msgTextLower, $optInKeywords)) {
+                            $contact->opted_in = true;
+                            $optStatusChanged = true;
+                            Log::info('Contact opted IN', ['contact_id' => $contact->id, 'phone' => $from]);
+                        }
+                        
+                        if ($optStatusChanged || $contact->name !== $contactName) {
+                            if ($contact->name !== $contactName) {
+                                $contact->name = $contactName;
+                            }
+                            $contact->last_message_at = now();
+                            $contact->save();
+                        } else {
+                            $contact->update(['last_message_at' => now()]);
+                        }
+                        
                         // Get or create Conversation
                         $conversation = \App\Models\WhatsappConversation::firstOrCreate(
                             [
@@ -140,7 +166,22 @@ class WhatsappController extends Controller
                     $messageId = $statusData['id'];
                     $status = $statusData['status'];
                     
-                    \App\Models\WhatsappMessage::where('whatsapp_message_id', $messageId)->update(['status' => $status]);
+                    $updateData = ['status' => $status];
+                    
+                    // Capture error message if status is failed
+                    if ($status === 'failed' && isset($statusData['errors'][0])) {
+                        $error = $statusData['errors'][0];
+                        $errorMsg = $error['title'] ?? $error['message'] ?? 'Unknown error';
+                        if (isset($error['code'])) {
+                            $errorMsg = "Code {$error['code']}: {$errorMsg}";
+                        }
+                        if (isset($error['error_data']['details'])) {
+                            $errorMsg .= " - " . $error['error_data']['details'];
+                        }
+                        $updateData['error_message'] = $errorMsg;
+                    }
+                    
+                    \App\Models\WhatsappMessage::where('whatsapp_message_id', $messageId)->update($updateData);
                     
                     Log::info('Message status updated', ['id' => $messageId, 'status' => $status]);
                     

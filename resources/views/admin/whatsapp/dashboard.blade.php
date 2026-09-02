@@ -194,28 +194,28 @@
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="dash-stat-card wa-card-primary">
                 <div class="dash-stat-label">Total Messages Sent</div>
-                <div class="dash-stat-value">12,847</div>
+                <div class="dash-stat-value">{{ number_format($totalMessagesSent) }}</div>
                 <div class="dash-stat-hint">Across all active campaigns</div>
             </div>
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="dash-stat-card wa-card-success">
                 <div class="dash-stat-label">Messages Delivered</div>
-                <div class="dash-stat-value">12,501</div>
-                <div class="dash-stat-hint">97.3% delivery rate</div>
+                <div class="dash-stat-value">{{ number_format($messagesDelivered) }}</div>
+                <div class="dash-stat-hint">{{ $deliveryRate }}% delivery rate</div>
             </div>
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="dash-stat-card wa-card-info">
                 <div class="dash-stat-label">Active Templates</div>
-                <div class="dash-stat-value">24</div>
+                <div class="dash-stat-value">{{ number_format($activeTemplates) }}</div>
                 <div class="dash-stat-hint">Approved by Meta</div>
             </div>
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="dash-stat-card wa-card-warning">
                 <div class="dash-stat-label">Active Conversations</div>
-                <div class="dash-stat-value">186</div>
+                <div class="dash-stat-value">{{ number_format($activeConversations) }}</div>
                 <div class="dash-stat-hint">In 24hr service window</div>
             </div>
         </div>
@@ -255,7 +255,7 @@
     <h4 class="mb-3 fs-5 fw-bold text-dark">Quick Actions</h4>
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-6 col-xl-3">
-            <a href="#" class="wa-action-card">
+            <a href="{{ route('admin.whatsapp.conversations') }}" class="wa-action-card">
                 <div class="wa-action-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </div>
@@ -266,7 +266,7 @@
             </a>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <a href="#" class="wa-action-card">
+            <a href="{{ route('admin.whatsapp.templates') }}" class="wa-action-card">
                 <div class="wa-action-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                 </div>
@@ -277,7 +277,7 @@
             </a>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <a href="#" class="wa-action-card">
+            <a href="{{ route('admin.whatsapp.phone-numbers') }}" class="wa-action-card">
                 <div class="wa-action-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                 </div>
@@ -288,7 +288,7 @@
             </a>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <a href="#" class="wa-action-card">
+            <a href="{{ route('admin.whatsapp.reports') }}" class="wa-action-card">
                 <div class="wa-action-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
                 </div>
@@ -317,66 +317,41 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @forelse($recentMessages as $msg)
                     <tr>
                         <td>
-                            <div class="fw-bold">+1 (555) 019-2831</div>
-                            <small class="text-muted">John Doe</small>
+                            <div class="fw-bold">{{ $msg->conversation->contact->phone_number ?? 'Unknown' }}</div>
+                            <small class="text-muted">{{ $msg->conversation->contact->name ?? 'Unknown' }}</small>
                         </td>
                         <td>
-                            <div class="fw-semibold">order_confirmation_v2</div>
-                            <small class="text-muted">Utility</small>
+                            @if($msg->template)
+                                <div class="fw-semibold">{{ $msg->template->name }}</div>
+                                <small class="text-muted">{{ ucfirst($msg->template->category ?? 'Template') }}</small>
+                            @else
+                                <div class="fw-semibold">Free-form Message</div>
+                                <small class="text-muted">{{ ucfirst($msg->type ?? 'text') }}</small>
+                            @endif
                         </td>
-                        <td><span class="badge bg-primary rounded-pill px-3">Read</span></td>
-                        <td class="text-muted">10 mins ago</td>
+                        <td>
+                            @if($msg->status === 'read')
+                                <span class="badge bg-primary rounded-pill px-3">Read</span>
+                            @elseif($msg->status === 'delivered')
+                                <span class="badge bg-success rounded-pill px-3">Delivered</span>
+                            @elseif($msg->status === 'failed')
+                                <span class="badge bg-danger rounded-pill px-3">Failed</span>
+                            @elseif($msg->status === 'sent')
+                                <span class="badge bg-info rounded-pill px-3">Sent</span>
+                            @else
+                                <span class="badge bg-warning text-dark rounded-pill px-3">{{ ucfirst($msg->status) }}</span>
+                            @endif
+                        </td>
+                        <td class="text-muted">{{ $msg->created_at->diffForHumans() }}</td>
                     </tr>
+                    @empty
                     <tr>
-                        <td>
-                            <div class="fw-bold">+44 7700 900077</div>
-                            <small class="text-muted">Sarah Smith</small>
-                        </td>
-                        <td>
-                            <div class="fw-semibold">appointment_reminder</div>
-                            <small class="text-muted">Utility</small>
-                        </td>
-                        <td><span class="badge bg-success rounded-pill px-3">Delivered</span></td>
-                        <td class="text-muted">45 mins ago</td>
+                        <td colspan="4" class="text-center py-4 text-muted">No recent messages found.</td>
                     </tr>
-                    <tr>
-                        <td>
-                            <div class="fw-bold">+91 98765 43210</div>
-                            <small class="text-muted">Rahul K.</small>
-                        </td>
-                        <td>
-                            <div class="fw-semibold">summer_sale_promo</div>
-                            <small class="text-muted">Marketing</small>
-                        </td>
-                        <td><span class="badge bg-danger rounded-pill px-3">Failed</span></td>
-                        <td class="text-muted">1 hour ago</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="fw-bold">+1 (555) 832-1192</div>
-                            <small class="text-muted">Emily Chen</small>
-                        </td>
-                        <td>
-                            <div class="fw-semibold">shipping_update</div>
-                            <small class="text-muted">Utility</small>
-                        </td>
-                        <td><span class="badge bg-success rounded-pill px-3">Delivered</span></td>
-                        <td class="text-muted">2 hours ago</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="fw-bold">+61 411 000 000</div>
-                            <small class="text-muted">Michael B.</small>
-                        </td>
-                        <td>
-                            <div class="fw-semibold">welcome_series_1</div>
-                            <small class="text-muted">Marketing</small>
-                        </td>
-                        <td><span class="badge bg-warning text-dark rounded-pill px-3">Pending</span></td>
-                        <td class="text-muted">3 hours ago</td>
-                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -400,11 +375,11 @@
     new Chart(document.getElementById('waMessageVolumeChart'), {
         type: 'line',
         data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            labels: @json($last7Days),
             datasets: [
                 {
                     label: 'Sent',
-                    data: [1200, 1900, 1500, 2200, 1800, 2800, 2400],
+                    data: @json($sentData),
                     borderColor: '#128C7E',
                     backgroundColor: 'rgba(18, 140, 126, .1)',
                     borderWidth: 3,
@@ -414,7 +389,7 @@
                 },
                 {
                     label: 'Delivered',
-                    data: [1150, 1850, 1480, 2100, 1750, 2750, 2350],
+                    data: @json($deliveredData),
                     borderColor: '#25D366',
                     backgroundColor: 'transparent',
                     borderWidth: 2,
@@ -436,7 +411,12 @@
         data: {
             labels: ['Delivered', 'Read', 'Failed', 'Pending'],
             datasets: [{
-                data: [65, 25, 5, 5],
+                data: [
+                    {{ $deliveryStatusData['delivered'] ?? 0 }}, 
+                    {{ $deliveryStatusData['read'] ?? 0 }}, 
+                    {{ $deliveryStatusData['failed'] ?? 0 }}, 
+                    {{ $deliveryStatusData['pending'] ?? 0 }}
+                ],
                 backgroundColor: ['#25D366', '#34B7F1', '#ef4444', '#f59e0b'],
                 borderWidth: 0
             }]

@@ -54,11 +54,25 @@
                         @unless($user->hasVerifiedEmail())
                             <form method="POST" action="{{ route('admin.saas.users.verify-email', $user) }}" class="d-inline" onsubmit="return confirm('Manually verify email for {{ $user->name }}?')">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Manually verify this user's email">
+                                <button type="submit" class="btn btn-sm btn-outline-success mb-1" title="Manually verify this user's email">
                                     Verify
                                 </button>
                             </form>
                         @endunless
+
+                        <form method="POST" action="{{ route('admin.saas.users.toggle-whatsapp', $user) }}" class="d-inline" onsubmit="return confirm('Change WhatsApp module access for {{ $user->name }}?')">
+                            @csrf
+                            <input type="hidden" name="has_whatsapp_access" value="{{ $user->has_whatsapp_access ? '0' : '1' }}">
+                            @if($user->has_whatsapp_access)
+                                <button type="submit" class="btn btn-sm btn-success mb-1" title="Disable WhatsApp Module">
+                                    <i class="bi bi-whatsapp"></i> Enabled
+                                </button>
+                            @else
+                                <button type="submit" class="btn btn-sm btn-outline-secondary mb-1" title="Enable WhatsApp Module">
+                                    <i class="bi bi-whatsapp"></i> Disabled
+                                </button>
+                            @endif
+                        </form>
                     </td>
                 </tr>
             @empty

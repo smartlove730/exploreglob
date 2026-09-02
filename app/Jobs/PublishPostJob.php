@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\FacebookPost;
 use App\Models\AutomationQueueItem;
 use App\Models\AutomationRunLog;
+use App\Jobs\MoveGoogleDriveFileJob;
 use App\Notifications\PostFailedNotification;
 use App\Services\MetaPostService;
 use App\Services\MetaVideoService;
@@ -206,7 +207,7 @@ class PublishPostJob implements ShouldQueue
             return;
         }
 
-        $item = AutomationQueueItem::query()->with('rule')->find($queueItemId);
+        $item = AutomationQueueItem::query()->with(['rule', 'page'])->find($queueItemId);
         if (!$item) {
             return;
         }
@@ -221,6 +222,15 @@ class PublishPostJob implements ShouldQueue
         ]);
         $item->rule?->increment('success_count');
         $this->logAutomation($item, 'published', 'Post published successfully.');
+
+        if ($item->rule && $item->rule->media_source_type === 'drive' && $item->source_id) {
+            $driveApiKeyId = data_get($item->rule->media_source_payload, 'drive_api_key_id');
+            $pageName = $item->page->page_name ?? 'Facebook Page';
+            
+            if ($driveApiKeyId) {
+                dispatch(new MoveGoogleDriveFileJob($item->source_id, $driveApiKeyId, $pageName));
+            }
+        }
     }
 
     private function logAutomation(AutomationQueueItem $item, string $status, string $message): void

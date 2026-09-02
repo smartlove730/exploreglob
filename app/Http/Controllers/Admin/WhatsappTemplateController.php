@@ -15,11 +15,116 @@ class WhatsappTemplateController extends Controller
     {
         $account = WhatsappAccount::where('user_id', auth()->id())->first();
         $templates = [];
+        $contacts = [];
         if ($account) {
             $templates = WhatsappTemplate::where('whatsapp_account_id', $account->id)->orderBy('created_at', 'desc')->get();
+            $contacts = \App\Models\WhatsappContact::where('user_id', auth()->id())->get();
         }
         
-        return view('admin.whatsapp.templates', compact('templates', 'account'));
+        return view('admin.whatsapp.templates', compact('templates', 'account', 'contacts'));
+    }
+
+    public function create()
+    {
+        $account = WhatsappAccount::where('user_id', auth()->id())->first();
+        if (!$account) {
+            return redirect()->route('admin.whatsapp.settings')->with('error', 'Please connect WhatsApp first.');
+        }
+
+        return view('admin.whatsapp.templates-create', compact('account'));
+    }
+
+    public function reports(Request $request)
+    {
+        $account = WhatsappAccount::where('user_id', auth()->id())->first();
+        if (!$account) {
+            return redirect()->route('admin.whatsapp.settings')->with('error', 'Please connect WhatsApp first.');
+        }
+
+        $query = \App\Models\WhatsappMessage::where('type', 'template')
+            ->whereHas('conversation.phoneNumber', function ($q) use ($account) {
+                $q->where('whatsapp_account_id', $account->id);
+            });
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('content', 'like', "%{$search}%")
+                  ->orWhereHas('conversation.contact', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('phone_number', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $messages = $query->with(['template', 'conversation.contact'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('admin.whatsapp.reports', compact('messages'));
+    }
+
+    public function send(Request $request)
+    {
+        $validated = $request->validate([
+            'template_id' => 'required|exists:whatsapp_templates,id',
+            'contact_ids' => 'required|array',
+            'contact_ids.*' => 'exists:whatsapp_contacts,id',
+            'schedule_at' => 'nullable|date_format:Y-m-d\TH:i',
+        ]);
+
+        $account = WhatsappAccount::where('user_id', auth()->id())->firstOrFail();
+        $template = WhatsappTemplate::findOrFail($validated['template_id']);
+        
+        if ($template->whatsapp_account_id !== $account->id) {
+            return response()->json(['success' => false, 'error' => 'Unauthorized'], 403);
+        }
+
+        $delay = null;
+        if (!empty($validated['schedule_at'])) {
+            $delay = \Carbon\Carbon::parse($validated['schedule_at']);
+        }
+
+        $optedOutCount = 0;
+        $queuedCount = 0;
+
+        foreach ($validated['contact_ids'] as $contactId) {
+            $contact = \App\Models\WhatsappContact::find($contactId);
+            if (!$contact || !$contact->opted_in) {
+                $optedOutCount++;
+                continue;
+            }
+
+            if ($delay) {
+                \App\Jobs\SendWhatsappTemplateJob::dispatch($account->id, $template->id, $contactId)->delay($delay);
+            } else {
+                \App\Jobs\SendWhatsappTemplateJob::dispatch($account->id, $template->id, $contactId);
+            }
+            $queuedCount++;
+        }
+
+        $message = $delay ? "Scheduled {$queuedCount} templates." : "Queued {$queuedCount} templates.";
+        if ($optedOutCount > 0) {
+            $message .= " Skipped {$optedOutCount} contacts who have opted out.";
+        }
+
+        return response()->json([
+            'success' => true, 
+            'message' => $message
+        ]);
     }
     
     public function store(Request $request)
@@ -28,6 +133,16 @@ class WhatsappTemplateController extends Controller
         
         if (!$account->business_account_id) {
             return response()->json(['success' => false, 'error' => 'WhatsApp Business Account ID is missing in settings.'], 400);
+        }
+
+        // Decode buttons from JSON string if sent that way (from the create page form)
+        if ($request->has('buttons') && is_string($request->input('buttons'))) {
+            $decoded = json_decode($request->input('buttons'), true);
+            if (is_array($decoded)) {
+                $request->merge(['buttons' => $decoded]);
+            } else {
+                $request->merge(['buttons' => null]);
+            }
         }
         
         $validated = $request->validate([

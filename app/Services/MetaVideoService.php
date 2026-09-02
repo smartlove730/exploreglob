@@ -17,6 +17,7 @@ class MetaVideoService
 
     public function postToFacebookVideo(FacebookPage $page, string $videoUrl, string $caption): array
     {
+        $videoUrl = $this->normalizeVideoUrl($videoUrl);
         $this->assertPublicHttpsVideoUrl($videoUrl);
 
         $response = Http::asForm()->post("https://graph.facebook.com/{$this->apiVersion}/{$page->page_id}/videos", [
@@ -34,6 +35,7 @@ class MetaVideoService
 
     public function postToInstagramVideo(FacebookPage $page, string $videoUrl, string $caption, int $maxPollAttempts = 20, int $pollDelaySeconds = 4): array
     {
+        $videoUrl = $this->normalizeVideoUrl($videoUrl);
         $this->assertPublicHttpsVideoUrl($videoUrl);
 
         $igUserId = $this->instagramService->ensureInstagramBusinessAccountId($page);
@@ -118,6 +120,19 @@ class MetaVideoService
 
         return str_contains($body, 'Tried accessing nonexisting field')
             && str_contains($body, "({$field})");
+    }
+
+    private function normalizeVideoUrl(string $videoUrl): string
+    {
+        $host = parse_url($videoUrl, PHP_URL_HOST);
+        
+        if ($host && str_ends_with($host, 'google.com') && str_contains($videoUrl, 'export=download')) {
+            if (!str_contains($videoUrl, 'confirm=')) {
+                $videoUrl .= '&confirm=t';
+            }
+        }
+        
+        return $videoUrl;
     }
 
     private function assertPublicHttpsVideoUrl(string $videoUrl): void
