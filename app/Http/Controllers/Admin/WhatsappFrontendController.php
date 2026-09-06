@@ -181,6 +181,54 @@ class WhatsappFrontendController extends Controller
         }
     }
     
+    public function sendReaction(Request $request, $conversationId)
+    {
+        $request->validate([
+            'message_id' => 'required|integer',
+            'emoji' => 'required|string|max:20'
+        ]);
+        
+        $userId = auth()->id() ?? 1;
+        
+        $conversation = WhatsappConversation::whereHas('phoneNumber.account', function($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->with('phoneNumber.account', 'contact')
+            ->findOrFail($conversationId);
+            
+        $account = $conversation->phoneNumber->account;
+        $message = WhatsappMessage::where('whatsapp_conversation_id', $conversationId)
+            ->findOrFail($request->input('message_id'));
+        
+        if (!$message->whatsapp_message_id) {
+            return response()->json(['success' => false, 'error' => 'Cannot react to this message'], 400);
+        }
+        
+        try {
+            $response = Http::withToken($account->access_token)
+                ->post("https://graph.facebook.com/{$account->api_version}/{$conversation->phoneNumber->phone_number_id}/messages", [
+                    'messaging_product' => 'whatsapp',
+                    'recipient_type' => 'individual',
+                    'to' => $conversation->contact->phone_number,
+                    'type' => 'reaction',
+                    'reaction' => [
+                        'message_id' => $message->whatsapp_message_id,
+                        'emoji' => $request->input('emoji')
+                    ]
+                ]);
+                
+            if ($response->successful()) {
+                $message->update(['reaction_emoji' => $request->input('emoji')]);
+                return response()->json(['success' => true]);
+            }
+            
+            return response()->json(['success' => false, 'error' => 'Failed to send reaction'], 500);
+        } catch (\Exception $e) {
+            Log::error('Failed to send reaction: ' . $e->getMessage());
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+    
     public function checkUpdates(Request $request)
     {
         $userId = auth()->id() ?? 1;

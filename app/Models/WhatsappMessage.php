@@ -17,6 +17,12 @@ class WhatsappMessage extends Model
         'status',
         'whatsapp_message_id',
         'error_message',
+        'media_url',
+        'media_mime_type',
+        'media_filename',
+        'media_caption',
+        'reaction_emoji',
+        'reaction_whatsapp_message_id',
     ];
 
     public function conversation(): BelongsTo

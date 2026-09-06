@@ -284,6 +284,7 @@ Route::middleware(['auth', 'role:customer,admin'])
         Route::get('/api/conversations', [\App\Http\Controllers\Admin\WhatsappFrontendController::class, 'getConversations'])->name('api.conversations.index');
         Route::get('/api/conversations/{conversation}/messages', [\App\Http\Controllers\Admin\WhatsappFrontendController::class, 'getMessages'])->name('api.conversations.messages');
         Route::post('/api/conversations/{conversation}/messages', [\App\Http\Controllers\Admin\WhatsappFrontendController::class, 'sendMessage'])->name('api.conversations.send');
+        Route::post('/api/conversations/{conversation}/react', [\App\Http\Controllers\Admin\WhatsappFrontendController::class, 'sendReaction'])->name('api.conversations.react');
     });
 
 require __DIR__.'/auth.php';

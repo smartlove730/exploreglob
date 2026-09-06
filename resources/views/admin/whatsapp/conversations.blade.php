@@ -249,6 +249,211 @@
     .wa-msg-status.read svg { color: #53bdeb; }
     .wa-msg-status.delivered svg { color: #64748b; }
     
+    /* Media message styles */
+    .wa-msg-media img {
+        max-width: 280px;
+        max-height: 300px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: block;
+    }
+    .wa-msg-media video {
+        max-width: 280px;
+        max-height: 250px;
+        border-radius: 6px;
+        display: block;
+    }
+    .wa-msg-media audio {
+        max-width: 260px;
+        height: 36px;
+    }
+    .wa-msg-media .wa-doc-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: rgba(0,0,0,0.04);
+        border-radius: 6px;
+        text-decoration: none;
+        color: #1e293b;
+        min-width: 200px;
+    }
+    .wa-msg-media .wa-doc-link:hover {
+        background: rgba(0,0,0,0.08);
+    }
+    .wa-msg-media .wa-doc-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+        background: #ef4444;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .wa-msg-media .wa-doc-icon.pdf { background: #ef4444; }
+    .wa-msg-media .wa-doc-icon.doc { background: #3b82f6; }
+    .wa-msg-media .wa-doc-icon.xls { background: #10b981; }
+    .wa-msg-media .wa-doc-icon.ppt { background: #f59e0b; }
+    .wa-msg-media .wa-doc-name {
+        font-size: 0.85rem;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 180px;
+    }
+    .wa-msg-media .wa-doc-size {
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+    .wa-msg-caption {
+        margin-top: 6px;
+        font-size: 0.9rem;
+    }
+    .wa-msg-sticker img {
+        max-width: 150px;
+        max-height: 150px;
+    }
+
+    /* Reaction badge on messages */
+    .wa-msg-wrapper {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+    .wa-msg-wrapper.out { align-items: flex-end; }
+    .wa-msg-wrapper.in { align-items: flex-start; }
+    .wa-reaction-badge {
+        position: absolute;
+        bottom: -10px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1px 6px;
+        font-size: 0.85rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        cursor: pointer;
+        z-index: 2;
+        line-height: 1.4;
+    }
+    .wa-msg-wrapper.in .wa-reaction-badge { left: 8px; }
+    .wa-msg-wrapper.out .wa-reaction-badge { right: 8px; }
+
+    /* Reaction picker (on hover/click) */
+    .wa-reaction-picker {
+        display: none;
+        position: absolute;
+        top: -40px;
+        background: #fff;
+        border-radius: 20px;
+        padding: 4px 6px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+        z-index: 10;
+        white-space: nowrap;
+    }
+    .wa-reaction-picker::after {
+        content: '';
+        position: absolute;
+        bottom: -15px;
+        left: 0;
+        right: 0;
+        height: 15px;
+    }
+    .wa-msg-wrapper.in .wa-reaction-picker { left: 0; }
+    .wa-msg-wrapper.out .wa-reaction-picker { right: 0; }
+    .wa-reaction-picker.show { display: flex; gap: 2px; }
+    .wa-reaction-picker button {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        padding: 3px 5px;
+        cursor: pointer;
+        border-radius: 50%;
+        transition: background 0.15s, transform 0.15s;
+        line-height: 1;
+    }
+    .wa-reaction-picker button:hover {
+        background: #f0f2f5;
+        transform: scale(1.25);
+    }
+
+    /* Emoji picker for chat input */
+    .wa-emoji-picker {
+        display: none;
+        position: absolute;
+        bottom: 100%;
+        left: 0;
+        width: 320px;
+        max-height: 280px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        margin-bottom: 8px;
+        z-index: 100;
+        overflow: hidden;
+    }
+    .wa-emoji-picker.show { display: block; }
+    .wa-emoji-tabs {
+        display: flex;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0 4px;
+        background: #f8f9fa;
+    }
+    .wa-emoji-tab {
+        padding: 8px 10px;
+        font-size: 1.1rem;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+    .wa-emoji-tab:hover, .wa-emoji-tab.active { opacity: 1; border-bottom-color: #25D366; }
+    .wa-emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        padding: 8px;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+    .wa-emoji-grid button {
+        background: none;
+        border: none;
+        font-size: 1.3rem;
+        padding: 4px;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background 0.15s;
+        line-height: 1;
+    }
+    .wa-emoji-grid button:hover {
+        background: #f0f2f5;
+    }
+    
+    /* Image lightbox */
+    .wa-lightbox {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+    .wa-lightbox.show { display: flex; }
+    .wa-lightbox img {
+        max-width: 90vw;
+        max-height: 90vh;
+        border-radius: 8px;
+        box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+    }
+
     .wa-input-area {
         display: flex;
         align-items: flex-end;
@@ -358,11 +563,29 @@
                 <!-- Messages populated via JS -->
             </div>
             
-            <div class="wa-input-area" style="flex-direction: column; align-items: stretch;">
+            <div class="wa-input-area" style="flex-direction: column; align-items: stretch; position: relative;">
                 <div id="wa-24h-warning" style="display: none; text-align: center; padding: 6px; font-size: 0.8rem; border-radius: 4px; margin-bottom: 8px;">
                     This window will close after 24 hours.
                 </div>
+                <!-- Emoji Picker Dropdown -->
+                <div class="wa-emoji-picker" id="chat-emoji-picker">
+                    <div class="wa-emoji-tabs">
+                        <div class="wa-emoji-tab active" data-category="smileys" title="Smileys">😀</div>
+                        <div class="wa-emoji-tab" data-category="gestures" title="Gestures">👋</div>
+                        <div class="wa-emoji-tab" data-category="hearts" title="Hearts">❤️</div>
+                        <div class="wa-emoji-tab" data-category="objects" title="Objects">🎉</div>
+                        <div class="wa-emoji-tab" data-category="symbols" title="Symbols">✅</div>
+                        <div class="wa-emoji-tab" data-category="animals" title="Animals">🐶</div>
+                        <div class="wa-emoji-tab" data-category="food" title="Food">🍕</div>
+                    </div>
+                    <div class="wa-emoji-grid" id="chat-emoji-grid">
+                        <!-- Populated via JS -->
+                    </div>
+                </div>
                 <div class="d-flex align-items-end" style="gap: 10px; width: 100%;">
+                    <button class="wa-input-btn" id="emoji-btn" title="Emoji">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                    </button>
                     <button class="wa-input-btn" id="attach-btn" title="Attach file">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
                     </button>
@@ -385,6 +608,11 @@
             </div>
         </div>
     </div>
+</div>
+
+<!-- Image Lightbox -->
+<div class="wa-lightbox" id="wa-lightbox" onclick="this.classList.remove('show')">
+    <img id="wa-lightbox-img" src="" alt="Preview">
 </div>
 @endsection
 
@@ -540,13 +768,76 @@
                             </span>`;
                         }
                         
+                        // Build message content based on type
+                        let msgContentHtml = '';
+                        const msgType = msg.type || 'text';
+                        const mediaTypes = ['image', 'video', 'audio', 'document', 'sticker'];
+                        
+                        if (mediaTypes.includes(msgType) && msg.media_url) {
+                            if (msgType === 'image') {
+                                msgContentHtml = `<div class="wa-msg-media"><img src="${msg.media_url}" alt="Image" onclick="document.getElementById('wa-lightbox-img').src=this.src; document.getElementById('wa-lightbox').classList.add('show');" loading="lazy"></div>`;
+                            } else if (msgType === 'video') {
+                                msgContentHtml = `<div class="wa-msg-media"><video controls preload="metadata"><source src="${msg.media_url}" type="${msg.media_mime_type || 'video/mp4'}">Video</video></div>`;
+                            } else if (msgType === 'audio') {
+                                msgContentHtml = `<div class="wa-msg-media"><audio controls preload="metadata"><source src="${msg.media_url}" type="${msg.media_mime_type || 'audio/ogg'}">Audio</audio></div>`;
+                            } else if (msgType === 'document') {
+                                const docName = msg.media_filename || 'Document';
+                                const ext = docName.split('.').pop().toLowerCase();
+                                let iconClass = 'pdf';
+                                if (['doc','docx'].includes(ext)) iconClass = 'doc';
+                                else if (['xls','xlsx'].includes(ext)) iconClass = 'xls';
+                                else if (['ppt','pptx'].includes(ext)) iconClass = 'ppt';
+                                msgContentHtml = `<div class="wa-msg-media"><a href="${msg.media_url}" target="_blank" download class="wa-doc-link"><div class="wa-doc-icon ${iconClass}">${ext.toUpperCase()}</div><div><div class="wa-doc-name">${docName}</div><div class="wa-doc-size">Download</div></div></a></div>`;
+                            } else if (msgType === 'sticker') {
+                                msgContentHtml = `<div class="wa-msg-sticker"><img src="${msg.media_url}" alt="Sticker" loading="lazy"></div>`;
+                            }
+                            // Add caption if present
+                            if (msg.media_caption || msg.content) {
+                                const caption = msg.media_caption || msg.content;
+                                if (caption) {
+                                    msgContentHtml += `<div class="wa-msg-caption">${escapeHtml(caption)}</div>`;
+                                }
+                            }
+                        } else if (mediaTypes.includes(msgType) && !msg.media_url) {
+                            // Media without downloaded URL - show a placeholder
+                            const typeLabels = {image: '📷 Image', video: '🎬 Video', audio: '🎵 Audio', document: '📄 Document', sticker: '🏷️ Sticker'};
+                            msgContentHtml = `<div style="padding: 8px; color: #64748b; font-style: italic;">${typeLabels[msgType] || '📎 Media'}</div>`;
+                            if (msg.content && msg.content !== '{}') {
+                                msgContentHtml += `<div>${escapeHtml(msg.content)}</div>`;
+                            }
+                        } else {
+                            // Regular text message
+                            msgContentHtml = `<div>${escapeHtml(msg.content || '')}</div>`;
+                        }
+                        
+                        // Reaction badge
+                        let reactionHtml = '';
+                        if (msg.reaction_emoji) {
+                            reactionHtml = `<div class="wa-reaction-badge">${msg.reaction_emoji}</div>`;
+                        }
+                        
+                        // Reaction picker (quick react)
+                        const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+                        let reactionPickerHtml = `<div class="wa-reaction-picker" data-msg-id="${msg.id}">`;
+                        quickReactions.forEach(emoji => {
+                            reactionPickerHtml += `<button onclick="sendReaction(${msg.id}, '${emoji}')">${emoji}</button>`;
+                        });
+                        reactionPickerHtml += '</div>';
+                        
+                        const wrapperDir = isOut ? 'out' : 'in';
+                        const marginBottom = msg.reaction_emoji ? 'margin-bottom: 14px;' : '';
+                        
                         html += `
-                            <div class="wa-msg ${isOut ? 'wa-msg-out' : 'wa-msg-in'}" data-msg-id="${msg.id}">
-                                <div>${msg.content}</div>
-                                <div class="wa-msg-meta">
-                                    <span class="wa-msg-time">${time}</span>
-                                    ${statusIcon}
+                            <div class="wa-msg-wrapper ${wrapperDir}" style="${marginBottom}" onmouseenter="this.querySelector('.wa-reaction-picker').classList.add('show')" onmouseleave="this.querySelector('.wa-reaction-picker').classList.remove('show')">
+                                ${reactionPickerHtml}
+                                <div class="wa-msg ${isOut ? 'wa-msg-out' : 'wa-msg-in'}" data-msg-id="${msg.id}">
+                                    ${msgContentHtml}
+                                    <div class="wa-msg-meta">
+                                        <span class="wa-msg-time">${time}</span>
+                                        ${statusIcon}
+                                    </div>
                                 </div>
+                                ${reactionHtml}
                             </div>
                         `;
                     });
@@ -644,6 +935,95 @@
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
+            }
+        });
+        
+        // Helper: escape HTML to prevent XSS
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Send reaction to a message
+        window.sendReaction = function(messageId, emoji) {
+            if (!activeConversationId) return;
+            
+            fetch(`{{ url('admin/whatsapp/api/conversations') }}/${activeConversationId}/react`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ message_id: messageId, emoji: emoji })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    loadMessages(activeConversationId);
+                } else {
+                    console.error('Failed to send reaction:', data.error);
+                }
+            })
+            .catch(err => console.error('Failed to send reaction', err));
+        };
+        
+        // ── Emoji Picker for Chat Input ──
+        const chatEmojiData = {
+            smileys: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😊','😇','🥰','😍','🤩','😘','😗','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤧','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐'],
+            gestures: ['👋','🤚','🖐','✋','🖖','👌','🤌','🤏','✌','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','💪','🦾','🤳','👆'],
+            hearts: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','♥️','😍','🥰','😘','💑','💏'],
+            objects: ['🎉','🎊','🎈','🎁','🎀','🏆','🥇','📱','💻','⌨️','📧','📩','📦','📋','📝','✏️','📌','📍','🔑','💰','💵','💳','📊','📈','🔔','🔗','⚡','🌟','⭐','✨','🔥','💡','💎','🎯','🎵','🎶','🎤','🎧','📷','🎬'],
+            symbols: ['✅','❌','⚠️','🔴','🟢','🔵','🟡','⬛','⬜','▶️','⏸','⏹','⏺','➡️','⬅️','⬆️','⬇️','↗️','↘️','♻️','✳️','❇️','🔰','⭕','✖️','➕','➖','➗','💲','💱','©️','®️','™️'],
+            animals: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🐢','🐍','🦎','🦀','🐙','🦑','🐠','🐟','🐡','🐬','🦈','🐳','🐊'],
+            food: ['🍕','🍔','🍟','🌭','🍿','🧂','🥓','🥚','🍳','🧇','🥞','🥐','🍞','🥖','🧀','🥗','🥙','🥪','🌮','🌯','🥫','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🍤','🍩','🍰','🎂','🧁','🍫','🍬','🍭','🍮','🍯','🍪','☕','🍵','🥤','🍺','🍷','🥂','🍹']
+        };
+        
+        const emojiGrid = document.getElementById('chat-emoji-grid');
+        const emojiPicker = document.getElementById('chat-emoji-picker');
+        const emojiBtn = document.getElementById('emoji-btn');
+        
+        function renderEmojiCategory(category) {
+            emojiGrid.innerHTML = '';
+            const emojis = chatEmojiData[category] || [];
+            emojis.forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = emoji;
+                btn.addEventListener('click', () => {
+                    const textarea = document.getElementById('message-input');
+                    const pos = textarea.selectionStart;
+                    textarea.value = textarea.value.substring(0, pos) + emoji + textarea.value.substring(pos);
+                    textarea.selectionStart = textarea.selectionEnd = pos + emoji.length;
+                    textarea.focus();
+                });
+                emojiGrid.appendChild(btn);
+            });
+        }
+        
+        // Initialize with smileys
+        renderEmojiCategory('smileys');
+        
+        // Tab switching
+        document.querySelectorAll('.wa-emoji-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.wa-emoji-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                renderEmojiCategory(tab.dataset.category);
+            });
+        });
+        
+        // Toggle emoji picker
+        emojiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            emojiPicker.classList.toggle('show');
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (!emojiPicker.contains(e.target) && e.target !== emojiBtn && !emojiBtn.contains(e.target)) {
+                emojiPicker.classList.remove('show');
             }
         });
         

@@ -226,4 +226,94 @@ class WhatsappCloudApiService
 
         return $handle;
     }
+
+    /**
+     * Get media URL from WhatsApp Cloud API
+     */
+    public function getMediaUrl(WhatsappAccount $account, string $mediaId): ?string
+    {
+        try {
+            $url = $this->getBaseUrl($account->api_version) . '/' . $mediaId;
+            $response = Http::withToken($account->access_token)->get($url);
+            
+            if ($response->successful()) {
+                return $response->json('url');
+            }
+            
+            Log::error('Failed to get media URL', ['media_id' => $mediaId, 'response' => $response->json()]);
+            return null;
+        } catch (Exception $e) {
+            Log::error('Exception getting media URL: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Download media file from WhatsApp and store locally
+     */
+    public function downloadMedia(WhatsappAccount $account, string $mediaUrl, string $mimeType, ?string $filename = null): ?string
+    {
+        try {
+            $response = Http::withToken($account->access_token)
+                ->timeout(30)
+                ->get($mediaUrl);
+            
+            if (!$response->successful()) {
+                Log::error('Failed to download media', ['url' => $mediaUrl, 'status' => $response->status()]);
+                return null;
+            }
+            
+            $extension = $this->getExtensionFromMimeType($mimeType);
+            $storagePath = 'whatsapp-media/' . date('Y/m');
+            $fileName = $filename ?: (uniqid('wa_') . '.' . $extension);
+            
+            // Ensure unique filename
+            $fullPath = $storagePath . '/' . $fileName;
+            $diskPath = public_path('storage/' . $fullPath);
+            
+            // Create directory if needed
+            $dir = dirname($diskPath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            
+            file_put_contents($diskPath, $response->body());
+            
+            return '/storage/' . $fullPath;
+        } catch (Exception $e) {
+            Log::error('Exception downloading media: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get file extension from MIME type
+     */
+    protected function getExtensionFromMimeType(string $mimeType): string
+    {
+        $map = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+            'video/mp4' => 'mp4',
+            'video/3gpp' => '3gp',
+            'audio/aac' => 'aac',
+            'audio/mp4' => 'm4a',
+            'audio/mpeg' => 'mp3',
+            'audio/amr' => 'amr',
+            'audio/ogg' => 'ogg',
+            'audio/ogg; codecs=opus' => 'ogg',
+            'application/pdf' => 'pdf',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/msword' => 'doc',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'text/plain' => 'txt',
+        ];
+        
+        return $map[$mimeType] ?? 'bin';
+    }
 }

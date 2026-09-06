@@ -10,6 +10,7 @@ use App\Models\WhatsappContact;
 use App\Models\WhatsappConversation;
 use App\Models\WhatsappMessage;
 use App\Events\WhatsappMessageReceived;
+use App\Services\WhatsappCloudApiService;
 
 class WhatsappController extends Controller
 {
@@ -41,8 +42,8 @@ class WhatsappController extends Controller
      */
     public function handleWebhook(Request $request)
     {
-        // Log the incoming POST request data for debugging
-        Log::info('WhatsApp Webhook Event received (POST)', $request->all());
+        // We use json_encode to bypass Monolog's 9-level depth limit for arrays
+        Log::info('WhatsApp Webhook Event received (POST): ' . json_encode($request->all()));
         
         $body = $request->all();
         
@@ -141,12 +142,77 @@ class WhatsappController extends Controller
                         // Update conversation last_message_at
                         $conversation->update(['last_message_at' => now()]);
                         
+                        // Handle reactions
+                        if (($message['type'] ?? '') === 'reaction') {
+                            $reactionEmoji = $message['reaction']['emoji'] ?? '';
+                            $targetMessageId = $message['reaction']['message_id'] ?? null;
+                            
+                            if ($targetMessageId) {
+                                $targetMessage = \App\Models\WhatsappMessage::where('whatsapp_message_id', $targetMessageId)->first();
+                                if ($targetMessage) {
+                                    // Empty emoji means reaction was removed
+                                    $targetMessage->update([
+                                        'reaction_emoji' => $reactionEmoji ?: null,
+                                        'reaction_whatsapp_message_id' => $reactionEmoji ? $messageId : null,
+                                    ]);
+                                    
+                                    Log::info('Reaction updated on message', ['target' => $targetMessageId, 'emoji' => $reactionEmoji]);
+                                    
+                                    if (class_exists(\App\Events\WhatsappMessageReceived::class)) {
+                                        broadcast(new \App\Events\WhatsappMessageReceived($targetMessage->fresh()))->toOthers();
+                                    }
+                                }
+                            }
+                            
+                            $conversation->update(['last_message_at' => now()]);
+                            return response('EVENT_RECEIVED', 200);
+                        }
+                        
+                        // Handle media messages (image, video, audio, document, sticker)
+                        $mediaTypes = ['image', 'video', 'audio', 'document', 'sticker', 'voice'];
+                        $msgType = $message['type'] ?? 'text';
+                        $mediaUrl = null;
+                        $mediaMimeType = null;
+                        $mediaFilename = null;
+                        $mediaCaption = null;
+                        $contentText = $msgBody;
+                        
+                        if (in_array($msgType, $mediaTypes)) {
+                            // For voice notes, WhatsApp uses 'audio' type with ptt=true
+                            $mediaKey = $msgType === 'voice' ? 'audio' : $msgType;
+                            $mediaData = $message[$mediaKey] ?? null;
+                            
+                            if ($mediaData && isset($mediaData['id'])) {
+                                $mediaMimeType = $mediaData['mime_type'] ?? null;
+                                $mediaFilename = $mediaData['filename'] ?? null;
+                                $mediaCaption = $mediaData['caption'] ?? null;
+                                
+                                // Download media from WhatsApp
+                                try {
+                                    $apiService = app(WhatsappCloudApiService::class);
+                                    $downloadUrl = $apiService->getMediaUrl($account, $mediaData['id']);
+                                    
+                                    if ($downloadUrl) {
+                                        $mediaUrl = $apiService->downloadMedia($account, $downloadUrl, $mediaMimeType ?? 'application/octet-stream', $mediaFilename);
+                                    }
+                                } catch (\Exception $e) {
+                                    Log::error('Failed to download WhatsApp media: ' . $e->getMessage());
+                                }
+                            }
+                            
+                            $contentText = $mediaCaption ?: '';
+                        }
+                        
                         // Create Message
                         $dbMessage = \App\Models\WhatsappMessage::create([
                             'whatsapp_conversation_id' => $conversation->id,
                             'direction' => 'inbound',
-                            'type' => $message['type'] ?? 'text',
-                            'content' => $message['type'] === 'text' ? $msgBody : json_encode($message),
+                            'type' => $msgType === 'voice' ? 'audio' : $msgType,
+                            'content' => $contentText,
+                            'media_url' => $mediaUrl,
+                            'media_mime_type' => $mediaMimeType,
+                            'media_filename' => $mediaFilename,
+                            'media_caption' => $mediaCaption,
                             'status' => 'received',
                             'whatsapp_message_id' => $messageId,
                         ]);
